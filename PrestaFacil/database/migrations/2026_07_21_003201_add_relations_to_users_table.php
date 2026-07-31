@@ -15,11 +15,12 @@ return new class extends Migration
 
             $table->foreignId('rol_id')
                 ->after('password')
-                ->constrained('roles');
+                ->constrained('rols');
 
             $table->foreignId('sucursal_id')
+                ->nullable()
                 ->after('rol_id')
-                ->constrained('sucursales');
+                ->constrained('sucursals');
 
         });
     }

@@ -50,9 +50,15 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
-     public function rol(): BelongsTo
+     public function rol()
     {
-        return $this->belongsTo(Rol::class);
+        return $this->belongsTo(Role::class, 'rol_id');
+    }
+
+    public function hasRole(string $rolName) : bool {
+
+        return $this->rol && strtolower($this->rol->nombre) == strtolower($rolName);
+
     }
 
     public function sucursal(): BelongsTo

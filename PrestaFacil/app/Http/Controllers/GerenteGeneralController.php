@@ -9,9 +9,7 @@ class GerenteGeneralController extends Controller
 {
     public function index(Request $request): View
     {
-        return view('auth.gerente-general.dashboard', [
-            'user' => $request->user(),
-        ]);
+        return view('gerente-general.dashboard');
 
     }
 }

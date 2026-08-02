@@ -17,16 +17,24 @@ class MisValesSeeder extends Seeder
     {
 
        DB::table('roles')->insertOrIgnore([
-            [
+           /* [
                 'id' => 1,
                 'nombre' => 'Administrador',
                 'created_at' => now(),
                 'updated_at' => now(),
-            ],
-            // Puedes agregar los demás roles aquí en el mismo formato
+            ],*/
+
+            [
+                
+                'id' =>1,
+                'nombre' => 'Gerente General',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+          
         ]);
 
-        // 2. Insertar usuarios en la tabla 'users'
+       
         DB::table('users')->insertOrIgnore([
             [
                 'name' => 'Leonardo Mendez',

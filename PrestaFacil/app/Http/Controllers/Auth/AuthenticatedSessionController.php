@@ -32,22 +32,14 @@ class AuthenticatedSessionController extends Controller
         $request->session()->forget('url.intended');
 
         $user = Auth::user();
+    
 
-        /*if (in_array($user->role, ['gerente_general, gerente_sucursal, coordinador'])){
-            
-            if ($user->google2fa_secret && ! $request->session()->get('2fa_passed')){
-                return redirect()->route('auth.2fa');
-            }
-        }*/
-
-        return match ($user->role_id) {
-            1  => redirect()->route('gerente-general.dashboard'),
+        return match ((int)$user->rol_id) {
+            1 => redirect()->route('gerente-general.dashboard'),
             'gerente_sucursal' => redirect()->route('gerente-sucursal.dashboard'),
-            'coordinador'      => redirect()->route('coordinador.dashboard'),
-            'cajero'           => redirect()->route('cajero.dashboard'),
-            'verificador'      => redirect()->route('verificador.dashboard'),
-            'distribuidor'     => redirect()->route('distribuidor.dashboard'),
-            default            => redirect()->route('login')->withErrors(['role' => 'Rol de usuario no reconocido.']),
+
+            default  => redirect()->route('login')->withErrors([
+                'role' => 'Rol de usuario no reconocido.']),
             
         };
 

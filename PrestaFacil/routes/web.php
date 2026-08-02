@@ -19,13 +19,14 @@ Route::middleware('auth')->group(function () {
 });
 
 
-
-
-
 // 1. Gerente General
-    Route::middleware(['auth', 'role:gerente_general'])->prefix('gerente-general')->group(function () {
+    Route::middleware(['auth'])
+    ->prefix('gerente-general')
+    ->group(function () {
+        
         Route::get('/dashboard', [GerenteGeneralController::class, 'index'])
         ->name('gerente-general.dashboard');
     });
 
-require __DIR__.'/auth.php';
+require __DIR__.'/auth.php'; 
+

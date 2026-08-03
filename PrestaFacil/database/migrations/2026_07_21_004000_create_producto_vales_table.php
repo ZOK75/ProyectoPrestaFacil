@@ -18,6 +18,7 @@ return new class extends Migration
             $table->decimal('monto_prestamo', 10, 2);
             $table->decimal('costo_seguro', 10, 2)->default(0.00);
             $table->integer('plazo_quincenas');
+            $table->decimal('comision_apertura', 10, 2)->default(0.00);
             $table->decimal('tasa_interes_quincenal', 5, 2)->default(0.00);
             $table->boolean('activo')->default(true);
             $table->timestamp('desactivado_at')->nullable();

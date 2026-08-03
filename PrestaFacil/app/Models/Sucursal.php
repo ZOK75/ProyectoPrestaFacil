@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Sucursal extends Model
 {
+    protected $table = 'sucursales';
+
     protected $fillable = [
         'nombre',
         'direccion',
@@ -14,8 +16,12 @@ class Sucursal extends Model
         'activo'
     ];
 
+    protected $casts = [
+        'activo' => 'boolean',
+    ];
+
     public function usuarios(): HasMany
     {
-        return $this->hasMany(User::class);
+        return $this->hasMany(User::class, 'sucursal_id');
     }
 }

@@ -19,6 +19,7 @@ class ProductoVale extends Model
         'monto_prestamo',
         'costo_seguro',
         'plazo_quincenas',
+        'comision_apertura',
         'tasa_interes_quincenal',
         'activo',
         'desactivado_at',
@@ -31,6 +32,7 @@ class ProductoVale extends Model
         'monto_prestamo' => 'decimal:2',
         'costo_seguro' => 'decimal:2',
         'plazo_quincenas' => 'integer',
+        'comision_apertura' => 'decimal:2',
         'tasa_interes_quincenal' => 'decimal:2',
         'activo' => 'boolean',
         'desactivado_at' => 'datetime',
@@ -74,7 +76,7 @@ class ProductoVale extends Model
     protected function montoTotalPagar(): Attribute
     {
         return Attribute::make(
-            get: fn () => (float)$this->monto_prestamo + (float)$this->costo_seguro + (float)$this->interes_total
+            get: fn () => (float)$this->monto_prestamo + (float)$this->costo_seguro + (float)$this->interes_total + ((float)$this->comision_apertura / 100) * (float)$this->monto_prestamo
         );
     }
 
@@ -86,7 +88,7 @@ class ProductoVale extends Model
         return Attribute::make(
             get: function () {
                 $plazo = (int)$this->plazo_quincenas;
-                return $plazo > 0 ? ((float)$this->monto_total_pagar / $plazo) : 0;
+                return $plazo > 0 ? ((float)$this->monto_total_pagar - ((float)$this->comision_apertura / 100) * (float)$this->monto_prestamo) / $plazo : 0;
             }
         );
     }

@@ -53,6 +53,10 @@
                 <span class="font-bold text-amber-400">${{ number_format($productoVale->costo_seguro, 2) }}</span>
             </div>
             <div class="flex justify-between text-sm">
+                <span class="text-slate-400">Comisión Apertura ({{ number_format($productoVale->comision_apertura, 2) }}%):</span>
+                <span class="font-bold text-cyan-400">${{ number_format($productoVale->monto_prestamo * ($productoVale->comision_apertura / 100), 2) }}</span>
+            </div>
+            <div class="flex justify-between text-sm">
                 <span class="text-slate-400">Plazo en Quincenas:</span>
                 <span class="font-bold text-slate-300">{{ $productoVale->plazo_quincenas }} quincenas</span>
             </div>

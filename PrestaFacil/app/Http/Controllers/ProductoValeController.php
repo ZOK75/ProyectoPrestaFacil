@@ -78,13 +78,14 @@ class ProductoValeController extends Controller
     {
         $productoVale->load(['createdBy', 'updatedBy']);
 
-        // Tabla de amortización quincenal (monto_total_pagar / plazo_quincenas)
         $amortizacion = [];
         $saldoPendiente = $productoVale->monto_total_pagar;
         $cuota = $productoVale->cuota_quincenal;
         $montoOriginal = $productoVale->monto_prestamo;
         $seguroPorQuincena = $productoVale->costo_seguro / max(1, $productoVale->plazo_quincenas);
-        $comisionPorQuincena = $productoVale->comision_transferencia / max(1, $productoVale->plazo_quincenas);
+        $comisionTransferenciaPorQuincena = $productoVale->comision_transferencia / max(1, $productoVale->plazo_quincenas);
+        $comisionAperturaMonto = $productoVale->monto_prestamo * ($productoVale->comision_apertura / 100);
+        $comisionAperturaPorQuincena = $comisionAperturaMonto / max(1, $productoVale->plazo_quincenas);
         $interesPorQuincena = $productoVale->interes_total / max(1, $productoVale->plazo_quincenas);
         $capitalPorQuincena = $montoOriginal / max(1, $productoVale->plazo_quincenas);
 
@@ -95,6 +96,8 @@ class ProductoValeController extends Controller
                 'cuota' => $cuota,
                 'capital' => $capitalPorQuincena,
                 'seguro' => $seguroPorQuincena,
+                'comision_transferencia' => $comisionTransferenciaPorQuincena,
+                'comision_apertura' => $comisionAperturaPorQuincena, // NUEVO
                 'interes' => $interesPorQuincena,
                 'saldo_restante' => $saldoPendiente,
             ];

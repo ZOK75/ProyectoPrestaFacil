@@ -83,6 +83,10 @@
                     <dd class="font-semibold text-amber-400">${{ number_format($productoVale->costo_seguro, 2) }}</dd>
                 </div>
                 <div class="flex justify-between">
+                    <dt class="text-slate-400">Comisión Apertura ({{ number_format($productoVale->comision_apertura, 2) }}%):</dt>
+                    <dd class="font-semibold text-cyan-400">${{ number_format($productoVale->monto_prestamo * ($productoVale->comision_apertura / 100), 2) }}</dd>
+                </div>
+                <div class="flex justify-between">
                     <dt class="text-slate-400">Comisión Transferencia:</dt>
                     <dd class="font-semibold text-slate-200">${{ number_format($productoVale->comision_transferencia, 2) }}</dd>
                 </div>
@@ -158,6 +162,7 @@
                         <th class="px-6 py-3">Cuota Total</th>
                         <th class="px-6 py-3">Capital Base</th>
                         <th class="px-6 py-3">Seguro</th>
+                        <th class="px-6 py-3">Comisión Apertura</th>
                         <th class="px-6 py-3">Interés</th>
                         <th class="px-6 py-3 text-right">Saldo Restante</th>
                     </tr>
@@ -169,6 +174,7 @@
                             <td class="px-6 py-3 font-bold text-white">${{ number_format($item['cuota'], 2) }}</td>
                             <td class="px-6 py-3 text-slate-300">${{ number_format($item['capital'], 2) }}</td>
                             <td class="px-6 py-3 text-amber-400">${{ number_format($item['seguro'], 2) }}</td>
+                            <td class="px-6 py-3 text-cyan-400">${{ number_format($item['comision_apertura'], 2) }}</td>
                             <td class="px-6 py-3 text-indigo-400">${{ number_format($item['interes'], 2) }}</td>
                             <td class="px-6 py-3 text-right font-mono text-slate-300">${{ number_format($item['saldo_restante'], 2) }}</td>
                         </tr>

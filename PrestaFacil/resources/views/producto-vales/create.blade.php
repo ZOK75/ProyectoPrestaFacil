@@ -49,7 +49,7 @@
                     </div>
                 </div>
 
-                <!-- Monto Préstamo, Seguro y Comisión -->
+                <!-- Monto Préstamo, Seguro y Comisión de Apertura -->
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
@@ -80,7 +80,21 @@
                         @enderror
                     </div>
 
-                    
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                            Comisión Apertura ($) <span class="text-rose-400">*</span>
+                        </label>
+                        <div class="relative">
+                            <input type="number" step="0.01" id="comision_apertura" name="comision_apertura" value="{{ old('comision_apertura', 0) }}" max="100" required
+                                class="w-full pl-4 pr-8 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-cyan-400 font-semibold focus:outline-none focus:border-indigo-500 @error('comision_apertura') border-rose-500 @enderror">
+                            <span class="absolute right-3.5 top-2.5 text-slate-500 text-sm">%</span>
+                        </div>
+                        <span class="text-[10px] text-slate-500 mt-1 block">% sobre el monto préstamo, se suma al total a pagar.</span>
+                        @error('comision_apertura')
+                            <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
                 </div>
 
                 <!-- Plazo Quincenas y Tasa de Interés -->
@@ -166,7 +180,7 @@
             </div>
 
             <div class="text-[11px] text-slate-500 leading-relaxed border-t border-slate-800/80 pt-4">
-                💡 El seguro se suma directamente al total a pagar por el cliente y se amortiza en las quincenas.
+                💡 El seguro y la comisión de apertura se suman directamente al total a pagar por el cliente y se amortizan en las quincenas.
             </div>
         </div>
 
@@ -180,7 +194,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         const inputMonto = document.getElementById('monto_prestamo');
         const inputSeguro = document.getElementById('costo_seguro');
-        //const inputComision = document.getElementById('comision_transferencia');
+        const inputComisionApertura = document.getElementById('comision_apertura');
         const inputPlazo = document.getElementById('plazo_quincenas');
         const inputTasa = document.getElementById('tasa_interes_quincenal');
 
@@ -191,20 +205,21 @@
         function calcularValores() {
             const monto = parseFloat(inputMonto.value) || 0;
             const seguro = parseFloat(inputSeguro.value) || 0;
-            //const comision = parseFloat(inputComision.value) || 0;
+            const comisionAperturaPct = parseFloat(inputComisionApertura.value) || 0;
+            const comisionApertura = monto * (comisionAperturaPct / 100);
             const plazo = parseInt(inputPlazo.value) || 0;
             const tasa = parseFloat(inputTasa.value) || 0;
 
             const interesTotal = monto * (tasa / 100) * plazo;
-            const totalPagar = monto + seguro + interesTotal;
-            const cuotaQuincenal = plazo > 0 ? (totalPagar / plazo) : 0;
+            const totalPagar = monto + seguro + comisionApertura + interesTotal;
+            const cuotaQuincenal = plazo > 0 ? (totalPagar - comisionApertura) / plazo : 0;
 
             displayTotal.textContent = '$' + totalPagar.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             displayCuota.textContent = '$' + cuotaQuincenal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             displayInteres.textContent = '$' + interesTotal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
-        [inputMonto, inputSeguro, inputPlazo, inputTasa].forEach(el => {
+        [inputMonto, inputSeguro, inputComisionApertura, inputPlazo, inputTasa].forEach(el => {
             if(el) el.addEventListener('input', calcularValores);
         });
 

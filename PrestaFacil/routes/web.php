@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\GerenteGeneralController;
+use App\Http\Controllers\GerenteSucursalController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -27,6 +28,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/dashboard', [GerenteGeneralController::class, 'index'])
         ->name('gerente-general.dashboard');
     });
+
+// 2. Gerente Sucursal
+    Route::middleware(['auth'])
+    ->prefix('gerente-sucursal')
+    ->group(function () {
+
+        Route::get('/dashboard',[GerenteSucursalController::class,'index'])
+        ->name('gerente-sucursal.dashboard');   
+        });
 
 require __DIR__.'/auth.php'; 
 

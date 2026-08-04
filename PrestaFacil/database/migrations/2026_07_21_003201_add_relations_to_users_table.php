@@ -14,16 +14,20 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
 
             $table->foreignId('rol_id')
+                ->nullable()
                 ->after('password')
-                ->constrained('rols');
+                ->constrained('roles')
+                ->nullOnDelete();
 
             $table->foreignId('sucursal_id')
                 ->nullable()
                 ->after('rol_id')
-                ->constrained('sucursals');
+                ->constrained('sucursales')
+                ->nullOnDelete();
 
         });
     }
+
     /**
      * Reverse the migrations.
      */

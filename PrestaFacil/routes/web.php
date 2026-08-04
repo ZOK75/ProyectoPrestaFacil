@@ -1,11 +1,14 @@
 <?php
 
+use App\Http\Controllers\ProductoValeController;
+use App\Http\Controllers\ConfiguracionController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProfileController;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\GerenteGeneralController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('producto-vales.index');
 });
 
 Route::get('/dashboard', function () {
@@ -18,15 +21,19 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-
 // 1. Gerente General
-    Route::middleware(['auth'])
+Route::middleware(['auth'])
     ->prefix('gerente-general')
     ->group(function () {
-        
         Route::get('/dashboard', [GerenteGeneralController::class, 'index'])
-        ->name('gerente-general.dashboard');
+            ->name('gerente-general.dashboard');
     });
 
-require __DIR__.'/auth.php'; 
+Route::resource('producto-vales', ProductoValeController::class);
 
+Route::get('configuracion-general', [ConfiguracionController::class, 'edit'])->name('configuracion-general.edit');
+Route::put('configuracion-general', [ConfiguracionController::class, 'update'])->name('configuracion-general.update');
+
+Route::resource('usuarios', UserController::class);
+
+require __DIR__.'/auth.php';

@@ -16,10 +16,8 @@ class DatabaseSeeder extends Seeder
             SucursalSeeder::class,
             UserSeeder::class,
             ProductoValeSeeder::class,
-<<<<<<< Updated upstream
-=======
             UsuariosSeeder::class,
->>>>>>> Stashed changes
+
         ]);
     }
 }

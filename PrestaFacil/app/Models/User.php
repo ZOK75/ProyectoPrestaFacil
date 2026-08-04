@@ -56,7 +56,12 @@ class User extends Authenticatable
 
     public function rol(): BelongsTo
     {
-        return $this->belongsTo(Rol::class);
+        return $this->belongsTo(Rol::class, 'rol_id');
+    }
+
+    public function hasRole(string $rolName): bool
+    {
+        return $this->rol && strtolower($this->rol->nombre) == strtolower($rolName);
     }
 
     public function sucursal(): BelongsTo

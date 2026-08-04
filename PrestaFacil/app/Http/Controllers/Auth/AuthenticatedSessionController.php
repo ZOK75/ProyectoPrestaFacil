@@ -35,15 +35,16 @@ class AuthenticatedSessionController extends Controller
     
 
         return match ((int)$user->rol_id) {
-            1 => redirect()->route('gerente-general.dashboard'),
-            'gerente_sucursal' => redirect()->route('gerente-sucursal.dashboard'),
+            1  => redirect()->route('gerente-general.dashboard'),
+            
+            2 => redirect()->route('gerente-sucursal.dashboard'),
 
             default  => redirect()->route('login')->withErrors([
-                'role' => 'Rol de usuario no reconocido.']),
+            'role' => 'Rol de usuario no reconocido.']),
             
         };
 
-        return redirect()->intended(route('dashboard', absolute: false));
+
     }
 
     /**

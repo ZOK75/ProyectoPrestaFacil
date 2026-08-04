@@ -5,6 +5,7 @@ use App\Http\Controllers\ConfiguracionController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\GerenteGeneralController;
+use App\Http\Controllers\GerenteSucursalController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -27,6 +28,14 @@ Route::middleware(['auth'])
     ->group(function () {
         Route::get('/dashboard', [GerenteGeneralController::class, 'index'])
             ->name('gerente-general.dashboard');
+    });
+
+// 2. Gerente Sucursal
+Route::middleware(['auth'])
+    ->prefix('gerente-sucursal')
+    ->group(function () {
+        Route::get('/dashboard', [GerenteSucursalController::class, 'index'])
+            ->name('gerente-sucursal.dashboard');
     });
 
 Route::resource('producto-vales', ProductoValeController::class);

@@ -9,7 +9,7 @@ use App\Http\Controllers\GerenteSucursalController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return redirect()->route('producto-vales.index');
+    return view('welcome');
 });
 
 Route::get('/dashboard', function () {

@@ -16,7 +16,8 @@ class DatabaseSeeder extends Seeder
             SucursalSeeder::class,
             UserSeeder::class,
             ProductoValeSeeder::class,
-            MisValesSeeder::class,
+            UsuariosSeeder::class,
+
         ]);
     }
 }

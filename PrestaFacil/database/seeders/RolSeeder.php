@@ -15,7 +15,7 @@ class RolSeeder extends Seeder
             ['nombre' => 'Distribuidor'],
             ['nombre' => 'Cajero'],
             ['nombre' => 'Coordinador'],
-            ['nombre' => 'verificador'],
+            ['nombre' => 'Verificador'],
             ['nombre' => 'Administrador'],
         ];
 

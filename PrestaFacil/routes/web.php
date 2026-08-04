@@ -6,7 +6,7 @@ use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return redirect()->route('producto-vales.index');
+    return view('welcome');
 });
 
 Route::resource('producto-vales', ProductoValeController::class);

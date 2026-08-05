@@ -1,15 +1,31 @@
 <?php
- 
+
 namespace App\Http\Controllers;
- 
+
 use App\Http\Requests\UpdateConfiguracionRequest;
 use App\Models\Configuracion;
 use App\Models\ConfiguracionLog;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
- 
+
 class ConfiguracionController extends Controller
 {
+    /**
+     * Obtiene el usuario operador actual o, mientras no haya sesión,
+     * devuelve el primer Gerente General para desarrollo.
+     */
+    private function operador(): ?User
+    {
+        if (Auth::check()) {
+            return Auth::user()->load('rol');
+        }
+
+        // Fallback desarrollo sin sesión: actuar como Gerente General
+        return User::whereHas('rol', fn ($q) => $q->where('nombre', 'Gerente General'))
+            ->first() ?? User::first();
+    }
+
     /**
      * Muestra el formulario de configuración general con el historial de cambios.
      */
@@ -17,20 +33,29 @@ class ConfiguracionController extends Controller
     {
         $configuracion = Configuracion::actual();
         $configuracion->load(['createdBy', 'updatedBy', 'logs.changedBy']);
- 
-        return view('configuracion-general.edit', compact('configuracion'));
+
+        $operador = $this->operador();
+        $puedeEditar = $operador ? $operador->esGerenteGeneral() : false;
+
+        return view('configuracion-general.edit', compact('configuracion', 'puedeEditar', 'operador'));
     }
- 
+
     /**
-     * Actualiza la configuración general, registra el usuario que hizo
-     * el cambio y crea una entrada en el historial de cambios.
+     * Actualiza la configuración general. Solo permitido para el Gerente General.
      */
     public function update(UpdateConfiguracionRequest $request)
     {
+        $operador = $this->operador();
+
+        // Restricción: Solo el Gerente General puede modificar la configuración
+        if (!$operador || !$operador->esGerenteGeneral()) {
+            return redirect()->route('configuracion-general.edit')
+                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para modificar la configuración general.');
+        }
+
         $configuracion = Configuracion::actual();
- 
         $validated = $request->validated();
-        $userId = Auth::id() ?? null;
+        $userId = Auth::id() ?? $operador->id;
 
         DB::transaction(function () use ($configuracion, $validated, $userId) {
             // 1. Registrar el cambio en el historial ANTES de actualizar
@@ -59,7 +84,7 @@ class ConfiguracionController extends Controller
 
             $configuracion->update($data);
         });
- 
+
         return redirect()->route('configuracion-general.edit')
             ->with('success', 'La configuración general fue actualizada correctamente el ' . now()->format('d/m/Y H:i') . '.');
     }

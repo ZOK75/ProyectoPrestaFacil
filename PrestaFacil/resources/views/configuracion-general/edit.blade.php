@@ -25,6 +25,33 @@
         </div>
     @endif
 
+    @if(session('error'))
+        <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <span class="text-sm font-medium">{{ session('error') }}</span>
+            </div>
+            <button onclick="this.parentElement.remove()" class="text-rose-400/60 hover:text-rose-400 text-lg leading-none">&times;</button>
+        </div>
+    @endif
+
+    @if(!$puedeEditar)
+        <div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 flex-shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0 0v2m0-2h2m-2 0H10m0-6h4m-2 0V9m0 0V7m0 2h2m-2 0H10m-4 8a8 8 0 1116 0 8 8 0 01-16 0z"/>
+                </svg>
+            </div>
+            <div>
+                <strong>🔒 Modo Lectura:</strong> Estás visualizando la configuración como <span class="text-white font-semibold">{{ $operador?->name }}</span> ({{ $operador?->rol?->nombre ?? 'Sin rol' }}). Únicamente el <strong>Gerente General</strong> tiene permisos para modificar estos parámetros.
+            </div>
+        </div>
+    @endif
+
     <!-- Card Formulario -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
         <form action="{{ route('configuracion-general.update') }}" method="POST" class="space-y-5">
@@ -39,7 +66,8 @@
                     </label>
                     <input type="datetime-local" name="fecha_corte" id="fecha_corte"
                         value="{{ old('fecha_corte', $configuracion->fecha_corte ? $configuracion->fecha_corte->format('Y-m-d\TH:i') : '') }}" required
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 @error('fecha_corte') border-rose-500 @enderror"
+                        {{ !$puedeEditar ? 'disabled' : '' }}
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed @error('fecha_corte') border-rose-500 @enderror"
                         style="color-scheme: dark;">
                     <span class="text-[11px] text-slate-500 mt-1 block">Selecciona día, hora y minuto del corte.</span>
                     @error('fecha_corte')
@@ -54,7 +82,8 @@
                     </label>
                     <input type="datetime-local" name="fecha_limite_pago" id="fecha_limite_pago"
                         value="{{ old('fecha_limite_pago', $configuracion->fecha_limite_pago ? $configuracion->fecha_limite_pago->format('Y-m-d\TH:i') : '') }}" required
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 @error('fecha_limite_pago') border-rose-500 @enderror"
+                        {{ !$puedeEditar ? 'disabled' : '' }}
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed @error('fecha_limite_pago') border-rose-500 @enderror"
                         style="color-scheme: dark;">
                     <span class="text-[11px] text-slate-500 mt-1 block">Debe ser igual o posterior a la fecha de corte.</span>
                     @error('fecha_limite_pago')
@@ -72,7 +101,8 @@
                     <span class="absolute left-3.5 top-2.5 text-slate-500 text-sm">$</span>
                     <input type="number" step="0.01" name="multa_adeudo"
                         value="{{ old('multa_adeudo', $configuracion->multa_adeudo) }}" required
-                        class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-rose-400 font-semibold focus:outline-none focus:border-indigo-500 @error('multa_adeudo') border-rose-500 @enderror">
+                        {{ !$puedeEditar ? 'disabled' : '' }}
+                        class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-rose-400 font-semibold focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed @error('multa_adeudo') border-rose-500 @enderror">
                 </div>
                 <span class="text-[11px] text-slate-500 mt-1 block">Monto fijo aplicado a cuentas con adeudo vencido.</span>
                 @error('multa_adeudo')
@@ -86,18 +116,21 @@
                     Motivo del Cambio
                 </label>
                 <textarea name="motivo" rows="2" placeholder="Describe brevemente la razón del cambio (ej. Ajuste de fechas por periodo vacacional)..."
-                    class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">{{ old('motivo') }}</textarea>
+                    {{ !$puedeEditar ? 'disabled' : '' }}
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">{{ old('motivo') }}</textarea>
                 <span class="text-[11px] text-slate-500 mt-1 block">Opcional. Se registrará en el historial de cambios.</span>
             </div>
 
-            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-                <button type="submit" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/30 transition flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                    </svg>
-                    Guardar Cambios
-                </button>
-            </div>
+            @if($puedeEditar)
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                    <button type="submit" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/30 transition flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Guardar Cambios
+                    </button>
+                </div>
+            @endif
         </form>
     </div>
 

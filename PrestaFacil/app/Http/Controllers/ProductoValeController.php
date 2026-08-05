@@ -4,16 +4,33 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreProductoValeRequest;
 use App\Models\ProductoVale;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ProductoValeController extends Controller
 {
     /**
+     * Obtiene el usuario operador actual.
+     */
+    private function operador(): ?User
+    {
+        if (Auth::check()) {
+            return Auth::user()->load('rol');
+        }
+
+        return User::whereHas('rol', fn ($q) => $q->where('nombre', 'Gerente General'))
+            ->first() ?? User::first();
+    }
+
+    /**
      * Muestra la lista de productos de vales de préstamo.
      */
     public function index(Request $request)
     {
+        $operador = $this->operador();
+        $esGerenteGeneral = $operador ? $operador->esGerenteGeneral() : false;
+
         $query = ProductoVale::with(['createdBy', 'updatedBy']);
 
         // Filtro por texto
@@ -44,24 +61,36 @@ class ProductoValeController extends Controller
             'costo_seguro_promedio' => ProductoVale::avg('costo_seguro') ?? 0,
         ];
 
-        return view('producto-vales.index', compact('productos', 'stats'));
+        return view('producto-vales.index', compact('productos', 'stats', 'esGerenteGeneral'));
     }
 
     /**
-     * Formulario de creación.
+     * Formulario de creación. Solo permitido para Gerente General.
      */
     public function create()
     {
+        $operador = $this->operador();
+        if (!$operador || !$operador->esGerenteGeneral()) {
+            return redirect()->route('producto-vales.index')
+                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para agregar nuevos vales.');
+        }
+
         return view('producto-vales.create');
     }
 
     /**
-     * Guardar nuevo vale con registro del usuario creador.
+     * Guardar nuevo vale con registro del usuario creador. Solo permitido para Gerente General.
      */
     public function store(StoreProductoValeRequest $request)
     {
+        $operador = $this->operador();
+        if (!$operador || !$operador->esGerenteGeneral()) {
+            return redirect()->route('producto-vales.index')
+                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para agregar nuevos vales.');
+        }
+
         $data = $request->validated();
-        $data['created_by_user_id'] = Auth::id() ?? null;
+        $data['created_by_user_id'] = Auth::id() ?? $operador->id;
         $data['activo'] = true;
         $data['desactivado_at'] = null;
 
@@ -77,13 +106,14 @@ class ProductoValeController extends Controller
     public function show(ProductoVale $productoVale)
     {
         $productoVale->load(['createdBy', 'updatedBy']);
+        $operador = $this->operador();
+        $esGerenteGeneral = $operador ? $operador->esGerenteGeneral() : false;
 
         $amortizacion = [];
         $saldoPendiente = $productoVale->monto_total_pagar;
         $cuota = $productoVale->cuota_quincenal;
         $montoOriginal = $productoVale->monto_prestamo;
         $seguroPorQuincena = $productoVale->costo_seguro / max(1, $productoVale->plazo_quincenas);
-        $comisionTransferenciaPorQuincena = $productoVale->comision_transferencia / max(1, $productoVale->plazo_quincenas);
         $comisionAperturaMonto = $productoVale->monto_prestamo * ($productoVale->comision_apertura / 100);
         $comisionAperturaPorQuincena = $comisionAperturaMonto / max(1, $productoVale->plazo_quincenas);
         $interesPorQuincena = $productoVale->interes_total / max(1, $productoVale->plazo_quincenas);
@@ -96,32 +126,42 @@ class ProductoValeController extends Controller
                 'cuota' => $cuota,
                 'capital' => $capitalPorQuincena,
                 'seguro' => $seguroPorQuincena,
-                'comision_transferencia' => $comisionTransferenciaPorQuincena,
-                'comision_apertura' => $comisionAperturaPorQuincena, // NUEVO
+                'comision_apertura' => $comisionAperturaPorQuincena,
                 'interes' => $interesPorQuincena,
                 'saldo_restante' => $saldoPendiente,
             ];
         }
 
-        return view('producto-vales.show', compact('productoVale', 'amortizacion'));
+        return view('producto-vales.show', compact('productoVale', 'amortizacion', 'esGerenteGeneral'));
     }
 
     /**
-     * La edición únicamente permite desactivar el producto.
+     * La edición únicamente permite desactivar el producto. Solo permitido para Gerente General.
      */
     public function edit(ProductoVale $productoVale)
     {
+        $operador = $this->operador();
+        if (!$operador || !$operador->esGerenteGeneral()) {
+            return redirect()->route('producto-vales.index')
+                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para desactivar vales.');
+        }
+
         $productoVale->load(['createdBy', 'updatedBy']);
 
         return view('producto-vales.edit', compact('productoVale'));
     }
 
     /**
-     * Proceso de desactivación con timestamp y registro de usuario.
+     * Proceso de desactivación con timestamp y registro de usuario. Solo permitido para Gerente General.
      */
     public function update(Request $request, ProductoVale $productoVale)
     {
-        // Solo se permite desactivar el producto
+        $operador = $this->operador();
+        if (!$operador || !$operador->esGerenteGeneral()) {
+            return redirect()->route('producto-vales.index')
+                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para desactivar vales.');
+        }
+
         if (!$productoVale->activo) {
             return redirect()->route('producto-vales.index')
                 ->with('info', "El vale '{$productoVale->nombre}' ya se encuentra desactivado.");
@@ -130,7 +170,7 @@ class ProductoValeController extends Controller
         $productoVale->update([
             'activo' => false,
             'desactivado_at' => now(),
-            'updated_by_user_id' => Auth::id() ?? null,
+            'updated_by_user_id' => Auth::id() ?? $operador->id,
         ]);
 
         return redirect()->route('producto-vales.index')
@@ -138,14 +178,28 @@ class ProductoValeController extends Controller
     }
 
     /**
-     * Eliminación de un vale.
+     * Desactivación de un vale (sin borrar de BD). Solo permitido para Gerente General.
      */
     public function destroy(ProductoVale $productoVale)
     {
-        $nombre = $productoVale->nombre;
-        $productoVale->delete();
+        $operador = $this->operador();
+        if (!$operador || !$operador->esGerenteGeneral()) {
+            return redirect()->route('producto-vales.index')
+                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para desactivar vales.');
+        }
+
+        if (!$productoVale->activo) {
+            return redirect()->route('producto-vales.index')
+                ->with('info', "El vale '{$productoVale->nombre}' ya se encuentra desactivado.");
+        }
+
+        $productoVale->update([
+            'activo' => false,
+            'desactivado_at' => now(),
+            'updated_by_user_id' => Auth::id() ?? $operador->id,
+        ]);
 
         return redirect()->route('producto-vales.index')
-            ->with('success', "El vale '{$nombre}' fue eliminado exitosamente.");
+            ->with('success', "El vale '{$productoVale->nombre}' ({$productoVale->clave}) fue desactivado correctamente el " . now()->format('d/m/Y H:i') . ".");
     }
 }

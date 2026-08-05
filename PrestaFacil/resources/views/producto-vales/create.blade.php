@@ -82,7 +82,7 @@
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                            Comisión Apertura ($) <span class="text-rose-400">*</span>
+                            Comisión ($) <span class="text-rose-400">*</span>
                         </label>
                         <div class="relative">
                             <input type="number" step="0.01" id="comision_apertura" name="comision_apertura" value="{{ old('comision_apertura', 0) }}" max="100" required
@@ -212,7 +212,7 @@
 
             const interesTotal = monto * (tasa / 100) * plazo;
             const totalPagar = monto + seguro + comisionApertura + interesTotal;
-            const cuotaQuincenal = plazo > 0 ? (totalPagar - comisionApertura) / plazo : 0;
+            const cuotaQuincenal = plazo > 0 ? (totalPagar) / plazo : 0;
 
             displayTotal.textContent = '$' + totalPagar.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             displayCuota.textContent = '$' + cuotaQuincenal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

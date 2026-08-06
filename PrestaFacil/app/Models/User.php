@@ -24,6 +24,7 @@ class User extends Authenticatable
         'password',
         'rol_id',
         'sucursal_id',
+        'categoria_distribuidor',
         'activo',
         'desactivado_at',
         'desactivado_by_user_id',
@@ -83,12 +84,32 @@ class User extends Authenticatable
 
     public function esGerenteGeneral(): bool
     {
-        return $this->rol?->nombre === 'Gerente General';
+        return strtolower($this->rol?->nombre ?? '') === 'gerente general';
     }
 
     public function esGerenteSucursal(): bool
     {
-        return $this->rol?->nombre === 'Gerente de Sucursal';
+        return strtolower($this->rol?->nombre ?? '') === 'gerente de sucursal';
+    }
+
+    public function esDistribuidor(): bool
+    {
+        $nombre = strtolower($this->rol?->nombre ?? '');
+        return in_array($nombre, ['distribuidor', 'distribuidora']);
+    }
+
+    /**
+     * Obtiene el porcentaje de ganancia según su categoría de distribuidor
+     * y la Configuración General vigente.
+     */
+    public function obtenerPorcentajeGanancia(): float
+    {
+        if (!$this->esDistribuidor()) {
+            return 0.0;
+        }
+
+        $config = Configuracion::actual();
+        return $config->obtenerComision($this->categoria_distribuidor);
     }
 
     /**

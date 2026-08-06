@@ -88,7 +88,7 @@ class ProductoVale extends Model
         return Attribute::make(
             get: function () {
                 $plazo = (int)$this->plazo_quincenas;
-                return $plazo > 0 ? ((float)$this->monto_total_pagar - ((float)$this->comision_apertura / 100) * (float)$this->monto_prestamo) / $plazo : 0;
+                return $plazo > 0 ? ((float)$this->monto_total_pagar) / $plazo : 0;
             }
         );
     }

@@ -28,7 +28,7 @@
             </div>
         </div>
 
-        @if($productoVale->activo)
+        @if($productoVale->activo && $esGerenteGeneral)
             <div class="flex items-center gap-2">
                 <a href="{{ route('producto-vales.edit', $productoVale) }}" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm shadow-md transition flex items-center gap-1.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -39,6 +39,20 @@
             </div>
         @endif
     </div>
+
+    @if(session('error'))
+        <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-between shadow-lg shadow-rose-950/20">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <span class="text-sm font-medium">{{ session('error') }}</span>
+            </div>
+            <button onclick="this.parentElement.remove()" class="text-rose-400/60 hover:text-rose-400 text-lg leading-none">&times;</button>
+        </div>
+    @endif
 
     <!-- Ficha Financiera en Grid -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -179,6 +193,7 @@
                             <td class="px-6 py-3 text-right font-mono text-slate-300">${{ number_format($item['saldo_restante'], 2) }}</td>
                         </tr>
                     @endforeach
+                </tbody>
                 </tbody>
             </table>
         </div>

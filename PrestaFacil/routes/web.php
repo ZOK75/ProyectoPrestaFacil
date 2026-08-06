@@ -1,48 +1,58 @@
 <?php
 
+use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\ProductoValeController;
 use App\Http\Controllers\ConfiguracionController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\GerenteGeneralController;
 use App\Http\Controllers\GerenteSucursalController;
+use App\Http\Controllers\PrestamoController;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
+// Redirección inicial según estado de sesión
 Route::get('/', function () {
-    return view('welcome');
+    return Auth::check() ? redirect()->route('producto-vales.index') : redirect()->route('login');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+// Todas las rutas del sistema requieren sesión activa (middleware 'auth')
+Route::middleware(['auth'])->group(function () {
 
-Route::middleware('auth')->group(function () {
+    Route::get('/dashboard', function () {
+        return view('dashboard');
+    })->name('dashboard');
+
+    // Perfil de usuario
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
 
-// 1. Gerente General
-Route::middleware(['auth'])
-    ->prefix('gerente-general')
-    ->group(function () {
+    // 1. Gerente General Dashboard
+    Route::prefix('gerente-general')->group(function () {
         Route::get('/dashboard', [GerenteGeneralController::class, 'index'])
             ->name('gerente-general.dashboard');
     });
 
-// 2. Gerente Sucursal
-Route::middleware(['auth'])
-    ->prefix('gerente-sucursal')
-    ->group(function () {
+    // 2. Gerente Sucursal Dashboard
+    Route::prefix('gerente-sucursal')->group(function () {
         Route::get('/dashboard', [GerenteSucursalController::class, 'index'])
             ->name('gerente-sucursal.dashboard');
     });
 
-Route::resource('producto-vales', ProductoValeController::class);
+    // Módulos del Sistema
+    Route::resource('producto-vales', ProductoValeController::class);
+    Route::resource('clientes', ClienteController::class);
 
-Route::get('configuracion-general', [ConfiguracionController::class, 'edit'])->name('configuracion-general.edit');
-Route::put('configuracion-general', [ConfiguracionController::class, 'update'])->name('configuracion-general.update');
+    // Sistema de Préstamos, Prevales/Vales y Cobranza
+    Route::resource('prestamos', PrestamoController::class);
+    Route::get('prestamos/{prestamo}/pago', [PrestamoController::class, 'pagoForm'])->name('prestamos.pago');
+    Route::post('prestamos/{prestamo}/pago', [PrestamoController::class, 'registrarPago'])->name('prestamos.pago.store');
 
-Route::resource('usuarios', UserController::class);
+    Route::get('configuracion-general', [ConfiguracionController::class, 'edit'])->name('configuracion-general.edit');
+    Route::put('configuracion-general', [ConfiguracionController::class, 'update'])->name('configuracion-general.update');
+
+    Route::resource('usuarios', UserController::class);
+});
 
 require __DIR__.'/auth.php';

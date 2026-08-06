@@ -17,6 +17,9 @@ class Configuracion extends Model
         'fecha_corte',
         'fecha_limite_pago',
         'multa_adeudo',
+        'comision_cobre',
+        'comision_plata',
+        'comision_oro',
         'created_by_user_id',
         'updated_by_user_id',
     ];
@@ -25,6 +28,9 @@ class Configuracion extends Model
         'fecha_corte' => 'datetime',
         'fecha_limite_pago' => 'datetime',
         'multa_adeudo' => 'decimal:2',
+        'comision_cobre' => 'decimal:2',
+        'comision_plata' => 'decimal:2',
+        'comision_oro' => 'decimal:2',
     ];
  
     /**
@@ -50,11 +56,22 @@ class Configuracion extends Model
     {
         return $this->hasMany(ConfiguracionLog::class, 'configuracion_id')->orderByDesc('changed_at');
     }
+
+    /**
+     * Devuelve el porcentaje de comisión configurado para una categoría dada.
+     */
+    public function obtenerComision(?string $categoria): float
+    {
+        return match(strtolower($categoria ?? 'cobre')) {
+            'oro' => floatval($this->comision_oro),
+            'plata' => floatval($this->comision_plata),
+            default => floatval($this->comision_cobre),
+        };
+    }
  
     /**
      * La configuración general es un singleton: siempre debe existir
-     * una sola fila. Este helper la obtiene o la crea con valores
-     * por defecto la primera vez que se necesita.
+     * una sola fila.
      */
     public static function actual(): self
     {
@@ -62,6 +79,9 @@ class Configuracion extends Model
             'fecha_corte' => now()->startOfDay(),
             'fecha_limite_pago' => now()->addDays(15)->startOfDay(),
             'multa_adeudo' => 300,
+            'comision_cobre' => 3.00,
+            'comision_plata' => 6.00,
+            'comision_oro' => 10.00,
         ]);
     }
 }

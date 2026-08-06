@@ -36,6 +36,20 @@ class UserController extends Controller
         $operador = $this->operador();
         $query = User::with(['rol', 'sucursal', 'desactivadoPor']);
 
+        // Si es Distribuidor, solo puede ver usuarios ACTIVOS
+        if ($operador->esDistribuidor()) {
+            $query->where('activo', true);
+        } else {
+            // Filtro por estado para otros roles
+            if ($request->filled('estado')) {
+                if ($request->input('estado') === 'activo') {
+                    $query->where('activo', true);
+                } elseif ($request->input('estado') === 'inactivo') {
+                    $query->where('activo', false);
+                }
+            }
+        }
+
         // Un gerente de sucursal solo ve los usuarios de su propia sucursal
         if ($operador->esGerenteSucursal()) {
             $query->where('sucursal_id', $operador->sucursal_id);
@@ -60,19 +74,10 @@ class UserController extends Controller
             $query->where('sucursal_id', $request->input('sucursal_id'));
         }
 
-        // Filtro por estado (activo / inactivo)
-        if ($request->filled('estado')) {
-            if ($request->input('estado') === 'activo') {
-                $query->where('activo', true);
-            } elseif ($request->input('estado') === 'inactivo') {
-                $query->where('activo', false);
-            }
-        }
-
         $usuarios = $query->orderBy('name')->paginate(12)->withQueryString();
 
         $stats = [
-            'total' => User::count(),
+            'total' => $operador->esDistribuidor() ? User::where('activo', true)->count() : User::count(),
             'activos' => User::where('activo', true)->count(),
             'inactivos' => User::where('activo', false)->count(),
             'con_rol' => User::whereNotNull('rol_id')->count(),
@@ -86,11 +91,17 @@ class UserController extends Controller
     }
 
     /**
-     * Formulario de alta de usuario.
+     * Formulario de alta de usuario. No permitido para Distribuidor.
      */
     public function create()
     {
         $operador = $this->operador();
+
+        if ($operador->esDistribuidor()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
+        }
+
         $rolesPermitidos = $operador->rolesPermitidos();
         $sucursalesPermitidas = $operador->sucursalesPermitidas();
 
@@ -98,11 +109,17 @@ class UserController extends Controller
     }
 
     /**
-     * Registrar un nuevo usuario.
+     * Registrar un nuevo usuario. No permitido para Distribuidor.
      */
     public function store(StoreUserRequest $request)
     {
         $operador = $this->operador();
+
+        if ($operador->esDistribuidor()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
+        }
+
         $data = $request->validated();
 
         // Validación de permisos de rol
@@ -136,21 +153,32 @@ class UserController extends Controller
         $usuario->load(['rol', 'sucursal', 'desactivadoPor']);
         $operador = $this->operador();
 
+        if ($operador->esDistribuidor() && !$usuario->activo) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'Acceso denegado: Tu rol de Distribuidor solo puede visualizar usuarios activos.');
+        }
+
         return view('usuarios.show', compact('usuario', 'operador'));
     }
 
     /**
-     * Formulario de edición.
+     * Formulario de edición. No permitido para Distribuidor.
      */
     public function edit(User $usuario)
     {
+        $operador = $this->operador();
+
+        if ($operador->esDistribuidor()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
+        }
+
         if (!$usuario->activo) {
             return redirect()->route('usuarios.index')
                 ->with('info', "El usuario '{$usuario->name}' está desactivado y no puede ser modificado ni reactivado.");
         }
 
         $usuario->load(['rol', 'sucursal']);
-        $operador = $this->operador();
         $rolesPermitidos = $operador->rolesPermitidos();
         $sucursalesPermitidas = $operador->sucursalesPermitidas();
 
@@ -158,16 +186,22 @@ class UserController extends Controller
     }
 
     /**
-     * Actualizar datos de un usuario.
+     * Actualizar datos de un usuario. No permitido para Distribuidor.
      */
     public function update(UpdateUserRequest $request, User $usuario)
     {
+        $operador = $this->operador();
+
+        if ($operador->esDistribuidor()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
+        }
+
         if (!$usuario->activo) {
             return redirect()->route('usuarios.index')
                 ->with('info', "El usuario '{$usuario->name}' está desactivado y no puede ser modificado ni reactivado.");
         }
 
-        $operador = $this->operador();
         $data = $request->validated();
 
         // Validación de permisos de rol
@@ -196,16 +230,21 @@ class UserController extends Controller
     }
 
     /**
-     * Desactivar un usuario (sin eliminar registros de la BD).
+     * Desactivar un usuario (sin eliminar registros de la BD). No permitido para Distribuidor.
      */
     public function destroy(User $usuario)
     {
+        $operador = $this->operador();
+
+        if ($operador->esDistribuidor()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
+        }
+
         if (!$usuario->activo) {
             return redirect()->route('usuarios.index')
                 ->with('info', "El usuario '{$usuario->name}' ya se encuentra desactivado.");
         }
-
-        $operador = $this->operador();
 
         $usuario->update([
             'activo' => false,

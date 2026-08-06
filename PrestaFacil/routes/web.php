@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\ProductoValeController;
 use App\Http\Controllers\ConfiguracionController;
 use App\Http\Controllers\UserController;
@@ -40,6 +41,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Módulos del Sistema
     Route::resource('producto-vales', ProductoValeController::class);
+    Route::resource('clientes', ClienteController::class);
 
     Route::get('configuracion-general', [ConfiguracionController::class, 'edit'])->name('configuracion-general.edit');
     Route::put('configuracion-general', [ConfiguracionController::class, 'update'])->name('configuracion-general.update');

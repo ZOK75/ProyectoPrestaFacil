@@ -24,7 +24,7 @@
             </div>
         </div>
 
-        @if($usuario->activo)
+        @if($usuario->activo && !$operador->esDistribuidor())
             <div class="flex items-center gap-2">
                 <a href="{{ route('usuarios.edit', $usuario) }}" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-md transition flex items-center gap-1.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -90,6 +90,8 @@
                                 'Asesor de Crédito' => 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
                                 'Cajero' => 'bg-amber-500/10 text-amber-400 border-amber-500/20',
                                 'Cobrador' => 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+                                'Distribuidor' => 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+                                'Distribuidora' => 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
                             ];
                             $cls = $colorMap[$usuario->rol->nombre] ?? 'bg-slate-800 text-slate-300 border-slate-700';
                         @endphp

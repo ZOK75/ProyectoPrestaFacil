@@ -108,13 +108,15 @@
                 <input type="text" name="buscar" value="{{ request('buscar') }}" placeholder="Buscar por clave (ej. VLT-5K) o nombre..." class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
             </div>
 
-            <div class="w-full md:w-48">
-                <select name="estado" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500">
-                    <option value="">Todos los estados</option>
-                    <option value="activo" {{ request('estado') === 'activo' ? 'selected' : '' }}>Solo Activos</option>
-                    <option value="inactivo" {{ request('estado') === 'inactivo' ? 'selected' : '' }}>Solo Desactivados</option>
-                </select>
-            </div>
+            @if(!$esDistribuidor)
+                <div class="w-full md:w-48">
+                    <select name="estado" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500">
+                        <option value="">Todos los estados</option>
+                        <option value="activo" {{ request('estado') === 'activo' ? 'selected' : '' }}>Solo Activos</option>
+                        <option value="inactivo" {{ request('estado') === 'inactivo' ? 'selected' : '' }}>Solo Desactivados</option>
+                    </select>
+                </div>
+            @endif
 
             <div class="flex gap-2">
                 <button type="submit" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold transition">
@@ -201,7 +203,7 @@
                                 @if($producto->activo && $esGerenteGeneral)
                                     <a href="{{ route('producto-vales.edit', $producto) }}" class="inline-flex p-2 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-600 hover:text-white transition" title="Desactivar Producto">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636"/>
                                         </svg>
                                     </a>
                                 @endif

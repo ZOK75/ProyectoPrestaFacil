@@ -30,8 +30,23 @@ class ProductoValeController extends Controller
     {
         $operador = $this->operador();
         $esGerenteGeneral = $operador ? $operador->esGerenteGeneral() : false;
+        $esDistribuidor = $operador ? $operador->esDistribuidor() : false;
 
         $query = ProductoVale::with(['createdBy', 'updatedBy']);
+
+        // Si el usuario es Distribuidor, solo ve vales ACTIVOS
+        if ($esDistribuidor) {
+            $query->where('activo', true);
+        } else {
+            // Filtro por estado para otros roles
+            if ($request->filled('estado')) {
+                if ($request->input('estado') === 'activo') {
+                    $query->where('activo', true);
+                } elseif ($request->input('estado') === 'inactivo') {
+                    $query->where('activo', false);
+                }
+            }
+        }
 
         // Filtro por texto
         if ($request->filled('buscar')) {
@@ -42,26 +57,22 @@ class ProductoValeController extends Controller
             });
         }
 
-        // Filtro por estado
-        if ($request->filled('estado')) {
-            if ($request->input('estado') === 'activo') {
-                $query->where('activo', true);
-            } elseif ($request->input('estado') === 'inactivo') {
-                $query->where('activo', false);
-            }
-        }
-
         $productos = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
 
         $stats = [
-            'total' => ProductoVale::count(),
+            'total' => $esDistribuidor ? ProductoVale::where('activo', true)->count() : ProductoVale::count(),
             'activos' => ProductoVale::where('activo', true)->count(),
             'inactivos' => ProductoVale::where('activo', false)->count(),
             'monto_promedio' => ProductoVale::avg('monto_prestamo') ?? 0,
             'costo_seguro_promedio' => ProductoVale::avg('costo_seguro') ?? 0,
         ];
 
-        return view('producto-vales.index', compact('productos', 'stats', 'esGerenteGeneral'));
+        // Renderizar vista móvil para el rol de Distribuidor / Distribuidora
+        if ($esDistribuidor) {
+            return view('producto-vales.index_mobile', compact('productos', 'stats', 'esGerenteGeneral', 'esDistribuidor'));
+        }
+
+        return view('producto-vales.index', compact('productos', 'stats', 'esGerenteGeneral', 'esDistribuidor'));
     }
 
     /**
@@ -108,6 +119,13 @@ class ProductoValeController extends Controller
         $productoVale->load(['createdBy', 'updatedBy']);
         $operador = $this->operador();
         $esGerenteGeneral = $operador ? $operador->esGerenteGeneral() : false;
+        $esDistribuidor = $operador ? $operador->esDistribuidor() : false;
+
+        // Si es distribuidor y el vale está desactivado, denegar acceso
+        if ($esDistribuidor && !$productoVale->activo) {
+            return redirect()->route('producto-vales.index')
+                ->with('error', 'Acceso denegado: Como Distribuidor solo puedes visualizar vales activos.');
+        }
 
         $amortizacion = [];
         $saldoPendiente = $productoVale->monto_total_pagar;
@@ -132,7 +150,12 @@ class ProductoValeController extends Controller
             ];
         }
 
-        return view('producto-vales.show', compact('productoVale', 'amortizacion', 'esGerenteGeneral'));
+        // Renderizar vista móvil para el rol de Distribuidor / Distribuidora
+        if ($esDistribuidor) {
+            return view('producto-vales.show_mobile', compact('productoVale', 'amortizacion', 'esGerenteGeneral', 'esDistribuidor'));
+        }
+
+        return view('producto-vales.show', compact('productoVale', 'amortizacion', 'esGerenteGeneral', 'esDistribuidor'));
     }
 
     /**

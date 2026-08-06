@@ -2,7 +2,7 @@
 <html lang="es" class="h-full bg-slate-900 text-slate-100">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>@yield('title', 'PrestaFácil - Vales de Préstamo')</title>
     
     <!-- Google Fonts -->
@@ -13,7 +13,7 @@
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-    <!-- Tailwind CSS (CDN Fallback + Vite) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -30,8 +30,7 @@
                             600: '#4f46e5',
                             700: '#4338ca',
                             900: '#1e1b4b',
-                        },
-                        emeraldCustom: '#10b981',
+                        }
                     }
                 }
             }
@@ -45,7 +44,7 @@
 <body class="h-full bg-slate-950 text-slate-100 antialiased flex flex-col min-h-screen">
 
     <!-- Header Navigation -->
-    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
+    <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3">
                 <a href="{{ route('producto-vales.index') }}" class="flex items-center gap-2 group">
@@ -63,15 +62,31 @@
 
             <div class="flex items-center space-x-4">
                 <nav class="flex items-center space-x-1">
+                    <!-- Opción Vales: Visible para todos -->
                     <a href="{{ route('producto-vales.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('producto-vales.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                         Vales
                     </a>
-                    <a href="{{ route('usuarios.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('usuarios.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
-                        Usuarios
-                    </a>
-                    <a href="{{ route('configuracion-general.edit') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('configuracion-general.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
-                        Configuración
-                    </a>
+
+                    @auth
+                        <!-- Opción Clientes: Únicamente para Distribuidor/Distribuidora -->
+                        @if(Auth::user()->esDistribuidor())
+                            <a href="{{ route('clientes.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('clientes.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Clientes
+                            </a>
+                        @endif
+
+                        <!-- Opción Usuarios y Configuración: Para Gerentes -->
+                        @if(!Auth::user()->esDistribuidor())
+                            <a href="{{ route('usuarios.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('usuarios.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Usuarios
+                            </a>
+                            @if(Auth::user()->esGerenteGeneral())
+                                <a href="{{ route('configuracion-general.edit') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('configuracion-general.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Configuración
+                                </a>
+                            @endif
+                        @endif
+                    @endauth
                 </nav>
 
                 @auth
@@ -81,7 +96,7 @@
                             <div class="w-7 h-7 rounded-full bg-indigo-600/40 border border-indigo-400/50 flex items-center justify-center text-indigo-200 font-bold text-xs">
                                 {{ strtoupper(substr(Auth::user()->name, 0, 2)) }}
                             </div>
-                            <span class="max-w-[120px] truncate">{{ Auth::user()->name }}</span>
+                            <span class="max-w-[100px] truncate hidden sm:inline">{{ Auth::user()->name }}</span>
                             <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                             </svg>
@@ -98,20 +113,21 @@
                              style="display: none;">
                             
                             <div class="px-4 py-2.5 border-b border-slate-800">
-                                <p class="text-xs text-slate-400">Usuario conectado</p>
-                                <p class="text-xs font-semibold text-slate-200 truncate">{{ Auth::user()->email }}</p>
+                                <p class="text-xs text-slate-400">Conectado como</p>
+                                <p class="text-xs font-semibold text-slate-200 truncate">{{ Auth::user()->name }}</p>
+                                <p class="text-[10px] text-indigo-400 font-medium">{{ Auth::user()->rol?->nombre ?? 'Usuario' }}</p>
                             </div>
 
-                            <a href="{{ route('profile.edit') }}" class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                            <a href="{{ route('profile.edit') }}" class="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition">
                                 <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                 </svg>
-                                Editar Perfil
+                                Perfil
                             </a>
 
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
-                                <button type="submit" class="w-full text-left flex items-center gap-2.5 px-4 py-2 text-sm text-rose-400 hover:bg-slate-800 hover:text-rose-300 transition border-t border-slate-800/60 mt-1">
+                                <button type="submit" class="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-sm text-rose-400 hover:bg-slate-800 hover:text-rose-300 transition border-t border-slate-800/60">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                                     </svg>
@@ -125,36 +141,43 @@
         </div>
     </header>
 
-    <!-- Alert Notifications & Main Content -->
-    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Main Content Container -->
+    <main class="flex-grow w-full mx-auto px-3 sm:px-6 lg:px-8 py-6">
         @if(session('success'))
-            <div class="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-between shadow-lg shadow-emerald-950/20">
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="max-w-md mx-auto mb-4 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-between shadow-lg shadow-emerald-950/20">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0">
+                        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
                     </div>
-                    <span class="text-sm font-medium">{{ session('success') }}</span>
+                    <span class="text-xs sm:text-sm font-medium">{{ session('success') }}</span>
                 </div>
                 <button onclick="this.parentElement.remove()" class="text-emerald-400/60 hover:text-emerald-400 text-lg leading-none">&times;</button>
             </div>
         @endif
 
-        @if (isset($header))
-            <div class="mb-6 pb-4 border-b border-slate-800">
-                {{ $header }}
+        @if(session('error'))
+            <div class="max-w-md mx-auto mb-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-between shadow-lg shadow-rose-950/20">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-7 h-7 rounded-lg bg-rose-500/20 flex items-center justify-center shrink-0">
+                        <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <span class="text-xs sm:text-sm font-medium">{{ session('error') }}</span>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-rose-400/60 hover:text-rose-400 text-lg leading-none">&times;</button>
             </div>
         @endif
 
-        {{ $slot ?? '' }}
         @yield('content')
     </main>
 
     <!-- Footer -->
-    <footer class="bg-slate-900 border-t border-slate-800 py-6 mt-auto">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-slate-500">
-            PrestaFácil &copy; {{ date('Y') }} - Sistema de Vales de Préstamo por Transferencia Bancaria
+    <footer class="bg-slate-900 border-t border-slate-800 py-4 mt-auto">
+        <div class="max-w-md mx-auto px-4 text-center text-[11px] text-slate-500">
+            PrestaFácil &copy; {{ date('Y') }} - Sistema de Vales Móvil
         </div>
     </footer>
 

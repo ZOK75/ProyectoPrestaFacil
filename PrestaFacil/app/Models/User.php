@@ -83,12 +83,18 @@ class User extends Authenticatable
 
     public function esGerenteGeneral(): bool
     {
-        return $this->rol?->nombre === 'Gerente General';
+        return strtolower($this->rol?->nombre ?? '') === 'gerente general';
     }
 
     public function esGerenteSucursal(): bool
     {
-        return $this->rol?->nombre === 'Gerente de Sucursal';
+        return strtolower($this->rol?->nombre ?? '') === 'gerente de sucursal';
+    }
+
+    public function esDistribuidor(): bool
+    {
+        $nombre = strtolower($this->rol?->nombre ?? '');
+        return in_array($nombre, ['distribuidor', 'distribuidora']);
     }
 
     /**

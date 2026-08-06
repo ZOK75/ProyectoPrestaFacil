@@ -7,6 +7,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\GerenteGeneralController;
 use App\Http\Controllers\GerenteSucursalController;
+use App\Http\Controllers\PrestamoController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -42,6 +43,11 @@ Route::middleware(['auth'])->group(function () {
     // Módulos del Sistema
     Route::resource('producto-vales', ProductoValeController::class);
     Route::resource('clientes', ClienteController::class);
+
+    // Sistema de Préstamos, Prevales/Vales y Cobranza
+    Route::resource('prestamos', PrestamoController::class);
+    Route::get('prestamos/{prestamo}/pago', [PrestamoController::class, 'pagoForm'])->name('prestamos.pago');
+    Route::post('prestamos/{prestamo}/pago', [PrestamoController::class, 'registrarPago'])->name('prestamos.pago.store');
 
     Route::get('configuracion-general', [ConfiguracionController::class, 'edit'])->name('configuracion-general.edit');
     Route::put('configuracion-general', [ConfiguracionController::class, 'update'])->name('configuracion-general.update');

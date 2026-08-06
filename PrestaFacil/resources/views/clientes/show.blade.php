@@ -49,6 +49,18 @@
             </div>
         @endif
 
+        <!-- Botón Directo: Asignar Vale / Prevale -->
+        @if($cliente->activo)
+            <div>
+                <a href="{{ route('prestamos.create', ['cliente_id' => $cliente->id]) }}" class="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-black text-center shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    Asignar Vale / Prevale a este Cliente
+                </a>
+            </div>
+        @endif
+
         <!-- Información Personal -->
         <div class="space-y-2">
             <span class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider block border-b border-slate-800/80 pb-1">

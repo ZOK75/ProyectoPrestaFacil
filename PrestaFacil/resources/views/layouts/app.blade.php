@@ -68,10 +68,13 @@
                     </a>
 
                     @auth
-                        <!-- Opción Clientes: Únicamente para Distribuidor/Distribuidora -->
+                        <!-- Opciones Clientes y Préstamos: Únicamente para Distribuidor/Distribuidora -->
                         @if(Auth::user()->esDistribuidor())
                             <a href="{{ route('clientes.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('clientes.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                 Clientes
+                            </a>
+                            <a href="{{ route('prestamos.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('prestamos.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Préstamos
                             </a>
                         @endif
 

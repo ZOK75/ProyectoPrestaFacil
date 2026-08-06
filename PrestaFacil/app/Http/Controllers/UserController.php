@@ -109,7 +109,7 @@ class UserController extends Controller
     }
 
     /**
-     * Registrar un nuevo usuario. No permitido para Distribuidor.
+     * Registrar un nuevo usuario. Al registrarse, los distribuidores SIEMPRE inician en categoría 'cobre'.
      */
     public function store(StoreUserRequest $request)
     {
@@ -134,6 +134,14 @@ class UserController extends Controller
             return back()->withErrors(['sucursal_id' => 'No tienes permiso para asignar usuarios a esta sucursal.'])->withInput();
         }
 
+        // Al registrarse, cualquier distribuidor inicia SIEMPRE en categoría 'cobre'
+        $rolSeleccionado = Rol::find($data['rol_id']);
+        if ($rolSeleccionado && in_array(strtolower($rolSeleccionado->nombre), ['distribuidor', 'distribuidora'])) {
+            $data['categoria_distribuidor'] = 'cobre';
+        } else {
+            $data['categoria_distribuidor'] = null;
+        }
+
         $data['password'] = Hash::make($data['password']);
         $data['activo'] = true;
         $data['desactivado_at'] = null;
@@ -142,7 +150,7 @@ class UserController extends Controller
         $user = User::create($data);
 
         return redirect()->route('usuarios.index')
-            ->with('success', "El usuario '{$user->name}' fue registrado exitosamente.");
+            ->with('success', "El usuario '{$user->name}' fue registrado exitosamente en categoría Cobre.");
     }
 
     /**
@@ -186,7 +194,7 @@ class UserController extends Controller
     }
 
     /**
-     * Actualizar datos de un usuario. No permitido para Distribuidor.
+     * Actualizar datos de un usuario (aquí sí se puede cambiar la categoría del distribuidor).
      */
     public function update(UpdateUserRequest $request, User $usuario)
     {
@@ -214,6 +222,14 @@ class UserController extends Controller
         $sucursalesPermitidasIds = $operador->sucursalesPermitidas()->pluck('id')->toArray();
         if (!in_array($data['sucursal_id'], $sucursalesPermitidasIds)) {
             return back()->withErrors(['sucursal_id' => 'No tienes permiso para asignar usuarios a esta sucursal.'])->withInput();
+        }
+
+        // Ajuste de categoría en la edición
+        $rolSeleccionado = Rol::find($data['rol_id']);
+        if ($rolSeleccionado && in_array(strtolower($rolSeleccionado->nombre), ['distribuidor', 'distribuidora'])) {
+            $data['categoria_distribuidor'] = $data['categoria_distribuidor'] ?? $usuario->categoria_distribuidor ?? 'cobre';
+        } else {
+            $data['categoria_distribuidor'] = null;
         }
 
         // Si no se envía contraseña, no se modifica

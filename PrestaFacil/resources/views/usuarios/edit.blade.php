@@ -99,6 +99,23 @@
                 </div>
             </div>
 
+            <!-- Categoría de Distribuidor -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                    Categoría de Distribuidor (Si aplica)
+                </label>
+                <select name="categoria_distribuidor"
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 @error('categoria_distribuidor') border-rose-500 @enderror">
+                    <option value="cobre" {{ old('categoria_distribuidor', $usuario->categoria_distribuidor) === 'cobre' ? 'selected' : '' }}>Cobre (Ganancia por Configuración General)</option>
+                    <option value="plata" {{ old('categoria_distribuidor', $usuario->categoria_distribuidor) === 'plata' ? 'selected' : '' }}>Plata (Ganancia por Configuración General)</option>
+                    <option value="oro" {{ old('categoria_distribuidor', $usuario->categoria_distribuidor) === 'oro' ? 'selected' : '' }}>Oro (Ganancia por Configuración General)</option>
+                </select>
+                <span class="text-[10px] text-slate-500 mt-1 block">Aplica únicamente si el usuario es Distribuidor o Distribuidora.</span>
+                @error('categoria_distribuidor')
+                    <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
+                @enderror
+            </div>
+
             <!-- Botones -->
             <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
                 <a href="{{ route('usuarios.index') }}" class="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-sm font-semibold transition">

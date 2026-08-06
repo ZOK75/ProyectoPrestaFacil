@@ -103,6 +103,20 @@
                     @endif
                 </div>
 
+                @if($usuario->esDistribuidor())
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Categoría de Distribuidor</span>
+                        <div class="mt-1 flex items-center gap-2">
+                            <span class="px-3 py-1 rounded-lg text-xs font-black uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                {{ strtoupper($usuario->categoria_distribuidor ?? 'cobre') }}
+                            </span>
+                            <span class="text-xs font-extrabold text-emerald-400">
+                                ({{ number_format($usuario->obtenerPorcentajeGanancia(), 2) }}% Ganancia)
+                            </span>
+                        </div>
+                    </div>
+                @endif
+
                 <div>
                     <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Sucursal</span>
                     <span class="text-sm text-white font-semibold mt-1 block">

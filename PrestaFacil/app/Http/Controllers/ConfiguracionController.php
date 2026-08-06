@@ -65,7 +65,7 @@ class ConfiguracionController extends Controller
                 'fecha_limite_pago' => $validated['fecha_limite_pago'],
                 'multa_adeudo' => $validated['multa_adeudo'],
                 'changed_by_user_id' => $userId,
-                'motivo' => $validated['motivo'] ?? null,
+                'motivo' => $validated['motivo'] ?? "Actualización de comisiones Cobre ({$validated['comision_cobre']}%), Plata ({$validated['comision_plata']}%), Oro ({$validated['comision_oro']}%).",
                 'changed_at' => now(),
             ]);
 
@@ -74,6 +74,9 @@ class ConfiguracionController extends Controller
                 'fecha_corte' => $validated['fecha_corte'],
                 'fecha_limite_pago' => $validated['fecha_limite_pago'],
                 'multa_adeudo' => $validated['multa_adeudo'],
+                'comision_cobre' => $validated['comision_cobre'],
+                'comision_plata' => $validated['comision_plata'],
+                'comision_oro' => $validated['comision_oro'],
                 'updated_by_user_id' => $userId,
             ];
 
@@ -86,6 +89,6 @@ class ConfiguracionController extends Controller
         });
 
         return redirect()->route('configuracion-general.edit')
-            ->with('success', 'La configuración general fue actualizada correctamente el ' . now()->format('d/m/Y H:i') . '.');
+            ->with('success', 'La configuración general y porcentajes por categoría fueron actualizados correctamente el ' . now()->format('d/m/Y H:i') . '.');
     }
 }

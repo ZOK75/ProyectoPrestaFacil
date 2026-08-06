@@ -5,7 +5,7 @@
 @section('content')
 <div class="max-w-md mx-auto space-y-4">
 
-    <!-- Encabezado Móvil -->
+    <!-- Encabezado Móvil con Categoría del Distribuidor -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
         <div class="flex items-center justify-between gap-2 mb-3">
             <div>
@@ -17,9 +17,19 @@
                 </h1>
                 <p class="text-xs text-slate-400 mt-0.5">Productos de crédito activos disponibles</p>
             </div>
-            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
-                Modo Distribución
-            </span>
+            
+            @auth
+                @if(Auth::user()->esDistribuidor())
+                    <div class="text-right shrink-0">
+                        <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 block">
+                            Categoría {{ strtoupper(Auth::user()->categoria_distribuidor ?? 'cobre') }}
+                        </span>
+                        <span class="text-[10px] font-extrabold text-emerald-400 block mt-0.5">
+                            {{ number_format(Auth::user()->obtenerPorcentajeGanancia(), 0) }}% Ganancia
+                        </span>
+                    </div>
+                @endif
+            @endauth
         </div>
 
         <!-- Badges de Estadísticas Móviles -->

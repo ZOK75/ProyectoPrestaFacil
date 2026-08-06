@@ -20,6 +20,7 @@ class StoreUserRequest extends FormRequest
             'password' => ['required', 'string', 'confirmed', Password::defaults()],
             'rol_id' => ['required', 'exists:roles,id'],
             'sucursal_id' => ['required', 'exists:sucursales,id'],
+            'categoria_distribuidor' => ['nullable', 'in:cobre,plata,oro'],
         ];
     }
 

@@ -30,6 +30,7 @@ class UpdateUserRequest extends FormRequest
             'password' => ['nullable', 'string', 'confirmed', Password::defaults()],
             'rol_id' => ['required', 'exists:roles,id'],
             'sucursal_id' => ['required', 'exists:sucursales,id'],
+            'categoria_distribuidor' => ['nullable', 'in:cobre,plata,oro'],
         ];
     }
 

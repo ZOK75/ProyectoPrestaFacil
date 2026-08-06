@@ -144,7 +144,7 @@
                 <thead class="bg-slate-950/80 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
                     <tr>
                         <th class="px-6 py-4">Usuario</th>
-                        <th class="px-6 py-4">Rol</th>
+                        <th class="px-6 py-4">Rol / Categoría</th>
                         <th class="px-6 py-4">Sucursal</th>
                         <th class="px-6 py-4">Estado / Desactivación</th>
                         <th class="px-6 py-4 text-right">Acciones</th>
@@ -178,9 +178,16 @@
                                         ];
                                         $cls = $colorMap[$usuario->rol->nombre] ?? 'bg-slate-800 text-slate-300 border-slate-700';
                                     @endphp
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border {{ $cls }}">
-                                        {{ $usuario->rol->nombre }}
-                                    </span>
+                                    <div class="space-y-1">
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border {{ $cls }}">
+                                            {{ $usuario->rol->nombre }}
+                                        </span>
+                                        @if($usuario->esDistribuidor())
+                                            <div class="text-[11px] text-amber-400 font-bold uppercase tracking-wider">
+                                                • {{ $usuario->categoria_distribuidor ?? 'cobre' }} ({{ number_format($usuario->obtenerPorcentajeGanancia(), 0) }}%)
+                                            </div>
+                                        @endif
+                                    </div>
                                 @else
                                     <span class="text-xs text-slate-500 italic">Sin rol</span>
                                 @endif

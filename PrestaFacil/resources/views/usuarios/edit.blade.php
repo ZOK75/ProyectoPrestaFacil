@@ -99,21 +99,43 @@
                 </div>
             </div>
 
-            <!-- Categoría de Distribuidor -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                    Categoría de Distribuidor (Si aplica)
-                </label>
-                <select name="categoria_distribuidor"
-                    class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 @error('categoria_distribuidor') border-rose-500 @enderror">
-                    <option value="cobre" {{ old('categoria_distribuidor', $usuario->categoria_distribuidor) === 'cobre' ? 'selected' : '' }}>Cobre (Ganancia por Configuración General)</option>
-                    <option value="plata" {{ old('categoria_distribuidor', $usuario->categoria_distribuidor) === 'plata' ? 'selected' : '' }}>Plata (Ganancia por Configuración General)</option>
-                    <option value="oro" {{ old('categoria_distribuidor', $usuario->categoria_distribuidor) === 'oro' ? 'selected' : '' }}>Oro (Ganancia por Configuración General)</option>
-                </select>
-                <span class="text-[10px] text-slate-500 mt-1 block">Aplica únicamente si el usuario es Distribuidor o Distribuidora.</span>
-                @error('categoria_distribuidor')
-                    <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
-                @enderror
+            <!-- Ajustes de Distribuidor: Categoría y Límite de Crédito -->
+            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-4">
+                <h3 class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider">
+                    Parámetros de Distribución
+                </h3>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                            Categoría de Distribuidor
+                        </label>
+                        <select name="categoria_distribuidor"
+                            class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500">
+                            <option value="cobre" {{ old('categoria_distribuidor', $usuario->categoria_distribuidor) === 'cobre' ? 'selected' : '' }}>Cobre (Ganancia Config General)</option>
+                            <option value="plata" {{ old('categoria_distribuidor', $usuario->categoria_distribuidor) === 'plata' ? 'selected' : '' }}>Plata (Ganancia Config General)</option>
+                            <option value="oro" {{ old('categoria_distribuidor', $usuario->categoria_distribuidor) === 'oro' ? 'selected' : '' }}>Oro (Ganancia Config General)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                            Límite de Crédito ($)
+                        </label>
+                        <input type="number" step="0.01" min="0" name="limite_credito" value="{{ old('limite_credito', $usuario->limite_credito ?? 20000) }}"
+                            class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-emerald-400 font-bold focus:outline-none focus:border-emerald-500">
+                        <span class="text-[10px] text-slate-500 mt-1 block">Línea de crédito asignada para colocar vales.</span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Referencia de Pago Bancaria Personalizada
+                    </label>
+                    <input type="text" name="referencia_pago_distribuidor" value="{{ old('referencia_pago_distribuidor', $usuario->referencia_pago_distribuidor) }}" placeholder="ej. REF-DIST-00000101"
+                        class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-mono focus:outline-none focus:border-indigo-500">
+                    <span class="text-[10px] text-slate-500 mt-1 block">Dejar en blanco para generar automáticamente.</span>
+                </div>
             </div>
 
             <!-- Botones -->

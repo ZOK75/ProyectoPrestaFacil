@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StorePagoRequest;
 use App\Http\Requests\StorePrestamoRequest;
 use App\Models\Cliente;
+use App\Models\Configuracion;
 use App\Models\PagoPrestamo;
 use App\Models\Prestamo;
 use App\Models\ProductoVale;
@@ -30,6 +31,11 @@ class PrestamoController extends Controller
     {
         $operador = $this->operador();
         $query = Prestamo::with(['cliente', 'productoVale', 'pagos']);
+
+        // Si es distribuidor, filtra solo sus préstamos colocados
+        if ($operador && $operador->esDistribuidor()) {
+            $query->where('created_by_user_id', $operador->id);
+        }
 
         // Buscador por Referencia o Nombre / CURP de Cliente
         if ($request->filled('buscar')) {
@@ -100,7 +106,10 @@ class PrestamoController extends Controller
     }
 
     /**
-     * Registrar la asignación de un vale/prevale con generación de Referencia única.
+     * Registrar la asignación de un vale/prevale con validaciones de:
+     * 1. Un solo préstamo activo por cliente.
+     * 2. Regla del vale máximo (50% del límite de crédito total + $500.00).
+     * 3. Crédito disponible del distribuidor.
      */
     public function store(StorePrestamoRequest $request)
     {
@@ -111,9 +120,44 @@ class PrestamoController extends Controller
             return back()->withErrors(['cliente_id' => 'Este cliente está desactivado.'])->withInput();
         }
 
+        // ─────────────────────────────────────────────────────────────
+        // REGLA 1: Solo se permite 1 préstamo activo por cliente
+        // ─────────────────────────────────────────────────────────────
+        $prestamoActivo = Prestamo::where('cliente_id', $cliente->id)
+            ->where('estado', 'activo')
+            ->first();
+
+        if ($prestamoActivo) {
+            return back()->withErrors([
+                'cliente_id' => "No es posible otorgar un nuevo vale. El cliente '{$cliente->nombre}' ya cuenta con un préstamo activo pendiente de liquidar (Referencia: {$prestamoActivo->referencia})."
+            ])->withInput();
+        }
+
         $vale = ProductoVale::where('id', $request->producto_vale_id)
             ->where('activo', true)
             ->firstOrFail();
+
+        // ─────────────────────────────────────────────────────────────
+        // REGLA 2: Límite máximo por vale (50% del límite de crédito + $500)
+        // ─────────────────────────────────────────────────────────────
+        if ($operador && $operador->esDistribuidor()) {
+            $montoMaxVale = $operador->montoMaximoPermitidoPorVale();
+            if (floatval($vale->monto_prestamo) > $montoMaxVale) {
+                return back()->withErrors([
+                    'producto_vale_id' => "El vale solicitado ($" . number_format($vale->monto_prestamo, 2) . ") excede el tope máximo permitido por vale para tu línea de crédito ($" . number_format($montoMaxVale, 2) . ")."
+                ])->withInput();
+            }
+
+            // ─────────────────────────────────────────────────────────
+            // REGLA 3: Verificar crédito disponible del distribuidor
+            // ─────────────────────────────────────────────────────────
+            $creditoDisponible = $operador->creditoDisponible();
+            if (floatval($vale->monto_prestamo) > $creditoDisponible) {
+                return back()->withErrors([
+                    'producto_vale_id' => "Límite de crédito insuficiente. Tu crédito disponible actual es de $" . number_format($creditoDisponible, 2) . " y el vale solicitado requiere $" . number_format($vale->monto_prestamo, 2) . "."
+                ])->withInput();
+            }
+        }
 
         // Determinar si es la primera asignación (prevale) o subsecuente (vale)
         $conteoPrevio = Prestamo::where('cliente_id', $cliente->id)->count();
@@ -143,7 +187,7 @@ class PrestamoController extends Controller
 
         $tipoTexto = strtoupper($tipo);
         return redirect()->route('prestamos.show', $prestamo)
-            ->with('success', "¡Asignación exitosa! Se generó el {$tipoTexto} con la Referencia {$referencia} para {$cliente->nombre}.");
+            ->with('success', "¡Asignación exitosa! Se generó el {$tipoTexto} con Referencia {$referencia} para {$cliente->nombre}. Saldo de crédito actualizado.");
     }
 
     /**
@@ -224,7 +268,32 @@ class PrestamoController extends Controller
             $mensaje .= " (Se aplicó multa de $" . number_format($montoMulta, 2) . ")";
         }
 
+        if ($nuevoEstado === 'finalizado') {
+            $mensaje .= " ¡La cuenta ha sido completamente liquidada y el saldo del crédito fue restaurado!";
+        }
+
         return redirect()->route('prestamos.show', $prestamo)
             ->with('success', $mensaje);
+    }
+
+    /**
+     * Genera la Relación de Cobranza del Distribuidor en formato PDF / Imprimible réplica oficial.
+     */
+    public function relacionCobranza()
+    {
+        $operador = $this->operador();
+        $configuracion = Configuracion::actual();
+
+        // Cargar todos los préstamos activos de los clientes de este distribuidor
+        $prestamosQuery = Prestamo::with(['cliente', 'productoVale', 'pagos'])
+            ->where('estado', 'activo');
+
+        if ($operador && $operador->esDistribuidor()) {
+            $prestamosQuery->where('created_by_user_id', $operador->id);
+        }
+
+        $prestamos = $prestamosQuery->orderBy('created_at', 'desc')->get();
+
+        return view('prestamos.relacion_pdf', compact('operador', 'configuracion', 'prestamos'));
     }
 }

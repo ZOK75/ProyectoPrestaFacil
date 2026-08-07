@@ -5,7 +5,7 @@
 @section('content')
 <div class="max-w-md mx-auto space-y-4">
 
-    <!-- Encabezado Móvil con Badge de Categoría del Distribuidor -->
+    <!-- Encabezado Móvil con Badge de Categoría y Crédito Disponible -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
         <div class="flex items-center justify-between gap-2 mb-3">
             <div>
@@ -32,13 +32,40 @@
             @endauth
         </div>
 
-        <div class="flex items-center justify-between pt-2 border-t border-slate-800">
-            <span class="text-xs font-medium text-slate-400">Acciones de Cobranza:</span>
-            <a href="{{ route('prestamos.create') }}" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center gap-1 shrink-0">
+        <!-- Ficha de Crédito Disponible & Tope de Vale -->
+        @auth
+            @if(Auth::user()->esDistribuidor())
+                <div class="bg-slate-950/80 rounded-xl p-3 border border-slate-800 mb-3 space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400 font-medium">Crédito Disponible:</span>
+                        <span class="font-black text-emerald-400 text-sm">
+                            ${{ number_format(Auth::user()->creditoDisponible(), 2) }}
+                            <span class="text-[10px] text-slate-500 font-normal">/ ${{ number_format(Auth::user()->limite_credito ?? 20000, 0) }}</span>
+                        </span>
+                    </div>
+
+                    <div class="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-800/80">
+                        <span class="text-indigo-300 font-medium">Tope por vale (50% + $500):</span>
+                        <span class="font-extrabold text-indigo-300">${{ number_format(Auth::user()->montoMaximoPermitidoPorVale(), 2) }}</span>
+                    </div>
+                </div>
+            @endif
+        @endauth
+
+        <!-- Botones de Acción -->
+        <div class="flex items-center gap-2 pt-2 border-t border-slate-800">
+            <a href="{{ route('prestamos.create') }}" class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs text-center shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
                 Asignar Vale
+            </a>
+
+            <a href="{{ route('prestamos.relacion-pdf') }}" target="_blank" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs text-center transition flex items-center justify-center gap-1">
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Relación PDF
             </a>
         </div>
 

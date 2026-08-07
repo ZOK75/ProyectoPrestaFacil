@@ -31,6 +31,8 @@ class UpdateUserRequest extends FormRequest
             'rol_id' => ['required', 'exists:roles,id'],
             'sucursal_id' => ['required', 'exists:sucursales,id'],
             'categoria_distribuidor' => ['nullable', 'in:cobre,plata,oro'],
+            'limite_credito' => ['nullable', 'numeric', 'min:0'],
+            'referencia_pago_distribuidor' => ['nullable', 'string', 'max:50'],
         ];
     }
 

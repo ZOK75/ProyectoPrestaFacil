@@ -5,7 +5,7 @@
 @section('content')
 <div class="max-w-md mx-auto space-y-4">
 
-    <!-- Encabezado Móvil con Categoría del Distribuidor -->
+    <!-- Encabezado Móvil con Categoría del Distribuidor y Crédito Disponible -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
         <div class="flex items-center justify-between gap-2 mb-3">
             <div>
@@ -31,6 +31,26 @@
                 @endif
             @endauth
         </div>
+
+        <!-- Ficha de Crédito Disponible & Tope de Vale -->
+        @auth
+            @if(Auth::user()->esDistribuidor())
+                <div class="bg-slate-950/80 rounded-xl p-3 border border-slate-800 mb-3 space-y-1.5">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400 font-medium">Crédito Disponible:</span>
+                        <span class="font-black text-emerald-400 text-sm">
+                            ${{ number_format(Auth::user()->creditoDisponible(), 2) }}
+                            <span class="text-[10px] text-slate-500 font-normal">/ ${{ number_format(Auth::user()->limite_credito ?? 20000, 0) }}</span>
+                        </span>
+                    </div>
+
+                    <div class="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-800/80">
+                        <span class="text-indigo-300 font-medium">Tope por vale (50% + $500):</span>
+                        <span class="font-extrabold text-indigo-300">${{ number_format(Auth::user()->montoMaximoPermitidoPorVale(), 2) }}</span>
+                    </div>
+                </div>
+            @endif
+        @endauth
 
         <!-- Badges de Estadísticas Móviles -->
         <div class="grid grid-cols-2 gap-2 pt-3 border-t border-slate-800 text-center">
@@ -108,7 +128,7 @@
                     </div>
                 </div>
 
-                <!-- Acciones Móviles (Full Width Touch) -->
+                <!-- Acciones Móviles -->
                 <div>
                     <a href="{{ route('producto-vales.show', $producto) }}" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold text-center shadow-lg transition flex items-center justify-center gap-1.5">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

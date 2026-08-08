@@ -15,13 +15,37 @@
 
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
         <div class="mb-4 pb-3 border-b border-slate-800">
-            <h1 class="text-lg font-black text-white">Editar Cliente</h1>
+            <h1 class="text-lg font-black text-white">
+                {{ Auth::user()->esDistribuidor() ? 'Solicitar Modificación de Cliente' : 'Editar Cliente' }}
+            </h1>
             <p class="text-xs text-slate-400 truncate">{{ $cliente->nombre }}</p>
+
+            @if(Auth::user()->esDistribuidor())
+                <div class="mt-3 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs flex items-start gap-2">
+                    <svg class="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span>
+                        <strong>Aviso:</strong> Los cambios solicitados serán enviados a tu Gerente de Sucursal y al Gerente General para su autorización antes de reflejarse en el cliente.
+                    </span>
+                </div>
+            @endif
         </div>
 
         <form action="{{ route('clientes.update', $cliente) }}" method="POST" enctype="multipart/form-data" class="space-y-5">
             @csrf
             @method('PUT')
+
+            @if(Auth::user()->esDistribuidor())
+                <!-- Motivo de la Solicitud -->
+                <div>
+                    <label class="block text-[11px] font-bold text-indigo-300 uppercase tracking-wider mb-1">
+                        Motivo / Justificación del Cambio (Opcional)
+                    </label>
+                    <input type="text" name="motivo_solicitud" placeholder="Ej. Corrección de domicilio, renovación de INE..."
+                           class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-indigo-500">
+                </div>
+            @endif
 
             <!-- 1. Datos Personales -->
             <div class="space-y-3">
@@ -189,7 +213,7 @@
                     Cancelar
                 </a>
                 <button type="submit" class="w-2/3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-1">
-                    Actualizar Datos
+                    {{ Auth::user()->esDistribuidor() ? 'Enviar Solicitud a Gerencia' : 'Actualizar Datos' }}
                 </button>
             </div>
         </form>

@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\ClienteController;
+use App\Http\Controllers\DistribuidorController;
 use App\Http\Controllers\ProductoValeController;
 use App\Http\Controllers\ConfiguracionController;
+use App\Http\Controllers\SolicitudClienteController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\GerenteGeneralController;
@@ -11,16 +13,27 @@ use App\Http\Controllers\PrestamoController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-// Redirección inicial según estado de sesión
+// Redirección inicial según estado de sesión y rol del usuario
 Route::get('/', function () {
-    return Auth::check() ? redirect()->route('producto-vales.index') : redirect()->route('login');
+    if (!Auth::check()) {
+        return redirect()->route('login');
+    }
+    $user = Auth::user()->load('rol');
+    if ($user->esGerenteGeneral()) return redirect()->route('gerente-general.dashboard');
+    if ($user->esGerenteSucursal()) return redirect()->route('gerente-sucursal.dashboard');
+    if ($user->esDistribuidor()) return redirect()->route('distribuidor.dashboard');
+    return redirect()->route('producto-vales.index');
 });
 
 // Todas las rutas del sistema requieren sesión activa (middleware 'auth')
 Route::middleware(['auth'])->group(function () {
 
     Route::get('/dashboard', function () {
-        return view('dashboard');
+        $user = Auth::user()->load('rol');
+        if ($user->esGerenteGeneral()) return redirect()->route('gerente-general.dashboard');
+        if ($user->esGerenteSucursal()) return redirect()->route('gerente-sucursal.dashboard');
+        if ($user->esDistribuidor()) return redirect()->route('distribuidor.dashboard');
+        return redirect()->route('producto-vales.index');
     })->name('dashboard');
 
     // Perfil de usuario
@@ -39,6 +52,18 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/dashboard', [GerenteSucursalController::class, 'index'])
             ->name('gerente-sucursal.dashboard');
     });
+
+    // 3. Distribuidor Dashboard
+    Route::prefix('distribuidor')->group(function () {
+        Route::get('/dashboard', [DistribuidorController::class, 'dashboard'])
+            ->name('distribuidor.dashboard');
+    });
+
+    // 4. Bandeja de Solicitudes y Notificaciones de Clientes (Gerencia)
+    Route::get('solicitudes-clientes', [SolicitudClienteController::class, 'index'])->name('solicitudes-clientes.index');
+    Route::get('solicitudes-clientes/{solicitud}', [SolicitudClienteController::class, 'show'])->name('solicitudes-clientes.show');
+    Route::post('solicitudes-clientes/{solicitud}/aprobar', [SolicitudClienteController::class, 'aprobar'])->name('solicitudes-clientes.aprobar');
+    Route::post('solicitudes-clientes/{solicitud}/rechazar', [SolicitudClienteController::class, 'rechazar'])->name('solicitudes-clientes.rechazar');
 
     // Módulos del Sistema
     Route::resource('producto-vales', ProductoValeController::class);

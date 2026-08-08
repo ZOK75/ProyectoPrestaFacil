@@ -31,18 +31,21 @@ class AuthenticatedSessionController extends Controller
         // Limpiamos la URL "intended" para obligar a Laravel a usar nuestro match
         $request->session()->forget('url.intended');
 
-        $user = Auth::user();
-    
+        $user = Auth::user()->load('rol');
 
-        return match ((int)$user->rol_id) {
-            1  => redirect()->route('gerente-general.dashboard'),
-            
-            2 => redirect()->route('gerente-sucursal.dashboard'),
+        if ($user->esGerenteGeneral()) {
+            return redirect()->route('gerente-general.dashboard');
+        }
 
-            default  => redirect()->route('login')->withErrors([
-            'role' => 'Rol de usuario no reconocido.']),
-            
-        };
+        if ($user->esGerenteSucursal()) {
+            return redirect()->route('gerente-sucursal.dashboard');
+        }
+
+        if ($user->esDistribuidor()) {
+            return redirect()->route('distribuidor.dashboard');
+        }
+
+        return redirect()->route('producto-vales.index');
 
 
     }

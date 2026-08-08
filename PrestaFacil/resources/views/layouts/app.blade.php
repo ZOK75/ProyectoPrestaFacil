@@ -62,24 +62,33 @@
 
             <div class="flex items-center space-x-4">
                 <nav class="flex items-center space-x-1">
-                    <!-- Opción Vales: Visible para todos -->
-                    <a href="{{ route('producto-vales.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('producto-vales.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
-                        Vales
-                    </a>
-
                     @auth
-                        <!-- Opciones Clientes y Préstamos: Únicamente para Distribuidor/Distribuidora -->
                         @if(Auth::user()->esDistribuidor())
+                            <!-- Opciones para Distribuidor -->
+                            <a href="{{ route('distribuidor.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('distribuidor.dashboard') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Mi Panel
+                            </a>
                             <a href="{{ route('clientes.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('clientes.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                 Clientes
                             </a>
                             <a href="{{ route('prestamos.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('prestamos.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                 Préstamos
                             </a>
-                        @endif
+                        @else
+                            <!-- Opciones para Gerentes y Administración -->
+                            @if(Auth::user()->esGerenteGeneral())
+                                <a href="{{ route('gerente-general.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('gerente-general.dashboard') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Dashboard
+                                </a>
+                            @elseif(Auth::user()->esGerenteSucursal())
+                                <a href="{{ route('gerente-sucursal.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('gerente-sucursal.dashboard') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Dashboard
+                                </a>
+                            @endif
 
-                        <!-- Opción Usuarios y Configuración: Para Gerentes -->
-                        @if(!Auth::user()->esDistribuidor())
+                            <a href="{{ route('producto-vales.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('producto-vales.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Vales
+                            </a>
                             <a href="{{ route('usuarios.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('usuarios.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                 Usuarios
                             </a>
@@ -93,6 +102,25 @@
                 </nav>
 
                 @auth
+                    <!-- Campana de Notificaciones de Solicitudes (Gerentes) -->
+                    @if(Auth::user()->esGerenteGeneral() || Auth::user()->esGerenteSucursal())
+                        @php
+                            $conteoNotif = Auth::user()->conteoSolicitudesPendientes();
+                        @endphp
+                        <a href="{{ route('solicitudes-clientes.index') }}" 
+                           class="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition border border-transparent hover:border-slate-700" 
+                           title="Bandeja de Solicitudes y Notificaciones">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                            </svg>
+                            @if($conteoNotif > 0)
+                                <span class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-black text-slate-950 shadow-lg shadow-amber-500/40 animate-bounce">
+                                    {{ $conteoNotif > 9 ? '9+' : $conteoNotif }}
+                                </span>
+                            @endif
+                        </a>
+                    @endif
+
                     <!-- Menu Desplegable de Usuario -->
                     <div x-data="{ open: false }" class="relative">
                         <button @click="open = !open" @click.outside="open = false" type="button" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 focus:outline-none transition border border-slate-700/50">

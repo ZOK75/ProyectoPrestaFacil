@@ -11,7 +11,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z" />
                     </svg>
                 </div>
-                <h2 class="text-2xl font-bold text-slate-900 tracking-wide">Mis Vales</h2>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-wide">PrestaFacil</h2>
                 <p class="text-sm text-slate-500 mt-1">Ingresa tus credenciales para acceder</p>
             </div>
 
@@ -53,23 +53,7 @@
                     <x-input-error :messages="$errors->get('password')" class="mt-2" />
                 </div>
 
-                <!-- Recordarme y Olvidó Contraseña -->
-                <div class="flex items-center justify-between pt-1">
-                    <label for="remember_me" class="inline-flex items-center cursor-pointer">
-                        <input id="remember_me" 
-                               type="checkbox" 
-                               name="remember" 
-                               class="rounded border-slate-300 text-emerald-600 shadow-sm focus:ring-emerald-500">
-                        <span class="ms-2 text-xs text-slate-600">Recordarme</span>
-                    </label>
-
-                    @if (Route::has('password.request'))
-                        <a class="text-xs text-emerald-600 hover:text-emerald-700 transition duration-150 ease-in-out font-medium" 
-                           href="{{ route('password.request') }}">
-                            ¿Olvidaste tu contraseña?
-                        </a>
-                    @endif
-                </div>
+      
 
                 <!-- Botón de Envío -->
                 <div class="pt-2">

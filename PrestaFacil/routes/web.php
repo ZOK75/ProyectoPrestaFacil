@@ -45,6 +45,7 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('clientes', ClienteController::class);
 
     // Sistema de Préstamos, Prevales/Vales y Cobranza
+    Route::get('prestamos-relacion-pdf', [PrestamoController::class, 'relacionCobranza'])->name('prestamos.relacion-pdf');
     Route::resource('prestamos', PrestamoController::class);
     Route::get('prestamos/{prestamo}/pago', [PrestamoController::class, 'pagoForm'])->name('prestamos.pago');
     Route::post('prestamos/{prestamo}/pago', [PrestamoController::class, 'registrarPago'])->name('prestamos.pago.store');

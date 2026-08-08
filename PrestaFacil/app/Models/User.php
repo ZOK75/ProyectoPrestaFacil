@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Prestamo;
 
 class User extends Authenticatable
 {
@@ -25,6 +26,9 @@ class User extends Authenticatable
         'rol_id',
         'sucursal_id',
         'categoria_distribuidor',
+        'limite_credito',
+        'referencia_pago_distribuidor',
+        'puntos',
         'activo',
         'desactivado_at',
         'desactivado_by_user_id',
@@ -52,6 +56,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'activo' => 'boolean',
             'desactivado_at' => 'datetime',
+            'limite_credito' => 'decimal:2',
+            'puntos' => 'integer',
         ];
     }
 
@@ -99,8 +105,7 @@ class User extends Authenticatable
     }
 
     /**
-     * Obtiene el porcentaje de ganancia según su categoría de distribuidor
-     * y la Configuración General vigente.
+     * Obtiene el porcentaje de ganancia según su categoría de distribuidor.
      */
     public function obtenerPorcentajeGanancia(): float
     {
@@ -110,6 +115,51 @@ class User extends Authenticatable
 
         $config = Configuracion::actual();
         return $config->obtenerComision($this->categoria_distribuidor);
+    }
+
+    /**
+     * Calcula el monto de crédito de vales en estado 'activo' que tiene ocupados el distribuidor.
+     */
+    public function creditoUtilizado(): float
+    {
+        if (!$this->esDistribuidor()) {
+            return 0.0;
+        }
+
+        return floatval(Prestamo::where('created_by_user_id', $this->id)
+            ->where('estado', 'activo')
+            ->sum('monto_prestamo'));
+    }
+
+    /**
+     * Calcula el crédito disponible actual del distribuidor.
+     */
+    public function creditoDisponible(): float
+    {
+        $limite = floatval($this->limite_credito ?? 20000.00);
+        return max(0.0, $limite - $this->creditoUtilizado());
+    }
+
+    /**
+     * Calcula el valor máximo que puede tener UN SOLO VALE otorgado por este distribuidor:
+     * Regla: (50% del Límite de Crédito Total) + $500.00
+     */
+    public function montoMaximoPermitidoPorVale(): float
+    {
+        $limite = floatval($this->limite_credito ?? 20000.00);
+        return ($limite * 0.50) + 500.00;
+    }
+
+    /**
+     * Devuelve la referencia de pago bancaria única del distribuidor.
+     */
+    public function referenciaPago(): string
+    {
+        if (!empty($this->referencia_pago_distribuidor)) {
+            return $this->referencia_pago_distribuidor;
+        }
+
+        return 'REF-DIST-' . str_pad((string)$this->id, 8, '0', STR_PAD_LEFT);
     }
 
     /**

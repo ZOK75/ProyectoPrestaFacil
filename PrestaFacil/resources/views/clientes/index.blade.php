@@ -92,7 +92,11 @@
                     </div>
 
                     <div>
-                        @if($cliente->activo)
+                        @if($cliente->tieneSolicitudPendiente())
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 animate-pulse">
+                                ⏳ Solicitud en Revisión
+                            </span>
+                        @elseif($cliente->activo)
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                                 • Activo
                             </span>
@@ -133,7 +137,7 @@
                     </div>
                 </div>
 
-                <!-- Acciones Móviles (Full Width Touch Targets) -->
+                <!-- Acciones Móviles -->
                 <div class="flex items-center gap-2 pt-2 border-t border-slate-800/80">
                     <a href="{{ route('clientes.show', $cliente) }}" class="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold text-center transition flex items-center justify-center gap-1 shadow">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,14 +147,14 @@
                         Expediente
                     </a>
 
-                    @if($cliente->activo)
-                        <a href="{{ route('clientes.edit', $cliente) }}" class="px-3 py-2 rounded-xl bg-slate-800 text-indigo-400 hover:text-white text-xs font-semibold transition" title="Editar">
+                    @if($cliente->activo && !$cliente->tieneSolicitudPendiente())
+                        <a href="{{ route('clientes.edit', $cliente) }}" class="px-3 py-2 rounded-xl bg-slate-800 text-indigo-400 hover:text-white text-xs font-semibold transition" title="Editar / Solicitar Modificación">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                             </svg>
                         </a>
 
-                        <form action="{{ route('clientes.destroy', $cliente) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Desactivar cliente {{ $cliente->nombre }}?');">
+                        <form action="{{ route('clientes.destroy', $cliente) }}" method="POST" class="inline-block" onsubmit="return confirm('{{ Auth::user()->esDistribuidor() ? '¿Enviar solicitud a Gerencia para desactivar al cliente ' . $cliente->nombre . '?' : '¿Desactivar al cliente ' . $cliente->nombre . '?' }}');">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="px-3 py-2 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-600 hover:text-white text-xs font-semibold transition" title="Desactivar">

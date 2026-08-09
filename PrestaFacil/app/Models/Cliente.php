@@ -52,4 +52,28 @@ class Cliente extends Model
     {
         return $this->belongsTo(User::class, 'desactivado_by_user_id');
     }
+
+    /**
+     * Solicitudes de cambio o desactivación sobre este cliente.
+     */
+    public function solicitudes(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SolicitudCliente::class, 'cliente_id')->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Solicitud pendiente actual si existe.
+     */
+    public function solicitudPendiente(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(SolicitudCliente::class, 'cliente_id')->where('estado', 'pendiente')->latestOfMany();
+    }
+
+    /**
+     * Indica si el cliente tiene alguna solicitud pendiente de aprobación.
+     */
+    public function tieneSolicitudPendiente(): bool
+    {
+        return $this->solicitudes()->where('estado', 'pendiente')->exists();
+    }
 }

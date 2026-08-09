@@ -163,11 +163,15 @@ class User extends Authenticatable
     }
 
     /**
-     * Devuelve los roles que este usuario tiene permiso de asignar.
+     * Devuelve los roles que este usuario tiene permiso de asignar al crear usuarios.
+     * Regla: Ningún rol puede crear usuarios con el rol Distribuidor / Distribuidora.
      */
     public function rolesPermitidos()
     {
         $query = Rol::query();
+
+        // Bloquear permanentemente la creación de distribuidores desde el módulo de usuarios
+        $query->whereNotIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']);
 
         if ($this->esGerenteGeneral()) {
             $query->where('nombre', '!=', 'Gerente General');
@@ -194,5 +198,39 @@ class User extends Authenticatable
         }
 
         return Sucursal::where('id', 0)->get();
+    }
+
+    /**
+     * Solicitudes de clientes enviadas por este distribuidor.
+     */
+    public function solicitudesEnviadas(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SolicitudCliente::class, 'distribuidor_id')->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Préstamos / Vales otorgados por este usuario (distribuidor).
+     */
+    public function prestamos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Prestamo::class, 'created_by_user_id')->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Conteo de solicitudes pendientes visibles para este gerente (campana de notificaciones).
+     */
+    public function conteoSolicitudesPendientes(): int
+    {
+        if ($this->esGerenteGeneral()) {
+            return SolicitudCliente::where('estado', 'pendiente')->count();
+        }
+
+        if ($this->esGerenteSucursal() && $this->sucursal_id) {
+            return SolicitudCliente::where('estado', 'pendiente')
+                ->where('sucursal_id', $this->sucursal_id)
+                ->count();
+        }
+
+        return 0;
     }
 }

@@ -27,6 +27,13 @@ class Prestamo extends Model
         'pagos_recibidos',
         'multas',
         'estado',
+        'estado_entrega',
+        'entregado_por_user_id',
+        'entregado_at',
+        'numero_transferencia',
+        'monto_depositado',
+        'sucursal_entrega_id',
+        'limite_credito_anterior',
         'activo',
         'created_by_user_id',
         'desactivado_at',
@@ -44,6 +51,9 @@ class Prestamo extends Model
         'pagos_realizados' => 'integer',
         'activo' => 'boolean',
         'desactivado_at' => 'datetime',
+        'entregado_at' => 'datetime',
+        'monto_depositado' => 'decimal:2',
+        'limite_credito_anterior' => 'decimal:2',
     ];
 
     public function cliente(): BelongsTo
@@ -71,6 +81,16 @@ class Prestamo extends Model
         return $this->belongsTo(User::class, 'desactivado_by_user_id');
     }
 
+    public function entregadoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'entregado_por_user_id');
+    }
+
+    public function sucursalEntrega(): BelongsTo
+    {
+        return $this->belongsTo(Sucursal::class, 'sucursal_entrega_id');
+    }
+
     public function esPrevale(): bool
     {
         return $this->tipo === 'prevale';
@@ -79,5 +99,20 @@ class Prestamo extends Model
     public function estaPagado(): bool
     {
         return $this->estado === 'finalizado' || $this->adeudo_pendiente <= 0;
+    }
+
+    public function estaEntregado(): bool
+    {
+        return $this->estado_entrega === 'entregado';
+    }
+
+    public function estaCancelado(): bool
+    {
+        return $this->estado_entrega === 'cancelado' || $this->estado === 'desactivado';
+    }
+
+    public function estaPendienteEntrega(): bool
+    {
+        return $this->estado_entrega === 'pendiente';
     }
 }

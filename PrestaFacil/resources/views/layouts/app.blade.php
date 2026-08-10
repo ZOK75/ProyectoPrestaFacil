@@ -121,6 +121,25 @@
                         </a>
                     @endif
 
+                    <!-- Campana de Notificaciones (Cajeros y Coordinadores) -->
+                    @if(Auth::user()->esCajero() || Auth::user()->esCoordinador())
+                        @php
+                            $conteoNotifCajero = Auth::user()->conteoNotificacionesSinLeer();
+                        @endphp
+                        <a href="{{ route('cajero.notificaciones') }}" 
+                           class="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition border border-transparent hover:border-slate-700" 
+                           title="Notificaciones">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                            </svg>
+                            @if($conteoNotifCajero > 0)
+                                <span class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-lg shadow-rose-500/40 animate-bounce">
+                                    {{ $conteoNotifCajero > 9 ? '9+' : $conteoNotifCajero }}
+                                </span>
+                            @endif
+                        </a>
+                    @endif
+
                     <!-- Menu Desplegable de Usuario -->
                     <div x-data="{ open: false }" class="relative">
                         <button @click="open = !open" @click.outside="open = false" type="button" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 focus:outline-none transition border border-slate-700/50">

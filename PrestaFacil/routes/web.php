@@ -10,6 +10,8 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\GerenteGeneralController;
 use App\Http\Controllers\GerenteSucursalController;
 use App\Http\Controllers\PrestamoController;
+use App\Http\Controllers\CajeroController;
+use App\Http\Controllers\AutorizacionController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -22,6 +24,8 @@ Route::get('/', function () {
     if ($user->esGerenteGeneral()) return redirect()->route('gerente-general.dashboard');
     if ($user->esGerenteSucursal()) return redirect()->route('gerente-sucursal.dashboard');
     if ($user->esDistribuidor()) return redirect()->route('distribuidor.dashboard');
+    if ($user->esCajero()) return redirect()->route('cajero.dashboard');
+    if ($user->esCoordinador()) return redirect()->route('autorizaciones.index');
     return redirect()->route('producto-vales.index');
 });
 
@@ -33,6 +37,8 @@ Route::middleware(['auth'])->group(function () {
         if ($user->esGerenteGeneral()) return redirect()->route('gerente-general.dashboard');
         if ($user->esGerenteSucursal()) return redirect()->route('gerente-sucursal.dashboard');
         if ($user->esDistribuidor()) return redirect()->route('distribuidor.dashboard');
+        if ($user->esCajero()) return redirect()->route('cajero.dashboard');
+        if ($user->esCoordinador()) return redirect()->route('autorizaciones.index');
         return redirect()->route('producto-vales.index');
     })->name('dashboard');
 
@@ -57,6 +63,48 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('distribuidor')->group(function () {
         Route::get('/dashboard', [DistribuidorController::class, 'dashboard'])
             ->name('distribuidor.dashboard');
+    });
+
+    // 3.1. Cajero Dashboard y Módulos
+    Route::prefix('cajero')->group(function () {
+        Route::get('/dashboard', [CajeroController::class, 'dashboard'])->name('cajero.dashboard');
+        
+        // Búsqueda de Folio
+        Route::get('/buscar-folio', [CajeroController::class, 'buscarFolio'])->name('cajero.buscar-folio');
+        
+        // Módulo 1: Prevale
+        Route::get('/prevale/{prestamo}/verificar', [CajeroController::class, 'verificarDatosPrevale'])->name('cajero.prevale.verificar');
+        Route::post('/prevale/{prestamo}/entregar', [CajeroController::class, 'entregarPrevale'])->name('cajero.prevale.entregar');
+        Route::match(['get', 'post'], '/prevale/{prestamo}/solicitar-modificacion', [CajeroController::class, 'solicitarModificacionDatos'])->name('cajero.solicitar-modificacion');
+        
+        // Módulo 2: Vale Digital
+        Route::get('/vale/{prestamo}/verificar', [CajeroController::class, 'verificarDatosVale'])->name('cajero.vale.verificar');
+        Route::post('/vale/{prestamo}/entregar', [CajeroController::class, 'entregarVale'])->name('cajero.vale.entregar');
+        
+        // Módulo 3: Abonos y Pagos
+        Route::get('/abonos', [CajeroController::class, 'indexAbonos'])->name('cajero.abonos.index');
+        Route::post('/abonos/{prestamo}', [CajeroController::class, 'registrarAbono'])->name('cajero.abonos.store');
+        
+        // Módulo 4: Conciliación
+        Route::get('/conciliaciones', [CajeroController::class, 'indexConciliaciones'])->name('cajero.conciliaciones.index');
+        Route::post('/conciliaciones', [CajeroController::class, 'solicitarConciliacion'])->name('cajero.conciliaciones.store');
+        Route::get('/conciliaciones/{conciliacion}', [CajeroController::class, 'mostrarConciliacion'])->name('cajero.conciliaciones.show');
+        
+        // Módulo 5: Canje de Puntos
+        Route::get('/canje-puntos', [CajeroController::class, 'indexCanje'])->name('cajero.canje-puntos.index');
+        Route::post('/canje-puntos', [CajeroController::class, 'realizarCanje'])->name('cajero.canje-puntos.store');
+        
+        // Notificaciones
+        Route::get('/notificaciones', [CajeroController::class, 'notificaciones'])->name('cajero.notificaciones');
+        Route::post('/notificaciones/{id}/leer', [CajeroController::class, 'marcarNotificacionLeida'])->name('cajero.notificaciones.leer');
+    });
+
+    // 3.2. Autorizaciones (Coordinador y Gerentes)
+    Route::prefix('autorizaciones')->group(function () {
+        Route::get('/', [AutorizacionController::class, 'index'])->name('autorizaciones.index');
+        Route::get('/{solicitud}', [AutorizacionController::class, 'show'])->name('autorizaciones.show');
+        Route::post('/{solicitud}/aprobar', [AutorizacionController::class, 'aprobar'])->name('autorizaciones.aprobar');
+        Route::post('/{solicitud}/rechazar', [AutorizacionController::class, 'rechazar'])->name('autorizaciones.rechazar');
     });
 
     // 4. Bandeja de Solicitudes y Notificaciones de Clientes (Gerencia)

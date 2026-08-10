@@ -76,4 +76,12 @@ class Cliente extends Model
     {
         return $this->solicitudes()->where('estado', 'pendiente')->exists();
     }
+
+    /**
+     * Préstamos/Vales del cliente.
+     */
+    public function prestamos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Prestamo::class, 'cliente_id')->orderBy('created_at', 'desc');
+    }
 }

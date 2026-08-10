@@ -27,6 +27,7 @@ class User extends Authenticatable
         'sucursal_id',
         'categoria_distribuidor',
         'limite_credito',
+        'limite_credito_anterior',
         'referencia_pago_distribuidor',
         'puntos',
         'activo',
@@ -57,6 +58,7 @@ class User extends Authenticatable
             'activo' => 'boolean',
             'desactivado_at' => 'datetime',
             'limite_credito' => 'decimal:2',
+            'limite_credito_anterior' => 'decimal:2',
             'puntos' => 'integer',
         ];
     }
@@ -104,6 +106,37 @@ class User extends Authenticatable
         return in_array($nombre, ['distribuidor', 'distribuidora']);
     }
 
+    public function esCajero(): bool
+    {
+        return strtolower($this->rol?->nombre ?? '') === 'cajero';
+    }
+
+    public function esCoordinador(): bool
+    {
+        return strtolower($this->rol?->nombre ?? '') === 'coordinador';
+    }
+
+    public function esAdministrador(): bool
+    {
+        return strtolower($this->rol?->nombre ?? '') === 'administrador';
+    }
+
+    /**
+     * Sistema de Autorizaciones Transversal
+     */
+    public function puedeAutorizar(string $tipo, ?int $sucursalId): bool
+    {
+        if ($this->esGerenteGeneral()) {
+            return true;
+        }
+
+        if (($this->esGerenteSucursal() || $this->esCoordinador()) && $this->sucursal_id && $this->sucursal_id === $sucursalId) {
+            return true;
+        }
+
+        return false;
+    }
+
     /**
      * Obtiene el porcentaje de ganancia según su categoría de distribuidor.
      */
@@ -142,12 +175,44 @@ class User extends Authenticatable
 
     /**
      * Calcula el valor máximo que puede tener UN SOLO VALE otorgado por este distribuidor:
-     * Regla: (50% del Límite de Crédito Total) + $500.00
+     * Regla por defecto: (50% del Límite de Crédito Total) + $500.00
+     * Lee de configuración.
      */
     public function montoMaximoPermitidoPorVale(): float
     {
         $limite = floatval($this->limite_credito ?? 20000.00);
-        return ($limite * 0.50) + 500.00;
+        $config = Configuracion::actual();
+        
+        $porcentaje = $config->obtenerPorcentajeRegla() / 100.0;
+        $tolerancia = $config->obtenerTolerancia();
+        
+        return ($limite * $porcentaje) + $tolerancia;
+    }
+
+    /**
+     * Morosidad Dinámica
+     */
+    public function conteoRelacionesMorosas(): int
+    {
+        if (!$this->esDistribuidor()) return 0;
+        
+        return $this->prestamos()
+            ->where('estado', 'activo')
+            ->whereHas('pagos', function ($q) {
+                // Aquí en el futuro se puede agregar lógica más compleja, pero por ahora 
+                // asumimos que el estado de 'retraso' o multa indica morosidad.
+                // Como simplificación temporal antes de tener la lógica de ValidacionValeService:
+                $q->where('monto_multa', '>', 0);
+            })
+            ->count();
+    }
+
+    public function esMorosa(): bool
+    {
+        if (!$this->esDistribuidor()) return false;
+        
+        $strikes = Configuracion::actual()->obtenerStrikesMorosidad();
+        return $this->conteoRelacionesMorosas() >= $strikes;
     }
 
     /**
@@ -232,5 +297,23 @@ class User extends Authenticatable
         }
 
         return 0;
+    }
+
+    /**
+     * Relación de notificaciones del cajero/coordinador
+     */
+    public function notificaciones(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(NotificacionCajero::class, 'user_id')->orderByDesc('created_at');
+    }
+
+    public function notificacionesSinLeer()
+    {
+        return $this->notificaciones()->where('leida', false);
+    }
+
+    public function conteoNotificacionesSinLeer(): int
+    {
+        return $this->notificacionesSinLeer()->count();
     }
 }

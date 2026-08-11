@@ -68,7 +68,7 @@ class CorteCobranzaService
                             'data' => [
                                 'fecha_corte' => $config->fecha_corte->toIso8601String(),
                                 'fecha_limite' => $config->fecha_limite_pago ? $config->fecha_limite_pago->toIso8601String() : null,
-                                'url' => route('prestamos.relacion-pdf'),
+                                'url' => route('prestamos.relacion-pdf', [], false),
                             ],
                             'leida' => false,
                         ]);

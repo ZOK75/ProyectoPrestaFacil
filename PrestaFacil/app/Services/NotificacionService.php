@@ -10,7 +10,7 @@ class NotificacionService
     /**
      * Envía notificación a un usuario específico (ej: Cajera)
      */
-    public static function enviar(int $userId, string $tipo, string $titulo, string $mensaje, array $data = []): void
+    public static function enviar(string $userId, string $tipo, string $titulo, string $mensaje, array $data = []): void
     {
         NotificacionCajero::enviar($userId, $tipo, $titulo, $mensaje, $data);
     }
@@ -19,7 +19,7 @@ class NotificacionService
      * Notifica a todos los autorizadores (Coordinador, Gerente de Sucursal y Gerente General) 
      * relevantes para una sucursal específica.
      */
-    public static function notificarAutorizadores(int $sucursalId, string $tipo, string $titulo, string $mensaje, array $data = []): void
+    public static function notificarAutorizadores(string $sucursalId, string $tipo, string $titulo, string $mensaje, array $data = []): void
     {
         // Obtener autorizadores de la sucursal (Coordinador y Gerente de Sucursal)
         // y al Gerente General (que es global)
@@ -42,7 +42,7 @@ class NotificacionService
     /**
      * Notifica a todos los cajeros activos de una sucursal específica.
      */
-    public static function notificarCajerosSucursal(int $sucursalId, string $tipo, string $titulo, string $mensaje, array $data = []): void
+    public static function notificarCajerosSucursal(string $sucursalId, string $tipo, string $titulo, string $mensaje, array $data = []): void
     {
         $cajeros = User::whereHas('rol', function ($q) {
             $q->where('nombre', 'Cajero');

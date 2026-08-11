@@ -217,6 +217,22 @@ class Configuracion extends Model
 
         return $bloques * $puntosMultiplicador;
     }
+
+    /**
+     * Devuelve el porcentaje de la regla para prevales
+     */
+    public function obtenerPorcentajeRegla(): float
+    {
+        return floatval($this->porcentaje_regla_prevale ?? 15.0);
+    }
+
+    /**
+     * Devuelve la tolerancia permitida en monto
+     */
+    public function obtenerTolerancia(): float
+    {
+        return floatval($this->tolerancia_regla_prevale ?? 500.0);
+    }
  
     /**
      * La configuración general es un singleton: siempre debe existir

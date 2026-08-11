@@ -184,7 +184,7 @@ class ValidacionValeService
     /**
      * Verifica si el cliente tiene un vale activo
      */
-    public function verificarValeActivoCliente(int $clienteId): ?Prestamo
+    public function verificarValeActivoCliente(string $clienteId): ?Prestamo
     {
         return Prestamo::where('cliente_id', $clienteId)
             ->where('estado', 'activo')

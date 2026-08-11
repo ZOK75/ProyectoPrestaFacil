@@ -182,7 +182,7 @@ class User extends Authenticatable
     /**
      * Determina si el usuario puede autorizar solicitudes operativas.
      */
-    public function puedeAutorizar(?string $tipo = null, ?int $sucursalId = null): bool
+    public function puedeAutorizar(?string $tipo = null, ?string $sucursalId = null): bool
     {
         if ($this->esAdministrador() || $this->esGerenteGeneral() || $this->esGerenteSucursal()) {
             return false;
@@ -337,5 +337,14 @@ class User extends Authenticatable
         }
 
         return Sucursal::where('id', 0)->get();
+    }
+
+    /**
+     * Determina si la distribuidora está bloqueada por morosidad.
+     * TODO: Implementar lógica real con tabla de strikes
+     */
+    public function esMorosa(): bool
+    {
+        return false;
     }
 }

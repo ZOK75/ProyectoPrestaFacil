@@ -52,7 +52,7 @@ class NotificacionCajero extends Model
     }
 
     public static function enviar(
-        int $userId, 
+        string $userId, 
         string $tipo, 
         string $titulo, 
         string $mensaje, 

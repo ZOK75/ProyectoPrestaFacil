@@ -61,7 +61,7 @@
             </div>
 
             <div class="flex items-center space-x-4">
-                <nav class="flex items-center space-x-1">
+                <nav class="flex items-center space-x-1 overflow-x-auto">
                     @auth
                         @if(Auth::user()->esDistribuidor())
                             <!-- Opciones para Distribuidor -->
@@ -97,8 +97,8 @@
                                 Autorizaciones
                             </a>
                         @else
-                            <!-- Opciones para Gerentes y Administradores -->
-                            @if(Auth::user()->esGerenteGeneral())
+                            <!-- Opciones para Gerentes y Administrador -->
+                            @if(Auth::user()->esGerenteGeneral() || Auth::user()->esAdministrador())
                                 <a href="{{ route('gerente-general.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('gerente-general.dashboard') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                     Dashboard
                                 </a>
@@ -111,12 +111,43 @@
                             <a href="{{ route('producto-vales.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('producto-vales.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                 Vales
                             </a>
+
                             <a href="{{ route('usuarios.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('usuarios.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                 Usuarios
                             </a>
-                            @if(Auth::user()->esGerenteGeneral())
+
+                            <!-- Módulos de Auditoría (Exclusivos para Administrador) -->
+                            @if(Auth::user()->esAdministrador())
+                                <a href="{{ route('clientes.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('clientes.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Clientes
+                                </a>
+
+                                <a href="{{ route('prestamos.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('prestamos.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Préstamos
+                                </a>
+
+                                <a href="{{ route('solicitudes-clientes.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('solicitudes-clientes.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Solicitudes
+                                </a>
+
+                                <a href="{{ route('autorizaciones.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('autorizaciones.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Autorizaciones
+                                </a>
+                            @endif
+
+                            @if(Auth::user()->esGerenteGeneral() || Auth::user()->esAdministrador())
                                 <a href="{{ route('configuracion-general.edit') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('configuracion-general.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                     Configuración
+                                </a>
+                            @endif
+
+                            @if(Auth::user()->esAdministrador())
+                                <!-- Módulo de Logs exclusivo para Administrador -->
+                                <a href="{{ route('logs.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1 {{ request()->routeIs('logs.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    Logs
                                 </a>
                             @endif
                         @endif
@@ -143,8 +174,8 @@
                         </a>
                     @endif
 
-                    <!-- Campana de Notificaciones de Solicitudes (Gerentes) -->
-                    @if(Auth::user()->esGerenteGeneral() || Auth::user()->esGerenteSucursal())
+                    <!-- Campana de Notificaciones de Solicitudes (Exclusivo para Administrador) -->
+                    @if(Auth::user()->esAdministrador())
                         @php
                             $conteoNotif = Auth::user()->conteoSolicitudesPendientes();
                         @endphp

@@ -14,6 +14,11 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     Préstamos y Cartera
+                    @if($operador && $operador->esAdministrador())
+                        <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-slate-800 text-indigo-400 border border-indigo-500/30">
+                            Auditoría
+                        </span>
+                    @endif
                 </h1>
                 <p class="text-xs text-slate-400 mt-0.5">Control de referencias y estado de cuenta</p>
             </div>
@@ -93,12 +98,14 @@
 
         <!-- Botones de Acción -->
         <div class="flex items-center gap-2 pt-2 border-t border-slate-800">
-            <a href="{{ route('prestamos.create') }}" class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs text-center shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-1">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                </svg>
-                Asignar Vale
-            </a>
+            @if(!$operador || !$operador->esAdministrador())
+                <a href="{{ route('prestamos.create') }}" class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs text-center shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Asignar Vale
+                </a>
+            @endif
 
             <a href="{{ route('prestamos.relacion-pdf') }}" target="_blank" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs text-center transition flex items-center justify-center gap-1">
                 <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -240,7 +247,7 @@
                         Estado de Cuenta
                     </a>
 
-                    @if(!$prestamo->estaPagado() && (!Auth::check() || !Auth::user()->esDistribuidor()))
+                    @if(!$prestamo->estaPagado() && (!Auth::check() || (!Auth::user()->esDistribuidor() && !Auth::user()->esAdministrador())))
                         <a href="{{ route('prestamos.pago', $prestamo) }}" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold text-center shadow-lg transition flex items-center justify-center gap-1">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>

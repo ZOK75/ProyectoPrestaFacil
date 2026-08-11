@@ -33,7 +33,7 @@ class AuthenticatedSessionController extends Controller
 
         $user = Auth::user()->load('rol');
 
-        if ($user->esGerenteGeneral()) {
+        if ($user->esGerenteGeneral() || $user->esAdministrador()) {
             return redirect()->route('gerente-general.dashboard');
         }
 
@@ -54,8 +54,6 @@ class AuthenticatedSessionController extends Controller
         }
 
         return redirect()->route('producto-vales.index');
-
-
     }
 
     /**

@@ -13,6 +13,7 @@ use App\Http\Controllers\PrestamoController;
 use App\Http\Controllers\CajeroController;
 use App\Http\Controllers\AutorizacionController;
 use App\Http\Controllers\NotificacionController;
+use App\Http\Controllers\LogViewerController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -22,7 +23,7 @@ Route::get('/', function () {
         return redirect()->route('login');
     }
     $user = Auth::user()->load('rol');
-    if ($user->esGerenteGeneral()) return redirect()->route('gerente-general.dashboard');
+    if ($user->esGerenteGeneral() || $user->esAdministrador()) return redirect()->route('gerente-general.dashboard');
     if ($user->esGerenteSucursal()) return redirect()->route('gerente-sucursal.dashboard');
     if ($user->esDistribuidor()) return redirect()->route('distribuidor.dashboard');
     if ($user->esCajero()) return redirect()->route('cajero.dashboard');
@@ -36,7 +37,7 @@ Route::middleware(['auth'])->group(function () {
     // Dashboard universal: redirige al panel según rol
     Route::get('/dashboard', function () {
         $user = Auth::user()->load('rol');
-        if ($user->esGerenteGeneral()) return redirect()->route('gerente-general.dashboard');
+        if ($user->esGerenteGeneral() || $user->esAdministrador()) return redirect()->route('gerente-general.dashboard');
         if ($user->esGerenteSucursal()) return redirect()->route('gerente-sucursal.dashboard');
         if ($user->esDistribuidor()) return redirect()->route('distribuidor.dashboard');
         if ($user->esCajero()) return redirect()->route('cajero.dashboard');
@@ -55,15 +56,22 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/notificaciones/marcar-todas', [NotificacionController::class, 'marcarTodasLeidas'])->name('notificaciones.marcar-todas');
 
     // ──────────────────────────────────────────
-    // 1. MÓDULO GERENTE GENERAL
+    // 0. CENTRO DE LOGS Y AUDITORÍA (Exclusivo Administrador)
     // ──────────────────────────────────────────
-    Route::middleware(['role:gerente_general'])->group(function () {
+    Route::middleware(['role:administrador'])->group(function () {
+        Route::get('/logs', [LogViewerController::class, 'index'])->name('logs.index');
+    });
+
+    // ──────────────────────────────────────────
+    // 1. MÓDULO GERENTE GENERAL Y ADMINISTRADOR
+    // ──────────────────────────────────────────
+    Route::middleware(['role:gerente_general,administrador'])->group(function () {
         Route::prefix('gerente-general')->group(function () {
             Route::get('/dashboard', [GerenteGeneralController::class, 'index'])
                 ->name('gerente-general.dashboard');
         });
 
-        // Configuración General del Sistema
+        // Configuración General del Sistema (Lectura para Administrador, Edición solo Gerente General)
         Route::get('configuracion-general', [ConfiguracionController::class, 'edit'])->name('configuracion-general.edit');
         Route::put('configuracion-general', [ConfiguracionController::class, 'update'])->name('configuracion-general.update');
     });
@@ -121,9 +129,9 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ──────────────────────────────────────────
-    // 5. AUTORIZACIONES (Coordinador y Gerentes)
+    // 5. AUTORIZACIONES (Coordinador y Administrador)
     // ──────────────────────────────────────────
-    Route::middleware(['role:coordinador,gerente_general,gerente_de_sucursal'])->prefix('autorizaciones')->group(function () {
+    Route::middleware(['role:coordinador,administrador'])->prefix('autorizaciones')->group(function () {
         Route::get('/', [AutorizacionController::class, 'index'])->name('autorizaciones.index');
         Route::get('/{solicitud}', [AutorizacionController::class, 'show'])->name('autorizaciones.show');
         Route::post('/{solicitud}/aprobar', [AutorizacionController::class, 'aprobar'])->name('autorizaciones.aprobar');
@@ -131,9 +139,9 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ──────────────────────────────────────────
-    // 6. SOLICITUDES DE CLIENTES (Gerente General y Gerente de Sucursal)
+    // 6. SOLICITUDES DE CLIENTES (Administrador en auditoría)
     // ──────────────────────────────────────────
-    Route::middleware(['role:gerente_general,gerente_de_sucursal'])->group(function () {
+    Route::middleware(['role:administrador'])->group(function () {
         Route::get('solicitudes-clientes', [SolicitudClienteController::class, 'index'])->name('solicitudes-clientes.index');
         Route::get('solicitudes-clientes/{solicitud}', [SolicitudClienteController::class, 'show'])->name('solicitudes-clientes.show');
         Route::post('solicitudes-clientes/{solicitud}/aprobar', [SolicitudClienteController::class, 'aprobar'])->name('solicitudes-clientes.aprobar');
@@ -141,23 +149,23 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ──────────────────────────────────────────
-    // 7. GESTIÓN DE USUARIOS (Gerente General y Gerente de Sucursal)
+    // 7. GESTIÓN DE USUARIOS (Gerente General, Gerente de Sucursal y Administrador)
     // ──────────────────────────────────────────
-    Route::middleware(['role:gerente_general,gerente_de_sucursal'])->group(function () {
+    Route::middleware(['role:gerente_general,gerente_de_sucursal,administrador'])->group(function () {
         Route::resource('usuarios', UserController::class);
     });
 
     // ──────────────────────────────────────────
-    // 8. CLIENTES (Distribuidores y Gerentes)
+    // 8. CLIENTES (Distribuidores y Administrador)
     // ──────────────────────────────────────────
-    Route::middleware(['role:distribuidor,gerente_general,gerente_de_sucursal'])->group(function () {
+    Route::middleware(['role:distribuidor,administrador'])->group(function () {
         Route::resource('clientes', ClienteController::class);
     });
 
     // ──────────────────────────────────────────
-    // 9. PRÉSTAMOS, VALES Y COBRANZA (Distribuidores, Cajeros y Gerentes)
+    // 9. PRÉSTAMOS, VALES Y COBRANZA (Distribuidores, Cajeros y Administrador)
     // ──────────────────────────────────────────
-    Route::middleware(['role:distribuidor,cajero,gerente_general,gerente_de_sucursal'])->group(function () {
+    Route::middleware(['role:distribuidor,cajero,administrador'])->group(function () {
         Route::get('prestamos-relacion-pdf', [PrestamoController::class, 'relacionCobranza'])->name('prestamos.relacion-pdf');
         Route::resource('prestamos', PrestamoController::class);
         Route::get('prestamos/{prestamo}/pago', [PrestamoController::class, 'pagoForm'])->name('prestamos.pago');

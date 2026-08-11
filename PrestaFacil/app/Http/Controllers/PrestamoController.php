@@ -33,15 +33,31 @@ class PrestamoController extends Controller
         return User::first();
     }
 
+    private function verificarBloqueoGerencial(?User $operador): ?\Illuminate\Http\RedirectResponse
+    {
+        if ($operador && ($operador->esGerenteGeneral() || $operador->esGerenteSucursal())) {
+            $ruta = $operador->esGerenteGeneral() ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
+            return redirect()->route($ruta)
+                ->with('error', 'Acceso denegado: El rol gerencial no tiene permisos para acceder al módulo de préstamos.');
+        }
+
+        return null;
+    }
+
     /**
      * Catálogo móvil de préstamos y estado de cuenta de clientes.
      */
     public function index(Request $request)
     {
+        $operador = $this->operador();
+
+        if ($redirect = $this->verificarBloqueoGerencial($operador)) {
+            return $redirect;
+        }
+
         // Ejecución automática reactiva con hora del servidor
         $this->corteService->verificarYProcesarCortesYVencimientos();
 
-        $operador = $this->operador();
         $query = Prestamo::with(['cliente', 'productoVale', 'pagos']);
 
         // Si es distribuidor, filtra solo sus préstamos colocados
@@ -102,6 +118,15 @@ class PrestamoController extends Controller
     {
         $operador = $this->operador();
 
+        if ($redirect = $this->verificarBloqueoGerencial($operador)) {
+            return $redirect;
+        }
+
+        if ($operador && $operador->esAdministrador()) {
+            return redirect()->route('prestamos.index')
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
+        }
+
         // Obtener únicamente vales activos
         $valesActivos = ProductoVale::where('activo', true)
             ->orderBy('monto_prestamo', 'asc')
@@ -132,6 +157,16 @@ class PrestamoController extends Controller
     public function store(StorePrestamoRequest $request)
     {
         $operador = $this->operador();
+
+        if ($redirect = $this->verificarBloqueoGerencial($operador)) {
+            return $redirect;
+        }
+
+        if ($operador && $operador->esAdministrador()) {
+            return redirect()->route('prestamos.index')
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
+        }
+
         $cliente = Cliente::findOrFail($request->cliente_id);
 
         if (!$cliente->activo) {
@@ -207,19 +242,32 @@ class PrestamoController extends Controller
      */
     public function show(Prestamo $prestamo)
     {
-        $prestamo->load(['cliente', 'productoVale', 'pagos.registradoPor', 'createdBy']);
         $operador = $this->operador();
+
+        if ($redirect = $this->verificarBloqueoGerencial($operador)) {
+            return $redirect;
+        }
+
+        $prestamo->load(['cliente', 'productoVale', 'pagos.registradoPor', 'createdBy']);
 
         return view('prestamos.show', compact('prestamo', 'operador'));
     }
 
     /**
      * Formulario móvil para registrar abono y aplicar multas.
-     * (Restringido para Distribuidor: el cobro se realiza en Caja).
      */
     public function pagoForm(Prestamo $prestamo)
     {
         $operador = $this->operador();
+
+        if ($redirect = $this->verificarBloqueoGerencial($operador)) {
+            return $redirect;
+        }
+
+        if ($operador && $operador->esAdministrador()) {
+            return redirect()->route('prestamos.show', $prestamo)
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
+        }
 
         if ($operador && $operador->esDistribuidor()) {
             return redirect()->route('prestamos.show', $prestamo)
@@ -235,12 +283,20 @@ class PrestamoController extends Controller
     }
 
     /**
-     * Procesar el pago de quincena, evaluar liquidación y aplicar lógica de puntos.
-     * (Restringido para Distribuidor: el cobro se realiza en Caja).
+     * Procesar el pago de quincena.
      */
     public function registrarPago(StorePagoRequest $request, Prestamo $prestamo)
     {
         $operador = $this->operador();
+
+        if ($redirect = $this->verificarBloqueoGerencial($operador)) {
+            return $redirect;
+        }
+
+        if ($operador && $operador->esAdministrador()) {
+            return redirect()->route('prestamos.show', $prestamo)
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
+        }
 
         if ($operador && $operador->esDistribuidor()) {
             return redirect()->route('prestamos.show', $prestamo)
@@ -312,13 +368,17 @@ class PrestamoController extends Controller
     }
 
     /**
-     * Genera la Relación de Cobranza del Distribuidor en formato PDF / Imprimible réplica oficial.
+     * Genera la Relación de Cobranza del Distribuidor en formato PDF.
      */
     public function relacionCobranza()
     {
-        $this->corteService->verificarYProcesarCortesYVencimientos();
-
         $operador = $this->operador();
+
+        if ($redirect = $this->verificarBloqueoGerencial($operador)) {
+            return $redirect;
+        }
+
+        $this->corteService->verificarYProcesarCortesYVencimientos();
         $configuracion = Configuracion::actual();
 
         // Cargar todos los préstamos activos de los clientes de este distribuidor

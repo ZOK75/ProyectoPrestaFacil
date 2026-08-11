@@ -132,6 +132,26 @@ class User extends Authenticatable
         return strtolower($this->rol?->nombre ?? '') === 'gerente general';
     }
 
+    public function esAdministrador(): bool
+    {
+        return strtolower($this->rol?->nombre ?? '') === 'administrador';
+    }
+
+    public function esAdminGeneralOAdmin(): bool
+    {
+        return $this->esGerenteGeneral() || $this->esAdministrador();
+    }
+
+    public function puedeModificar(): bool
+    {
+        // El rol de Administrador es estrictamente de solo lectura / auditoría
+        if ($this->esAdministrador()) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function esGerenteSucursal(): bool
     {
         return strtolower($this->rol?->nombre ?? '') === 'gerente de sucursal';
@@ -156,15 +176,34 @@ class User extends Authenticatable
     }
 
     /**
+     * Determina si el usuario puede autorizar solicitudes operativas.
+     */
+    public function puedeAutorizar(?string $tipo = null, ?int $sucursalId = null): bool
+    {
+        if ($this->esAdministrador() || $this->esGerenteGeneral() || $this->esGerenteSucursal()) {
+            return false;
+        }
+
+        if ($this->esCoordinador()) {
+            if ($sucursalId && $this->sucursal_id) {
+                return $this->sucursal_id == $sucursalId;
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Conteo de solicitudes pendientes para vista de gerentes.
      */
     public function conteoSolicitudesPendientes(): int
     {
-        $query = SolicitudCliente::where('estado', 'pendiente');
-        if ($this->esGerenteSucursal() && $this->sucursal_id) {
-            $query->where('sucursal_id', $this->sucursal_id);
+        if ($this->esGerenteSucursal()) {
+            return 0;
         }
-        return $query->count();
+
+        return SolicitudCliente::where('estado', 'pendiente')->count();
     }
 
     /**
@@ -272,7 +311,7 @@ class User extends Authenticatable
         if ($this->esGerenteGeneral()) {
             $query->where('nombre', '!=', 'Gerente General');
         } elseif ($this->esGerenteSucursal()) {
-            $query->whereNotIn('nombre', ['Gerente General', 'Gerente de Sucursal']);
+            $query->whereNotIn('nombre', ['Gerente General', 'Gerente de Sucursal', 'Administrador']);
         } else {
             return Rol::where('id', 0)->get();
         }

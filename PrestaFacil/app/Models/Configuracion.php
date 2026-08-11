@@ -184,6 +184,22 @@ class Configuracion extends Model
     }
 
     /**
+     * Devuelve el múltiplo requerido para canjear puntos (por defecto 20).
+     */
+    public function obtenerMultiploCanje(): int
+    {
+        return intval($this->multiplo_canje_puntos ?? 20);
+    }
+
+    /**
+     * Devuelve el valor monetario por cada punto canjeado (por defecto $2.00).
+     */
+    public function obtenerValorPunto(): float
+    {
+        return floatval($this->valor_punto ?? 2.00);
+    }
+
+    /**
      * Calcula los puntos generados según el total de productos colocados.
      * Fórmula: floor(montoTotal / monto_base_puntos) * puntos_por_monto_base
      */
@@ -218,6 +234,7 @@ class Configuracion extends Model
             'monto_base_puntos' => 1200.00,
             'puntos_por_monto_base' => 3,
             'valor_punto' => 2.00,
+            'multiplo_canje_puntos' => 20,
         ]);
     }
 }

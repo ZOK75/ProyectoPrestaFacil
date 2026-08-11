@@ -6,6 +6,7 @@ use App\Http\Requests\UpdateConfiguracionRequest;
 use App\Models\Configuracion;
 use App\Models\ConfiguracionLog;
 use App\Models\User;
+use App\Services\CorteCobranzaService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -43,7 +44,7 @@ class ConfiguracionController extends Controller
     /**
      * Actualiza la configuración general. Solo permitido para el Gerente General.
      */
-    public function update(UpdateConfiguracionRequest $request)
+    public function update(UpdateConfiguracionRequest $request, CorteCobranzaService $corteService)
     {
         $operador = $this->operador();
 
@@ -58,25 +59,41 @@ class ConfiguracionController extends Controller
         $userId = Auth::id() ?? $operador->id;
 
         DB::transaction(function () use ($configuracion, $validated, $userId) {
+            // Asignar los campos temporales para calcular las fechas
+            $configuracion->dia_corte = $validated['dia_corte'];
+            $configuracion->hora_corte = $validated['hora_corte'];
+            $configuracion->dia_limite_pago = $validated['dia_limite_pago'];
+            $configuracion->hora_limite_pago = $validated['hora_limite_pago'];
+
+            $fechaCorteCalculada = $configuracion->fechaCorteCalculada();
+            $fechaLimiteCalculada = $configuracion->fechaLimitePagoCalculada();
+
             // 1. Registrar el cambio en el historial ANTES de actualizar
             ConfiguracionLog::create([
                 'configuracion_id' => $configuracion->id,
-                'fecha_corte' => $validated['fecha_corte'],
-                'fecha_limite_pago' => $validated['fecha_limite_pago'],
+                'fecha_corte' => $fechaCorteCalculada,
+                'fecha_limite_pago' => $fechaLimiteCalculada,
                 'multa_adeudo' => $validated['multa_adeudo'],
                 'changed_by_user_id' => $userId,
-                'motivo' => $validated['motivo'] ?? "Actualización de comisiones Cobre ({$validated['comision_cobre']}%), Plata ({$validated['comision_plata']}%), Oro ({$validated['comision_oro']}%).",
+                'motivo' => $validated['motivo'] ?? "Ajuste de ciclo periódico (Corte: Día {$validated['dia_corte']} a las {$validated['hora_corte']}, Límite: Día {$validated['dia_limite_pago']} a las {$validated['hora_limite_pago']}, Multa: \${$validated['multa_adeudo']}).",
                 'changed_at' => now(),
             ]);
 
             // 2. Actualizar la configuración actual
             $data = [
-                'fecha_corte' => $validated['fecha_corte'],
-                'fecha_limite_pago' => $validated['fecha_limite_pago'],
+                'dia_corte' => $validated['dia_corte'],
+                'hora_corte' => $validated['hora_corte'],
+                'dia_limite_pago' => $validated['dia_limite_pago'],
+                'hora_limite_pago' => $validated['hora_limite_pago'],
+                'fecha_corte' => $fechaCorteCalculada,
+                'fecha_limite_pago' => $fechaLimiteCalculada,
                 'multa_adeudo' => $validated['multa_adeudo'],
                 'comision_cobre' => $validated['comision_cobre'],
                 'comision_plata' => $validated['comision_plata'],
                 'comision_oro' => $validated['comision_oro'],
+                'monto_base_puntos' => $validated['monto_base_puntos'],
+                'puntos_por_monto_base' => $validated['puntos_por_monto_base'],
+                'valor_punto' => $validated['valor_punto'],
                 'updated_by_user_id' => $userId,
             ];
 
@@ -88,7 +105,10 @@ class ConfiguracionController extends Controller
             $configuracion->update($data);
         });
 
+        // Ejecutar verificación de corte inmediatamente con los nuevos parámetros
+        $corteService->verificarYProcesarCortesYVencimientos();
+
         return redirect()->route('configuracion-general.edit')
-            ->with('success', 'La configuración general y porcentajes por categoría fueron actualizados correctamente el ' . now()->format('d/m/Y H:i') . '.');
+            ->with('success', 'La configuración periódica de corte (Día ' . $validated['dia_corte'] . ' ' . $validated['hora_corte'] . ') y fecha límite (Día ' . $validated['dia_limite_pago'] . ' ' . $validated['hora_limite_pago'] . ') fueron actualizadas con éxito.');
     }
 }

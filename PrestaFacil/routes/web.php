@@ -12,6 +12,7 @@ use App\Http\Controllers\GerenteSucursalController;
 use App\Http\Controllers\PrestamoController;
 use App\Http\Controllers\CajeroController;
 use App\Http\Controllers\AutorizacionController;
+use App\Http\Controllers\NotificacionController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -43,10 +44,15 @@ Route::middleware(['auth'])->group(function () {
         return redirect()->route('producto-vales.index');
     })->name('dashboard');
 
-    // Perfil de usuario (Disponible para todos los usuarios autenticados)
+    // Perfil de usuario
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Notificaciones universales
+    Route::get('/notificaciones', [NotificacionController::class, 'index'])->name('notificaciones.index');
+    Route::post('/notificaciones/{notificacion}/leer', [NotificacionController::class, 'marcarLeida'])->name('notificaciones.leer');
+    Route::post('/notificaciones/marcar-todas', [NotificacionController::class, 'marcarTodasLeidas'])->name('notificaciones.marcar-todas');
 
     // ──────────────────────────────────────────
     // 1. MÓDULO GERENTE GENERAL
@@ -57,7 +63,7 @@ Route::middleware(['auth'])->group(function () {
                 ->name('gerente-general.dashboard');
         });
 
-        // Configuración General del Sistema (tasas, comisiones, límites globales)
+        // Configuración General del Sistema
         Route::get('configuracion-general', [ConfiguracionController::class, 'edit'])->name('configuracion-general.edit');
         Route::put('configuracion-general', [ConfiguracionController::class, 'update'])->name('configuracion-general.update');
     });
@@ -109,9 +115,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/canje-puntos', [CajeroController::class, 'indexCanje'])->name('cajero.canje-puntos.index');
         Route::post('/canje-puntos', [CajeroController::class, 'realizarCanje'])->name('cajero.canje-puntos.store');
         
-        // Notificaciones
-        Route::get('/notificaciones', [CajeroController::class, 'notificaciones'])->name('cajero.notificaciones');
-        Route::post('/notificaciones/{id}/leer', [CajeroController::class, 'marcarNotificacionLeida'])->name('cajero.notificaciones.leer');
+        // Notificaciones Cajero
+        Route::get('/notificaciones-cajero', [CajeroController::class, 'notificaciones'])->name('cajero.notificaciones');
+        Route::post('/notificaciones-cajero/{id}/leer', [CajeroController::class, 'marcarNotificacionLeida'])->name('cajero.notificaciones.leer');
     });
 
     // ──────────────────────────────────────────

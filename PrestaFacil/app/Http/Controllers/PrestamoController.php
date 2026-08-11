@@ -9,12 +9,21 @@ use App\Models\Configuracion;
 use App\Models\PagoPrestamo;
 use App\Models\Prestamo;
 use App\Models\ProductoVale;
+use App\Models\RelacionCobranza;
 use App\Models\User;
+use App\Services\CorteCobranzaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class PrestamoController extends Controller
 {
+    protected CorteCobranzaService $corteService;
+
+    public function __construct(CorteCobranzaService $corteService)
+    {
+        $this->corteService = $corteService;
+    }
+
     private function operador(): ?User
     {
         if (Auth::check()) {
@@ -29,6 +38,9 @@ class PrestamoController extends Controller
      */
     public function index(Request $request)
     {
+        // Ejecución automática reactiva con hora del servidor
+        $this->corteService->verificarYProcesarCortesYVencimientos();
+
         $operador = $this->operador();
         $query = Prestamo::with(['cliente', 'productoVale', 'pagos']);
 
@@ -71,7 +83,16 @@ class PrestamoController extends Controller
             'multas_total' => Prestamo::sum('multas'),
         ];
 
-        return view('prestamos.index', compact('prestamos', 'stats', 'operador'));
+        // Obtener estado del periodo actual
+        $configuracion = Configuracion::actual();
+        $relacionActual = null;
+        if ($operador && $operador->esDistribuidor()) {
+            $relacionActual = RelacionCobranza::where('distribuidora_id', $operador->id)
+                ->where('fecha_corte', $configuracion->fecha_corte)
+                ->first();
+        }
+
+        return view('prestamos.index', compact('prestamos', 'stats', 'operador', 'configuracion', 'relacionActual'));
     }
 
     /**
@@ -106,10 +127,7 @@ class PrestamoController extends Controller
     }
 
     /**
-     * Registrar la asignación de un vale/prevale con validaciones de:
-     * 1. Un solo préstamo activo por cliente.
-     * 2. Regla del vale máximo (50% del límite de crédito total + $500.00).
-     * 3. Crédito disponible del distribuidor.
+     * Registrar la asignación de un vale/prevale con validaciones de negocio.
      */
     public function store(StorePrestamoRequest $request)
     {
@@ -120,9 +138,7 @@ class PrestamoController extends Controller
             return back()->withErrors(['cliente_id' => 'Este cliente está desactivado.'])->withInput();
         }
 
-        // ─────────────────────────────────────────────────────────────
-        // REGLA 1: Solo se permite 1 préstamo activo por cliente
-        // ─────────────────────────────────────────────────────────────
+        // 1. Solo se permite 1 préstamo activo por cliente
         $prestamoActivo = Prestamo::where('cliente_id', $cliente->id)
             ->where('estado', 'activo')
             ->first();
@@ -137,9 +153,7 @@ class PrestamoController extends Controller
             ->where('activo', true)
             ->firstOrFail();
 
-        // ─────────────────────────────────────────────────────────────
-        // REGLA 2: Límite máximo por vale (50% del límite de crédito + $500)
-        // ─────────────────────────────────────────────────────────────
+        // 2. Límite máximo por vale (50% del límite de crédito + $500)
         if ($operador && $operador->esDistribuidor()) {
             $montoMaxVale = $operador->montoMaximoPermitidoPorVale();
             if (floatval($vale->monto_prestamo) > $montoMaxVale) {
@@ -148,9 +162,7 @@ class PrestamoController extends Controller
                 ])->withInput();
             }
 
-            // ─────────────────────────────────────────────────────────
-            // REGLA 3: Verificar crédito disponible del distribuidor
-            // ─────────────────────────────────────────────────────────
+            // 3. Verificar crédito disponible del distribuidor
             $creditoDisponible = $operador->creditoDisponible();
             if (floatval($vale->monto_prestamo) > $creditoDisponible) {
                 return back()->withErrors([
@@ -203,31 +215,44 @@ class PrestamoController extends Controller
 
     /**
      * Formulario móvil para registrar abono y aplicar multas.
+     * (Restringido para Distribuidor: el cobro se realiza en Caja).
      */
     public function pagoForm(Prestamo $prestamo)
     {
+        $operador = $this->operador();
+
+        if ($operador && $operador->esDistribuidor()) {
+            return redirect()->route('prestamos.show', $prestamo)
+                ->with('error', 'Acceso denegado: El cobro y registro de abonos debe ser realizado en ventanilla por el personal de Caja.');
+        }
+
         if ($prestamo->estaPagado()) {
             return redirect()->route('prestamos.show', $prestamo)
                 ->with('info', "La referencia {$prestamo->referencia} ya se encuentra liquidada.");
         }
 
-        $operador = $this->operador();
-
         return view('prestamos.pago', compact('prestamo', 'operador'));
     }
 
     /**
-     * Procesar el pago de quincena y aplicar multas acumuladas.
+     * Procesar el pago de quincena, evaluar liquidación y aplicar lógica de puntos.
+     * (Restringido para Distribuidor: el cobro se realiza en Caja).
      */
     public function registrarPago(StorePagoRequest $request, Prestamo $prestamo)
     {
+        $operador = $this->operador();
+
+        if ($operador && $operador->esDistribuidor()) {
+            return redirect()->route('prestamos.show', $prestamo)
+                ->with('error', 'Acceso denegado: El cobro y registro de abonos debe ser realizado en ventanilla por el personal de Caja.');
+        }
+
         if ($prestamo->estaPagado()) {
             return redirect()->route('prestamos.show', $prestamo)
                 ->with('info', "La referencia {$prestamo->referencia} ya se encuentra liquidada.");
         }
 
         $data = $request->validated();
-        $operador = $this->operador();
 
         $montoAbonado = floatval($data['monto_abonado']);
         $montoMulta = floatval($data['monto_multa'] ?? 0);
@@ -268,8 +293,18 @@ class PrestamoController extends Controller
             $mensaje .= " (Se aplicó multa de $" . number_format($montoMulta, 2) . ")";
         }
 
-        if ($nuevoEstado === 'finalizado') {
-            $mensaje .= " ¡La cuenta ha sido completamente liquidada y el saldo del crédito fue restaurado!";
+        // Evaluar si la distribuidora liquidó por completo su relación
+        if ($prestamo->createdBy) {
+            $relacionLiquidada = $this->corteService->evaluarLiquidacionRelacion($prestamo->createdBy);
+            if ($relacionLiquidada) {
+                if ($relacionLiquidada->esPagoAnticipado()) {
+                    $mensaje .= " 🌟 ¡Relación liquidada con Pago Anticipado! Se acumularon {$relacionLiquidada->puntos_ganados} puntos.";
+                } elseif ($relacionLiquidada->esPagoATiempo()) {
+                    $mensaje .= " ✅ Relación liquidada a tiempo dentro del periodo.";
+                } elseif ($relacionLiquidada->esPagoAtrasado()) {
+                    $mensaje .= " ⚠️ Relación liquidada con Pago Atrasado (-20% puntos aplicados).";
+                }
+            }
         }
 
         return redirect()->route('prestamos.show', $prestamo)
@@ -281,6 +316,8 @@ class PrestamoController extends Controller
      */
     public function relacionCobranza()
     {
+        $this->corteService->verificarYProcesarCortesYVencimientos();
+
         $operador = $this->operador();
         $configuracion = Configuracion::actual();
 
@@ -294,6 +331,13 @@ class PrestamoController extends Controller
 
         $prestamos = $prestamosQuery->orderBy('created_at', 'desc')->get();
 
-        return view('prestamos.relacion_pdf', compact('operador', 'configuracion', 'prestamos'));
+        $relacion = null;
+        if ($operador && $operador->esDistribuidor()) {
+            $relacion = RelacionCobranza::where('distribuidora_id', $operador->id)
+                ->where('fecha_corte', $configuracion->fecha_corte)
+                ->first();
+        }
+
+        return view('prestamos.relacion_pdf', compact('operador', 'configuracion', 'prestamos', 'relacion'));
     }
 }

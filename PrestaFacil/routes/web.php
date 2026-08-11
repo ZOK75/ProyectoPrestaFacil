@@ -22,6 +22,7 @@ Route::get('/', function () {
     if ($user->esGerenteGeneral()) return redirect()->route('gerente-general.dashboard');
     if ($user->esGerenteSucursal()) return redirect()->route('gerente-sucursal.dashboard');
     if ($user->esDistribuidor()) return redirect()->route('distribuidor.dashboard');
+    if ($user->esCoordinador()) return redirect()->route('coordinador.dashboard');
     return redirect()->route('producto-vales.index');
 });
 
@@ -33,6 +34,7 @@ Route::middleware(['auth'])->group(function () {
         if ($user->esGerenteGeneral()) return redirect()->route('gerente-general.dashboard');
         if ($user->esGerenteSucursal()) return redirect()->route('gerente-sucursal.dashboard');
         if ($user->esDistribuidor()) return redirect()->route('distribuidor.dashboard');
+        if ($user->esCoordinador()) return redirect()->route('coordinador.dashboard');
         return redirect()->route('producto-vales.index');
     })->name('dashboard');
 
@@ -57,6 +59,14 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('distribuidor')->group(function () {
         Route::get('/dashboard', [DistribuidorController::class, 'dashboard'])
             ->name('distribuidor.dashboard');
+    });
+
+    // 4. Coordinador Dashboard y Rutas
+    Route::prefix('coordinador')->name('coordinador.')->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\CoordinadorController::class, 'dashboard'])->name('dashboard');
+        Route::resource('solicitudes', \App\Http\Controllers\CoordinadorController::class)->except(['show']);
+        Route::post('solicitudes/{solicitud}/enviar-verificacion', [\App\Http\Controllers\CoordinadorController::class, 'enviarAVerificacion'])->name('solicitudes.enviar-verificacion');
+        // Agregaremos más rutas del coordinador conforme avancemos
     });
 
     // 4. Bandeja de Solicitudes y Notificaciones de Clientes (Gerencia)

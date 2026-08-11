@@ -104,6 +104,11 @@ class User extends Authenticatable
         return in_array($nombre, ['distribuidor', 'distribuidora']);
     }
 
+    public function esCoordinador(): bool
+    {
+        return strtolower($this->rol?->nombre ?? '') === 'coordinador';
+    }
+
     /**
      * Obtiene el porcentaje de ganancia según su categoría de distribuidor.
      */
@@ -214,6 +219,14 @@ class User extends Authenticatable
     public function prestamos(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Prestamo::class, 'created_by_user_id')->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Solicitudes de distribuidores creadas por este coordinador.
+     */
+    public function solicitudesDistribuidoresCreadas(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SolicitudDistribuidor::class, 'coordinador_id')->orderBy('created_at', 'desc');
     }
 
     /**

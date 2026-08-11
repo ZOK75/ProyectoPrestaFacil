@@ -12,15 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('pago_prestamos', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('prestamo_id')->constrained('prestamos')->cascadeOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('prestamo_id')->constrained('prestamos')->cascadeOnDelete();
             $table->string('folio_pago', 50)->unique();
             $table->integer('numero_quincena');
             $table->decimal('monto_abonado', 10, 2);
             $table->decimal('monto_multa', 10, 2)->default(0);
             $table->string('metodo_pago')->default('Efectivo');
             $table->text('observaciones')->nullable();
-            $table->foreignId('registrado_por_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('registrado_por_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });
     }

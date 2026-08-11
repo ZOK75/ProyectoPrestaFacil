@@ -12,26 +12,26 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('audit_logs', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('tipo_operacion');
             $table->text('descripcion');
             $table->json('datos_antes')->nullable();
             $table->json('datos_despues')->nullable();
             
             // Usuario que realizó la acción
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('user_id')->constrained('users')->cascadeOnDelete();
             $table->string('user_rol');
 
             // Autorizador si aplica
-            $table->foreignId('autorizador_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('autorizador_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('autorizador_rol')->nullable();
 
             // Sucursal donde se ejecutó
-            $table->foreignId('sucursal_id')->nullable()->constrained('sucursales')->nullOnDelete();
+            $table->foreignUuid('sucursal_id')->nullable()->constrained('sucursales')->nullOnDelete();
 
             // Entidad afectada (Polimorfismo manual)
             $table->string('entidad_tipo')->nullable();
-            $table->unsignedBigInteger('entidad_id')->nullable();
+            $table->uuid('entidad_id')->nullable();
 
             $table->string('evidencia_path')->nullable();
             $table->string('ip_address')->nullable();

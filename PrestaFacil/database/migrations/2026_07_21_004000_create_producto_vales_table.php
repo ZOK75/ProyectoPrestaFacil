@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('producto_vales', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('clave')->unique();
             $table->string('nombre');
             $table->decimal('monto_prestamo', 10, 2);
@@ -24,8 +24,8 @@ return new class extends Migration
             $table->timestamp('desactivado_at')->nullable();
             
             // Usuario que creó y usuario que modificó/desactivó
-            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('updated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('updated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
 
             $table->text('descripcion')->nullable();
             $table->timestamps();

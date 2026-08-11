@@ -12,15 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('canjes_puntos', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('distribuidora_id')->constrained('users')->cascadeOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('distribuidora_id')->constrained('users')->cascadeOnDelete();
             $table->integer('puntos_canjeados');
             $table->decimal('valor_punto', 10, 2);
             $table->decimal('equivalente_dinero', 10, 2);
             $table->decimal('sobrante_devuelto', 10, 2)->default(0);
             
-            $table->foreignId('cajera_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('sucursal_id')->constrained('sucursales')->cascadeOnDelete();
+            $table->foreignUuid('cajera_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('sucursal_id')->constrained('sucursales')->cascadeOnDelete();
             
             $table->timestamp('created_at')->useCurrent();
         });

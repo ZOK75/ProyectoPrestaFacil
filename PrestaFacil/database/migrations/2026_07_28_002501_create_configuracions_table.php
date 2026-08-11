@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('configuracion_generales', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
  
             // Parámetros de negocio (afectan a todas las sucursales)
             $table->dateTime('fecha_corte');
@@ -20,16 +20,16 @@ return new class extends Migration
             $table->decimal('multa_adeudo', 10, 2)->default(0);
  
             // Auditoría de quién crea / modifica la configuración
-            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('updated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('updated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
  
             $table->timestamps();
         });
 
         // Historial de cambios de la configuración general
         Schema::create('configuracion_logs', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('configuracion_id')->constrained('configuracion_generales')->cascadeOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('configuracion_id')->constrained('configuracion_generales')->cascadeOnDelete();
 
             // Snapshot de los valores al momento del cambio
             $table->dateTime('fecha_corte');
@@ -37,7 +37,7 @@ return new class extends Migration
             $table->decimal('multa_adeudo', 10, 2)->default(0);
 
             // Quién hizo el cambio
-            $table->foreignId('changed_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('changed_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('motivo')->nullable();
 
             $table->timestamp('changed_at');

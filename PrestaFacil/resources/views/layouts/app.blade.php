@@ -74,8 +74,30 @@
                             <a href="{{ route('prestamos.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('prestamos.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                 Préstamos
                             </a>
+                        @elseif(Auth::user()->esCajero())
+                            <!-- Opciones para Cajero -->
+                            <a href="{{ route('cajero.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('cajero.dashboard') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Caja
+                            </a>
+                            <a href="{{ route('cajero.buscar-folio') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('cajero.buscar-folio') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Buscar Folio
+                            </a>
+                            <a href="{{ route('cajero.abonos.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('cajero.abonos.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Abonos
+                            </a>
+                            <a href="{{ route('cajero.conciliaciones.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('cajero.conciliaciones.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Conciliación
+                            </a>
+                            <a href="{{ route('cajero.canje-puntos.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('cajero.canje-puntos.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Canje
+                            </a>
+                        @elseif(Auth::user()->esCoordinador())
+                            <!-- Opciones para Coordinador -->
+                            <a href="{{ route('autorizaciones.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('autorizaciones.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Autorizaciones
+                            </a>
                         @else
-                            <!-- Opciones para Gerentes y Administración -->
+                            <!-- Opciones para Gerentes y Administradores -->
                             @if(Auth::user()->esGerenteGeneral())
                                 <a href="{{ route('gerente-general.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('gerente-general.dashboard') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                     Dashboard

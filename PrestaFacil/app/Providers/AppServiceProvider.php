@@ -25,11 +25,11 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Password::defaults(function () {
-            return Password::min(22)
-            ->letters()
-            ->mixedCase()
-            ->numbers()
-            ->symbols();
+            return Password::min(12)
+                ->letters()
+                ->mixedCase()
+                ->numbers()
+                ->symbols();
         });
 
         RateLimiter::for('login', function (Request $request) {

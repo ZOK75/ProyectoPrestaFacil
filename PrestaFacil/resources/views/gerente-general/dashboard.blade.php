@@ -92,7 +92,7 @@
 
         @if($solicitudesPendientes->isEmpty())
             <div class="p-8 text-center text-slate-500 text-sm">
-                🎉 No hay solicitudes pendientes de aprobación en este momento.
+                 No hay solicitudes pendientes de aprobación en este momento.
             </div>
         @else
             <div class="overflow-x-auto">

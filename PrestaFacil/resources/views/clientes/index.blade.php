@@ -13,16 +13,23 @@
                     <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
                     </svg>
-                    Mis Clientes
+                    Clientes
+                    @if($operador->esAdministrador())
+                        <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-slate-800 text-indigo-400 border border-indigo-500/30">
+                            Auditoría
+                        </span>
+                    @endif
                 </h1>
-                <p class="text-xs text-slate-400 mt-0.5">Expedientes digitales y registro de clientes</p>
+                <p class="text-xs text-slate-400 mt-0.5">Expedientes digitales y consulta de clientes</p>
             </div>
-            <a href="{{ route('clientes.create') }}" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center gap-1 shrink-0">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                </svg>
-                Nuevo
-            </a>
+            @if(!$operador->esAdministrador())
+                <a href="{{ route('clientes.create') }}" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center gap-1 shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Nuevo
+                </a>
+            @endif
         </div>
 
         <!-- Badges de Resumen Móvil -->
@@ -147,7 +154,7 @@
                         Expediente
                     </a>
 
-                    @if($cliente->activo && !$cliente->tieneSolicitudPendiente())
+                    @if($cliente->activo && !$cliente->tieneSolicitudPendiente() && !$operador->esAdministrador())
                         <a href="{{ route('clientes.edit', $cliente) }}" class="px-3 py-2 rounded-xl bg-slate-800 text-indigo-400 hover:text-white text-xs font-semibold transition" title="Editar / Solicitar Modificación">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>

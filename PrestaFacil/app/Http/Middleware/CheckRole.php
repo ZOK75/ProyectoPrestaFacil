@@ -41,6 +41,24 @@ class CheckRole
 
         $userRole = $this->normalize($user->rol?->nombre ?? '');
 
+        // El Administrador tiene prohibidas las mutaciones de datos en toda la aplicación
+        if ($userRole === 'administrador' && !($request->isMethod('get') || $request->isMethod('head'))) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'error' => 'Acceso denegado',
+                    'message' => 'El rol de Administrador cuenta con permisos de solo lectura (auditoría).'
+                ], 403);
+            }
+            return redirect()->route('gerente-general.dashboard')->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
+        }
+
+        // El Administrador tiene acceso de visualización (GET/HEAD) transversal a toda la aplicación
+        if ($userRole === 'administrador') {
+            if ($request->isMethod('get') || $request->isMethod('head')) {
+                return $next($request);
+            }
+        }
+
         // Validación directa por nombre de rol
         if (in_array($userRole, $allowedRoles, true)) {
             return $next($request);
@@ -51,19 +69,6 @@ class CheckRole
             return $next($request);
         }
 
-        // Alias 'gerente': permite tanto a Gerente General como Gerente de Sucursal
-        if (in_array('gerente', $allowedRoles, true) && ($user->esGerenteGeneral() || $user->esGerenteSucursal())) {
-            return $next($request);
-        }
-
-        // El Gerente General y Administrador tienen acceso gerencial transversal
-        if (in_array($userRole, ['gerentegeneral', 'administrador'], true)) {
-            // Si la ruta pide gerencia, autorizaciones, usuarios o configuracion, el Gerente General tiene acceso
-            if (array_intersect($allowedRoles, ['gerentedesucursal', 'gerente', 'coordinador', 'admin'])) {
-                return $next($request);
-            }
-        }
-
         // Si es petición AJAX / API
         if ($request->expectsJson()) {
             return response()->json([
@@ -72,8 +77,21 @@ class CheckRole
             ], 403);
         }
 
-        // Redirección amigable al dashboard correspondiente del usuario con mensaje de error
-        return redirect()->route('dashboard')->with('error', 'Acceso denegado: Tu rol actual (' . ($user->rol?->nombre ?? 'Usuario') . ') no tiene permiso para ingresar a esa sección.');
+        // Redirección amigable directa al dashboard correspondiente del usuario con mensaje de error
+        if ($user->esGerenteSucursal()) {
+            return redirect()->route('gerente-sucursal.dashboard')->with('error', 'Acceso denegado: Tu rol (' . ($user->rol?->nombre ?? 'Usuario') . ') no tiene permiso para realizar esta acción.');
+        }
+        if ($user->esGerenteGeneral() || $user->esAdministrador()) {
+            return redirect()->route('gerente-general.dashboard')->with('error', 'Acceso denegado: Tu rol (' . ($user->rol?->nombre ?? 'Usuario') . ') no tiene permiso para realizar esta acción.');
+        }
+        if ($user->esDistribuidor()) {
+            return redirect()->route('distribuidor.dashboard')->with('error', 'Acceso denegado: Tu rol (' . ($user->rol?->nombre ?? 'Usuario') . ') no tiene permiso para realizar esta acción.');
+        }
+        if ($user->esCajero()) {
+            return redirect()->route('cajero.dashboard')->with('error', 'Acceso denegado: Tu rol (' . ($user->rol?->nombre ?? 'Usuario') . ') no tiene permiso para realizar esta acción.');
+        }
+
+        return redirect()->route('dashboard')->with('error', 'Acceso denegado: Tu rol actual (' . ($user->rol?->nombre ?? 'Usuario') . ') no tiene permiso para realizar esta acción.');
     }
 
     /**

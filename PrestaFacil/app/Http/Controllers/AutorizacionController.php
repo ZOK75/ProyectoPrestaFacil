@@ -17,16 +17,31 @@ class AutorizacionController extends Controller
         return Auth::user()->load('sucursal');
     }
 
+    private function verificarBloqueoGerencial($user): ?\Illuminate\Http\RedirectResponse
+    {
+        if ($user->esGerenteGeneral() || $user->esGerenteSucursal()) {
+            $ruta = $user->esGerenteGeneral() ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
+            return redirect()->route($ruta)
+                ->with('error', 'Acceso denegado: El rol gerencial no tiene permisos para acceder al módulo de autorizaciones.');
+        }
+
+        return null;
+    }
+
     public function index(Request $request)
     {
         $user = $this->autorizador();
+
+        if ($redirect = $this->verificarBloqueoGerencial($user)) {
+            return $redirect;
+        }
         
         $query = SolicitudAutorizacion::with(['solicitante.sucursal'])
             ->orderByRaw("estado = 'pendiente' DESC")
             ->orderBy('created_at', 'desc');
 
-        // Filtrar por permisos
-        if (!$user->esGerenteGeneral()) {
+        // El Administrador ve todas
+        if (!$user->esAdministrador()) {
             $query->where('sucursal_id', $user->sucursal_id);
         }
 
@@ -38,7 +53,12 @@ class AutorizacionController extends Controller
     public function show(SolicitudAutorizacion $solicitud)
     {
         $user = $this->autorizador();
-        if (!$user->puedeAutorizar($solicitud->tipo, $solicitud->sucursal_id)) {
+
+        if ($redirect = $this->verificarBloqueoGerencial($user)) {
+            return $redirect;
+        }
+
+        if (!$user->esAdministrador() && !$user->puedeAutorizar($solicitud->tipo, $solicitud->sucursal_id)) {
             abort(403, 'No tienes permiso para ver esta solicitud.');
         }
 
@@ -48,8 +68,13 @@ class AutorizacionController extends Controller
     public function aprobar(Request $request, SolicitudAutorizacion $solicitud)
     {
         $user = $this->autorizador();
-        if (!$user->puedeAutorizar($solicitud->tipo, $solicitud->sucursal_id)) {
-            abort(403);
+
+        if ($redirect = $this->verificarBloqueoGerencial($user)) {
+            return $redirect;
+        }
+
+        if ($user->esAdministrador() || !$user->puedeAutorizar($solicitud->tipo, $solicitud->sucursal_id)) {
+            return back()->with('error', 'Acceso denegado: No tienes permisos para aprobar solicitudes.');
         }
 
         DB::transaction(function () use ($request, $solicitud, $user) {
@@ -65,9 +90,6 @@ class AutorizacionController extends Controller
                         'autorizador_rol' => $user->rol->nombre,
                         'resolved_at' => now(),
                     ]);
-                    
-                    // Aquí se aplicaría la corrección financiera al préstamo/pago
-                    // Para el MVP solo lo marcamos como aprobado
                 }
             }
             
@@ -97,8 +119,13 @@ class AutorizacionController extends Controller
         $request->validate(['motivo' => 'required|string|max:500']);
 
         $user = $this->autorizador();
-        if (!$user->puedeAutorizar($solicitud->tipo, $solicitud->sucursal_id)) {
-            abort(403);
+
+        if ($redirect = $this->verificarBloqueoGerencial($user)) {
+            return $redirect;
+        }
+
+        if ($user->esAdministrador() || !$user->puedeAutorizar($solicitud->tipo, $solicitud->sucursal_id)) {
+            return back()->with('error', 'Acceso denegado: No tienes permisos para rechazar solicitudes.');
         }
 
         DB::transaction(function () use ($request, $solicitud, $user) {

@@ -68,7 +68,7 @@
                     Crédito disponible: <span class="font-bold text-emerald-700">${{ number_format($operador->creditoDisponible(), 0) }}</span>
                 </div>
                 <div class="font-bold text-slate-900">
-                    Puntos: <span class="font-bold text-indigo-700">{{ $operador->puntos ?? 346 }}</span>
+                    Puntos: <span class="font-bold text-indigo-700">{{ $operador->puntos ?? $operador->puntosAcumulados() }}</span>
                 </div>
                 <div class="font-bold text-slate-900 pt-1">
                     Referencia de Pago: <span class="font-mono text-slate-900 font-extrabold">{{ $operador->referenciaPago() }}</span>
@@ -82,13 +82,33 @@
                 <div>
                     <span class="font-bold text-slate-900">Fecha límite de pago:</span>
                     <span class="font-semibold text-slate-800 ml-1">
-                        {{ $configuracion->fecha_limite_pago ? $configuracion->fecha_limite_pago->format('d \d\e F Y') : now()->addDays(15)->format('d \d\e F Y') }}
+                        {{ $configuracion->fecha_limite_pago ? $configuracion->fecha_limite_pago->format('d \d\e F Y H:i') : now()->addDays(15)->format('d \d\e F Y') }}
                     </span>
                 </div>
                 <div>
-                    <span class="font-bold text-slate-900">Pago anticipado:</span>
-                    <span class="text-slate-700 ml-1">13, 14, 15 de febrero {{ date('Y') }}</span>
+                    <span class="font-bold text-slate-900">Fecha de corte:</span>
+                    <span class="text-slate-700 ml-1">
+                        {{ $configuracion->fecha_corte ? $configuracion->fecha_corte->format('d \d\e F Y H:i') : '13 de febrero 2026' }}
+                    </span>
                 </div>
+                @if(isset($relacion) && $relacion->estado_pago !== 'pendiente')
+                    <div class="pt-1">
+                        <span class="font-bold text-slate-900">Estado de Liquidación:</span>
+                        @if($relacion->esPagoAnticipado())
+                            <span class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase">
+                                Pago Anticipado (+{{ $relacion->puntos_ganados }} pts)
+                            </span>
+                        @elseif($relacion->esPagoATiempo())
+                            <span class="px-2 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 uppercase">
+                                Pago a Tiempo
+                            </span>
+                        @elseif($relacion->esPagoAtrasado())
+                            <span class="px-2 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 uppercase">
+                                Pago Atrasado (-{{ $relacion->puntos_descontados }} pts)
+                            </span>
+                        @endif
+                    </div>
+                @endif
             </div>
 
             @php

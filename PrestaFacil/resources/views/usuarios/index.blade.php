@@ -8,13 +8,20 @@
     <!-- Encabezado -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-extrabold text-white tracking-tight">Gestión de Usuarios</h1>
+            <h1 class="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                Gestión de Usuarios
+                @if($operador->esAdministrador())
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-slate-800 text-indigo-400 border border-indigo-500/30">
+                        🔒 Modo Auditoría (Solo Lectura)
+                    </span>
+                @endif
+            </h1>
             <p class="text-slate-400 text-sm mt-1">
-                Administra los empleados del sistema.
+                Consulta y supervisión de empleados y distribuidores.
                 <span class="text-indigo-400 font-semibold">Operando como: {{ $operador->name }} ({{ $operador->rol?->nombre ?? 'Sin rol' }})</span>
             </p>
         </div>
-        @if(!$operador->esDistribuidor())
+        @if(!$operador->esDistribuidor() && !$operador->esAdministrador())
             <div>
                 <a href="{{ route('usuarios.create') }}" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.02]">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,7 +118,7 @@
                 @endforeach
             </select>
 
-            @if($operador->esGerenteGeneral())
+            @if($operador->esGerenteGeneral() || $operador->esAdministrador())
                 <select name="sucursal_id" class="w-full md:w-44 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500">
                     <option value="">Todas las sucursales</option>
                     @foreach($sucursales as $suc)
@@ -170,6 +177,7 @@
                                         $colorMap = [
                                             'Gerente General' => 'bg-violet-500/10 text-violet-400 border-violet-500/20',
                                             'Gerente de Sucursal' => 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+                                            'Administrador' => 'bg-slate-500/10 text-slate-300 border-slate-500/20',
                                             'Asesor de Crédito' => 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
                                             'Cajero' => 'bg-amber-500/10 text-amber-400 border-amber-500/20',
                                             'Cobrador' => 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
@@ -225,7 +233,7 @@
                                     </svg>
                                 </a>
 
-                                @if($usuario->activo && !$operador->esDistribuidor())
+                                @if($usuario->activo && !$operador->esDistribuidor() && !$operador->esAdministrador())
                                     <a href="{{ route('usuarios.edit', $usuario) }}" class="inline-flex p-2 rounded-lg bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600 hover:text-white transition" title="Editar Usuario">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>

@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('notificaciones_cajero', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('user_id')->constrained('users')->cascadeOnDelete();
             $table->string('tipo');
             $table->string('titulo');
             $table->text('mensaje');
@@ -22,7 +22,7 @@ return new class extends Migration
             $table->timestamp('leida_at')->nullable();
             
             $table->string('entidad_tipo')->nullable();
-            $table->unsignedBigInteger('entidad_id')->nullable();
+            $table->uuid('entidad_id')->nullable();
             
             $table->timestamps();
         });

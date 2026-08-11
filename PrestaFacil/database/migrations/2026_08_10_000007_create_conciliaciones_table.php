@@ -12,17 +12,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('conciliaciones', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('prestamo_id')->constrained('prestamos')->cascadeOnDelete();
-            $table->foreignId('pago_prestamo_id')->nullable()->constrained('pago_prestamos')->nullOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('prestamo_id')->constrained('prestamos')->cascadeOnDelete();
+            $table->foreignUuid('pago_prestamo_id')->nullable()->constrained('pago_prestamos')->nullOnDelete();
             
             $table->decimal('monto_original', 10, 2);
             $table->decimal('monto_corregido', 10, 2);
             $table->text('motivo');
             $table->string('evidencia_path')->nullable();
             
-            $table->foreignId('solicitante_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('autorizador_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('solicitante_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('autorizador_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('autorizador_rol')->nullable();
             
             $table->enum('estado', ['pendiente', 'aprobada', 'rechazada'])->default('pendiente');

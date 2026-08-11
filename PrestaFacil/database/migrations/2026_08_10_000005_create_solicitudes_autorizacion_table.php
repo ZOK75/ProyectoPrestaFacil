@@ -12,23 +12,23 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('solicitudes_autorizacion', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->enum('tipo', ['modificacion_datos', 'conciliacion_manual']);
             $table->enum('estado', ['pendiente', 'aprobada', 'rechazada'])->default('pendiente');
             
-            $table->foreignId('solicitante_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('sucursal_id')->constrained('sucursales')->cascadeOnDelete();
+            $table->foreignUuid('solicitante_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('sucursal_id')->constrained('sucursales')->cascadeOnDelete();
             
             // Polimorfismo manual para ligar al cliente o al préstamo/pago
             $table->string('entidad_tipo');
-            $table->unsignedBigInteger('entidad_id');
+            $table->uuid('entidad_id');
 
             $table->json('datos_originales')->nullable();
             $table->json('datos_propuestos')->nullable();
             $table->text('motivo');
             $table->string('evidencia_path')->nullable();
 
-            $table->foreignId('autorizador_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('autorizador_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('autorizador_rol')->nullable();
             
             $table->text('observaciones_resolucion')->nullable();

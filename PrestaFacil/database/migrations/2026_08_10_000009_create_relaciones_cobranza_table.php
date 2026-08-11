@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('relaciones_cobranza', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('distribuidora_id')->constrained('users')->cascadeOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('distribuidora_id')->constrained('users')->cascadeOnDelete();
             $table->dateTime('fecha_corte');
             $table->dateTime('fecha_limite_pago');
             $table->decimal('monto_total_periodo', 10, 2)->default(0);

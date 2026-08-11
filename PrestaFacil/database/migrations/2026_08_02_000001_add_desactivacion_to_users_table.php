@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->boolean('activo')->default(true)->after('sucursal_id');
             $table->timestamp('desactivado_at')->nullable()->after('activo');
-            $table->foreignId('desactivado_by_user_id')->nullable()->after('desactivado_at')
+            $table->foreignUuid('desactivado_by_user_id')->nullable()->after('desactivado_at')
                 ->constrained('users')->nullOnDelete();
         });
     }

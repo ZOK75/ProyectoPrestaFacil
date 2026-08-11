@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('clientes', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
 
             // Datos Personales
             $table->string('nombre');
@@ -35,8 +35,8 @@ return new class extends Migration
             // Auditoría y Desactivación
             $table->boolean('activo')->default(true);
             $table->timestamp('desactivado_at')->nullable();
-            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('desactivado_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('desactivado_by_user_id')->nullable()->constrained('users')->nullOnDelete();
 
             $table->timestamps();
         });

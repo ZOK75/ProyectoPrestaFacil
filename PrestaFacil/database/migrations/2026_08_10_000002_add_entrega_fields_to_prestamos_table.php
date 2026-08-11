@@ -13,11 +13,11 @@ return new class extends Migration
     {
         Schema::table('prestamos', function (Blueprint $table) {
             $table->enum('estado_entrega', ['pendiente', 'entregado', 'cancelado'])->default('pendiente')->after('estado');
-            $table->foreignId('entregado_por_user_id')->nullable()->constrained('users')->nullOnDelete()->after('created_by_user_id');
+            $table->foreignUuid('entregado_por_user_id')->nullable()->constrained('users')->nullOnDelete()->after('created_by_user_id');
             $table->timestamp('entregado_at')->nullable()->after('entregado_por_user_id');
             $table->string('numero_transferencia', 100)->nullable()->after('entregado_at');
             $table->decimal('monto_depositado', 10, 2)->nullable()->after('numero_transferencia');
-            $table->foreignId('sucursal_entrega_id')->nullable()->constrained('sucursales')->nullOnDelete()->after('monto_depositado');
+            $table->foreignUuid('sucursal_entrega_id')->nullable()->constrained('sucursales')->nullOnDelete()->after('monto_depositado');
             $table->decimal('limite_credito_anterior', 10, 2)->nullable()->after('sucursal_entrega_id')->comment('Limite credito de distribuidora antes de incremento para regla 50%');
         });
     }

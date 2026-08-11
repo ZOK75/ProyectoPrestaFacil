@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Prestamo;
 
 class User extends Authenticatable
 {
@@ -24,6 +25,11 @@ class User extends Authenticatable
         'password',
         'rol_id',
         'sucursal_id',
+        'categoria_distribuidor',
+        'limite_credito',
+        'limite_credito_anterior',
+        'referencia_pago_distribuidor',
+        'puntos',
         'activo',
         'desactivado_at',
         'desactivado_by_user_id',
@@ -51,6 +57,9 @@ class User extends Authenticatable
             'password' => 'hashed',
             'activo' => 'boolean',
             'desactivado_at' => 'datetime',
+            'limite_credito' => 'decimal:2',
+            'limite_credito_anterior' => 'decimal:2',
+            'puntos' => 'integer',
         ];
     }
 
@@ -83,20 +92,151 @@ class User extends Authenticatable
 
     public function esGerenteGeneral(): bool
     {
-        return $this->rol?->nombre === 'Gerente General';
+        return strtolower($this->rol?->nombre ?? '') === 'gerente general';
     }
 
     public function esGerenteSucursal(): bool
     {
-        return $this->rol?->nombre === 'Gerente de Sucursal';
+        return strtolower($this->rol?->nombre ?? '') === 'gerente de sucursal';
+    }
+
+    public function esDistribuidor(): bool
+    {
+        $nombre = strtolower($this->rol?->nombre ?? '');
+        return in_array($nombre, ['distribuidor', 'distribuidora']);
+    }
+
+    public function esCajero(): bool
+    {
+        return strtolower($this->rol?->nombre ?? '') === 'cajero';
+    }
+
+    public function esCoordinador(): bool
+    {
+        return strtolower($this->rol?->nombre ?? '') === 'coordinador';
+    }
+
+    public function esAdministrador(): bool
+    {
+        return strtolower($this->rol?->nombre ?? '') === 'administrador';
     }
 
     /**
-     * Devuelve los roles que este usuario tiene permiso de asignar.
+     * Sistema de Autorizaciones Transversal
+     */
+    public function puedeAutorizar(string $tipo, ?int $sucursalId): bool
+    {
+        if ($this->esGerenteGeneral()) {
+            return true;
+        }
+
+        if (($this->esGerenteSucursal() || $this->esCoordinador()) && $this->sucursal_id && $this->sucursal_id === $sucursalId) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Obtiene el porcentaje de ganancia según su categoría de distribuidor.
+     */
+    public function obtenerPorcentajeGanancia(): float
+    {
+        if (!$this->esDistribuidor()) {
+            return 0.0;
+        }
+
+        $config = Configuracion::actual();
+        return $config->obtenerComision($this->categoria_distribuidor);
+    }
+
+    /**
+     * Calcula el monto de crédito de vales en estado 'activo' que tiene ocupados el distribuidor.
+     */
+    public function creditoUtilizado(): float
+    {
+        if (!$this->esDistribuidor()) {
+            return 0.0;
+        }
+
+        return floatval(Prestamo::where('created_by_user_id', $this->id)
+            ->where('estado', 'activo')
+            ->sum('monto_prestamo'));
+    }
+
+    /**
+     * Calcula el crédito disponible actual del distribuidor.
+     */
+    public function creditoDisponible(): float
+    {
+        $limite = floatval($this->limite_credito ?? 20000.00);
+        return max(0.0, $limite - $this->creditoUtilizado());
+    }
+
+    /**
+     * Calcula el valor máximo que puede tener UN SOLO VALE otorgado por este distribuidor:
+     * Regla por defecto: (50% del Límite de Crédito Total) + $500.00
+     * Lee de configuración.
+     */
+    public function montoMaximoPermitidoPorVale(): float
+    {
+        $limite = floatval($this->limite_credito ?? 20000.00);
+        $config = Configuracion::actual();
+        
+        $porcentaje = $config->obtenerPorcentajeRegla() / 100.0;
+        $tolerancia = $config->obtenerTolerancia();
+        
+        return ($limite * $porcentaje) + $tolerancia;
+    }
+
+    /**
+     * Morosidad Dinámica
+     */
+    public function conteoRelacionesMorosas(): int
+    {
+        if (!$this->esDistribuidor()) return 0;
+        
+        return $this->prestamos()
+            ->where('estado', 'activo')
+            ->whereHas('pagos', function ($q) {
+                // Aquí en el futuro se puede agregar lógica más compleja, pero por ahora 
+                // asumimos que el estado de 'retraso' o multa indica morosidad.
+                // Como simplificación temporal antes de tener la lógica de ValidacionValeService:
+                $q->where('monto_multa', '>', 0);
+            })
+            ->count();
+    }
+
+    public function esMorosa(): bool
+    {
+        if (!$this->esDistribuidor()) return false;
+        
+        $strikes = Configuracion::actual()->obtenerStrikesMorosidad();
+        return $this->conteoRelacionesMorosas() >= $strikes;
+    }
+
+    /**
+     * Devuelve la referencia de pago bancaria única del distribuidor.
+     */
+    public function referenciaPago(): string
+    {
+        if (!empty($this->referencia_pago_distribuidor)) {
+            return $this->referencia_pago_distribuidor;
+        }
+
+        return 'REF-DIST-' . str_pad((string)$this->id, 8, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Devuelve los roles que este usuario tiene permiso de asignar al crear usuarios.
+     * Regla: Ningún rol puede crear usuarios con el rol Distribuidor / Distribuidora.
      */
     public function rolesPermitidos()
     {
         $query = Rol::query();
+
+        // Bloquear permanentemente la creación de distribuidores desde el módulo de usuarios
+        $query->whereNotIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']);
 
         if ($this->esGerenteGeneral()) {
             $query->where('nombre', '!=', 'Gerente General');
@@ -123,5 +263,57 @@ class User extends Authenticatable
         }
 
         return Sucursal::where('id', 0)->get();
+    }
+
+    /**
+     * Solicitudes de clientes enviadas por este distribuidor.
+     */
+    public function solicitudesEnviadas(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SolicitudCliente::class, 'distribuidor_id')->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Préstamos / Vales otorgados por este usuario (distribuidor).
+     */
+    public function prestamos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Prestamo::class, 'created_by_user_id')->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Conteo de solicitudes pendientes visibles para este gerente (campana de notificaciones).
+     */
+    public function conteoSolicitudesPendientes(): int
+    {
+        if ($this->esGerenteGeneral()) {
+            return SolicitudCliente::where('estado', 'pendiente')->count();
+        }
+
+        if ($this->esGerenteSucursal() && $this->sucursal_id) {
+            return SolicitudCliente::where('estado', 'pendiente')
+                ->where('sucursal_id', $this->sucursal_id)
+                ->count();
+        }
+
+        return 0;
+    }
+
+    /**
+     * Relación de notificaciones del cajero/coordinador
+     */
+    public function notificaciones(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(NotificacionCajero::class, 'user_id')->orderByDesc('created_at');
+    }
+
+    public function notificacionesSinLeer()
+    {
+        return $this->notificaciones()->where('leida', false);
+    }
+
+    public function conteoNotificacionesSinLeer(): int
+    {
+        return $this->notificacionesSinLeer()->count();
     }
 }

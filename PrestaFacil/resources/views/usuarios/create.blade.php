@@ -54,9 +54,10 @@
                     <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                         Contraseña <span class="text-rose-400">*</span>
                     </label>
-                    <input type="password" name="password" required
+                    <input type="password" name="password" required minlength="12"
                         class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 @error('password') border-rose-500 @enderror"
-                        placeholder="Mínimo 6 caracteres">
+                        placeholder="Mínimo 12 caracteres">
+                    <span class="text-[10px] text-slate-500 mt-1 block">Debe contener al menos 12 caracteres.</span>
                     @error('password')
                         <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
                     @enderror
@@ -65,7 +66,7 @@
                     <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                         Confirmar Contraseña <span class="text-rose-400">*</span>
                     </label>
-                    <input type="password" name="password_confirmation" required
+                    <input type="password" name="password_confirmation" required minlength="12"
                         class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                         placeholder="Repite la contraseña">
                 </div>
@@ -87,7 +88,6 @@
                     @error('rol_id')
                         <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
                     @enderror
-                    <span class="text-[10px] text-slate-500 mt-1 block">Solo se muestran los roles que tienes permiso de asignar.</span>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
@@ -103,9 +103,16 @@
                     @error('sucursal_id')
                         <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
                     @enderror
-                    @if($operador->esGerenteSucursal())
-                        <span class="text-[10px] text-slate-500 mt-1 block">Solo puedes asignar usuarios a tu sucursal.</span>
-                    @endif
+                </div>
+            </div>
+
+            <!-- Nota Informativa de Categoría Inicial Cobre -->
+            <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-2.5">
+                <div class="w-6 h-6 rounded-lg bg-amber-500/20 flex items-center justify-center font-bold text-amber-400 shrink-0">
+                    🥉
+                </div>
+                <div>
+                    <strong>Categoría Inicial Automática:</strong> Si el rol asignado es <strong>Distribuidor / Distribuidora</strong>, iniciará siempre en <strong>Categoría Cobre</strong> por regla del sistema. Podrá ascender de categoría en la edición de su perfil.
                 </div>
             </div>
 

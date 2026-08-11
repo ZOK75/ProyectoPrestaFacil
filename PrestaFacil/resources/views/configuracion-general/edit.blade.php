@@ -8,7 +8,7 @@
     <!-- Encabezado -->
     <div>
         <h1 class="text-2xl font-extrabold text-white">Configuración General del Sistema</h1>
-        <p class="text-sm text-slate-400">Estos parámetros aplican a todas las sucursales. Cada cambio queda registrado con usuario, fecha/hora y motivo.</p>
+        <p class="text-sm text-slate-400">Estos parámetros aplican a todas las sucursales y distribuidores. Cada cambio queda registrado con usuario, fecha/hora y motivo.</p>
     </div>
 
     @if(session('success'))
@@ -25,105 +25,187 @@
         </div>
     @endif
 
+    @if(session('error'))
+        <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <span class="text-sm font-medium">{{ session('error') }}</span>
+            </div>
+            <button onclick="this.parentElement.remove()" class="text-rose-400/60 hover:text-rose-400 text-lg leading-none">&times;</button>
+        </div>
+    @endif
+
+    @if(!$puedeEditar)
+        <div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 flex-shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0 0v2m0-2h2m-2 0H10m0-6h4m-2 0V9m0 0V7m0 2h2m-2 0H10m-4 8a8 8 0 1116 0 8 8 0 01-16 0z"/>
+                </svg>
+            </div>
+            <div>
+                <strong>🔒 Modo Lectura:</strong> Estás visualizando la configuración como <span class="text-white font-semibold">{{ $operador?->name }}</span> ({{ $operador?->rol?->nombre ?? 'Sin rol' }}). Únicamente el <strong>Gerente General</strong> tiene permisos para modificar estos parámetros.
+            </div>
+        </div>
+    @endif
+
     <!-- Card Formulario -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-        <form action="{{ route('configuracion-general.update') }}" method="POST" class="space-y-5">
+        <form action="{{ route('configuracion-general.update') }}" method="POST" class="space-y-6">
             @csrf
             @method('PUT')
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <!-- Fecha y Hora de Corte -->
-                <div>
-                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                        Fecha y Hora de Corte <span class="text-rose-400">*</span>
-                    </label>
-                    <input type="datetime-local" name="fecha_corte" id="fecha_corte"
-                        value="{{ old('fecha_corte', $configuracion->fecha_corte ? $configuracion->fecha_corte->format('Y-m-d\TH:i') : '') }}" required
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 @error('fecha_corte') border-rose-500 @enderror"
-                        style="color-scheme: dark;">
-                    <span class="text-[11px] text-slate-500 mt-1 block">Selecciona día, hora y minuto del corte.</span>
-                    @error('fecha_corte')
-                        <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
-                    @enderror
+            <!-- Seccion 1: Fechas y Multas -->
+            <div class="space-y-4">
+                <h3 class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider border-b border-slate-800 pb-2">
+                    1. Fechas de Corte y Sanciones por Adeudo
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Fecha y Hora de Corte -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                            Fecha y Hora de Corte <span class="text-rose-400">*</span>
+                        </label>
+                        <input type="datetime-local" name="fecha_corte" id="fecha_corte"
+                            value="{{ old('fecha_corte', $configuracion->fecha_corte ? $configuracion->fecha_corte->format('Y-m-d\TH:i') : '') }}" required
+                            {{ !$puedeEditar ? 'disabled' : '' }}
+                            class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed @error('fecha_corte') border-rose-500 @enderror"
+                            style="color-scheme: dark;">
+                        @error('fecha_corte')
+                            <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Fecha y Hora Límite de Pago -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                            Fecha y Hora Límite de Pago <span class="text-rose-400">*</span>
+                        </label>
+                        <input type="datetime-local" name="fecha_limite_pago" id="fecha_limite_pago"
+                            value="{{ old('fecha_limite_pago', $configuracion->fecha_limite_pago ? $configuracion->fecha_limite_pago->format('Y-m-d\TH:i') : '') }}" required
+                            {{ !$puedeEditar ? 'disabled' : '' }}
+                            class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed @error('fecha_limite_pago') border-rose-500 @enderror"
+                            style="color-scheme: dark;">
+                        @error('fecha_limite_pago')
+                            <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
                 </div>
 
-                <!-- Fecha y Hora Límite de Pago -->
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                        Fecha y Hora Límite de Pago <span class="text-rose-400">*</span>
+                        Multa por Adeudo ($) <span class="text-rose-400">*</span>
                     </label>
-                    <input type="datetime-local" name="fecha_limite_pago" id="fecha_limite_pago"
-                        value="{{ old('fecha_limite_pago', $configuracion->fecha_limite_pago ? $configuracion->fecha_limite_pago->format('Y-m-d\TH:i') : '') }}" required
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 @error('fecha_limite_pago') border-rose-500 @enderror"
-                        style="color-scheme: dark;">
-                    <span class="text-[11px] text-slate-500 mt-1 block">Debe ser igual o posterior a la fecha de corte.</span>
-                    @error('fecha_limite_pago')
-                        <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
-                    @enderror
+                    <div class="relative max-w-xs">
+                        <span class="absolute left-3.5 top-2.5 text-slate-500 text-sm">$</span>
+                        <input type="number" step="0.01" name="multa_adeudo"
+                            value="{{ old('multa_adeudo', $configuracion->multa_adeudo) }}" required
+                            {{ !$puedeEditar ? 'disabled' : '' }}
+                            class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-rose-400 font-semibold focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed @error('multa_adeudo') border-rose-500 @enderror">
+                    </div>
                 </div>
             </div>
 
-            <!-- Multa por Adeudo -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                    Multa por Adeudo ($) <span class="text-rose-400">*</span>
-                </label>
-                <div class="relative max-w-xs">
-                    <span class="absolute left-3.5 top-2.5 text-slate-500 text-sm">$</span>
-                    <input type="number" step="0.01" name="multa_adeudo"
-                        value="{{ old('multa_adeudo', $configuracion->multa_adeudo) }}" required
-                        class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-rose-400 font-semibold focus:outline-none focus:border-indigo-500 @error('multa_adeudo') border-rose-500 @enderror">
+            <!-- Seccion 2: Porcentajes de Ganancia por Categoría de Distribuidor -->
+            <div class="space-y-4 pt-2">
+                <h3 class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider border-b border-slate-800 pb-2">
+                    2. Porcentajes de Ganancia de Distribuidores por Categoría
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <!-- Cobre -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-amber-900/30">
+                        <label class="block text-xs font-bold text-amber-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-600"></span> Categoría Cobre (%)
+                        </label>
+                        <div class="relative mt-2">
+                            <input type="number" step="0.01" min="0" max="100" name="comision_cobre"
+                                value="{{ old('comision_cobre', $configuracion->comision_cobre) }}" required
+                                {{ !$puedeEditar ? 'disabled' : '' }}
+                                class="w-full pr-8 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-bold focus:outline-none focus:border-amber-500 disabled:opacity-50">
+                            <span class="absolute right-3 top-2 text-slate-400 text-sm font-bold">%</span>
+                        </div>
+                        <span class="text-[10px] text-slate-500 mt-1 block">Valor por defecto: 3%</span>
+                    </div>
+
+                    <!-- Plata -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-400/30">
+                        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span> Categoría Plata (%)
+                        </label>
+                        <div class="relative mt-2">
+                            <input type="number" step="0.01" min="0" max="100" name="comision_plata"
+                                value="{{ old('comision_plata', $configuracion->comision_plata) }}" required
+                                {{ !$puedeEditar ? 'disabled' : '' }}
+                                class="w-full pr-8 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-bold focus:outline-none focus:border-slate-400 disabled:opacity-50">
+                            <span class="absolute right-3 top-2 text-slate-400 text-sm font-bold">%</span>
+                        </div>
+                        <span class="text-[10px] text-slate-500 mt-1 block">Valor por defecto: 6%</span>
+                    </div>
+
+                    <!-- Oro -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-amber-400/30">
+                        <label class="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Categoría Oro (%)
+                        </label>
+                        <div class="relative mt-2">
+                            <input type="number" step="0.01" min="0" max="100" name="comision_oro"
+                                value="{{ old('comision_oro', $configuracion->comision_oro) }}" required
+                                {{ !$puedeEditar ? 'disabled' : '' }}
+                                class="w-full pr-8 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-bold focus:outline-none focus:border-amber-400 disabled:opacity-50">
+                            <span class="absolute right-3 top-2 text-slate-400 text-sm font-bold">%</span>
+                        </div>
+                        <span class="text-[10px] text-slate-500 mt-1 block">Valor por defecto: 10%</span>
+                    </div>
                 </div>
-                <span class="text-[11px] text-slate-500 mt-1 block">Monto fijo aplicado a cuentas con adeudo vencido.</span>
-                @error('multa_adeudo')
-                    <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
-                @enderror
             </div>
 
             <!-- Motivo del Cambio -->
-            <div>
+            <div class="pt-2">
                 <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                     Motivo del Cambio
                 </label>
-                <textarea name="motivo" rows="2" placeholder="Describe brevemente la razón del cambio (ej. Ajuste de fechas por periodo vacacional)..."
-                    class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">{{ old('motivo') }}</textarea>
-                <span class="text-[11px] text-slate-500 mt-1 block">Opcional. Se registrará en el historial de cambios.</span>
+                <textarea name="motivo" rows="2" placeholder="Describe brevemente la razón del cambio (ej. Ajuste de porcentajes por meta anual)..."
+                    {{ !$puedeEditar ? 'disabled' : '' }}
+                    class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">{{ old('motivo') }}</textarea>
+                <span class="text-[11px] text-slate-500 mt-1 block">Opcional. Se registrará en el historial de cambios de configuración.</span>
             </div>
 
-            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-                <button type="submit" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/30 transition flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                    </svg>
-                    Guardar Cambios
-                </button>
-            </div>
+            @if($puedeEditar)
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                    <button type="submit" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/30 transition flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Guardar Configuración y Ganancias
+                    </button>
+                </div>
+            @endif
         </form>
     </div>
 
-    <!-- Configuración Actual -->
+    <!-- Configuración Actual Vigente -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
         <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">
-            Configuración Actual Vigente
+            Resumen de Ganancias por Categoría Vigentes
         </h3>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
-                <span class="text-xs text-slate-400 block font-medium">Fecha y Hora de Corte</span>
-                <span class="text-lg font-extrabold text-indigo-300 mt-1 block">
-                    {{ $configuracion->fecha_corte ? $configuracion->fecha_corte->format('d/m/Y H:i') : 'Sin definir' }}
-                </span>
+            <div class="bg-slate-950 rounded-xl p-4 border border-amber-900/30">
+                <span class="text-xs text-amber-500 block font-bold">Cobre</span>
+                <span class="text-2xl font-black text-white mt-1 block">{{ number_format($configuracion->comision_cobre, 2) }}%</span>
+                <span class="text-[10px] text-slate-500">Ganancia por vale colocado</span>
             </div>
-            <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
-                <span class="text-xs text-slate-400 block font-medium">Fecha y Hora Límite de Pago</span>
-                <span class="text-lg font-extrabold text-amber-400 mt-1 block">
-                    {{ $configuracion->fecha_limite_pago ? $configuracion->fecha_limite_pago->format('d/m/Y H:i') : 'Sin definir' }}
-                </span>
+            <div class="bg-slate-950 rounded-xl p-4 border border-slate-400/30">
+                <span class="text-xs text-slate-300 block font-bold">Plata</span>
+                <span class="text-2xl font-black text-white mt-1 block">{{ number_format($configuracion->comision_plata, 2) }}%</span>
+                <span class="text-[10px] text-slate-500">Ganancia por vale colocado</span>
             </div>
-            <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
-                <span class="text-xs text-slate-400 block font-medium">Multa por Adeudo</span>
-                <span class="text-lg font-extrabold text-rose-400 mt-1 block">
-                    ${{ number_format($configuracion->multa_adeudo, 2) }}
-                </span>
+            <div class="bg-slate-950 rounded-xl p-4 border border-amber-400/30">
+                <span class="text-xs text-amber-400 block font-bold">Oro</span>
+                <span class="text-2xl font-black text-amber-400 mt-1 block">{{ number_format($configuracion->comision_oro, 2) }}%</span>
+                <span class="text-[10px] text-slate-500">Ganancia por vale colocado</span>
             </div>
         </div>
     </div>
@@ -153,7 +235,7 @@
                             <th class="px-6 py-3">Fecha Límite Pago</th>
                             <th class="px-6 py-3">Multa</th>
                             <th class="px-6 py-3">Usuario</th>
-                            <th class="px-6 py-3">Motivo</th>
+                            <th class="px-6 py-3">Motivo / Descripción</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800/60">
@@ -195,7 +277,6 @@
                         </svg>
                     </div>
                     <p class="font-medium text-slate-400">Aún no hay cambios registrados</p>
-                    <p class="text-xs text-slate-500">El historial se poblará cuando se guarden modificaciones a la configuración.</p>
                 </div>
             </div>
         @endif

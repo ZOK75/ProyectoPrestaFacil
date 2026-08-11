@@ -81,8 +81,8 @@
             </div>
         </div>
 
-        <!-- Botón de Cobro Móvil -->
-        @if(!$prestamo->estaPagado())
+        <!-- Botón de Cobro Móvil (Exclusivo para Caja/Cajero, oculto para Distribuidor) -->
+        @if(!$prestamo->estaPagado() && (!Auth::check() || !Auth::user()->esDistribuidor()))
             <div>
                 <a href="{{ route('prestamos.pago', $prestamo) }}" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold text-center shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-1.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

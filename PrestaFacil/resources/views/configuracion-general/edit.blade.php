@@ -6,9 +6,20 @@
 <div class="max-w-4xl mx-auto space-y-6">
 
     <!-- Encabezado -->
-    <div>
-        <h1 class="text-2xl font-extrabold text-white">Configuración General del Sistema</h1>
-        <p class="text-sm text-slate-400">Estos parámetros aplican a todas las sucursales y distribuidores. Cada cambio queda registrado con usuario, fecha/hora y motivo.</p>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-extrabold text-white">Configuración General del Sistema</h1>
+            <p class="text-sm text-slate-400">Reglas periódicas de corte por día y hora, multas, comisiones y puntos.</p>
+        </div>
+
+        <!-- Reloj del Servidor en Tiempo Real -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-right shrink-0">
+            <span class="text-[10px] uppercase font-bold text-indigo-400 block tracking-wider">Hora del Servidor</span>
+            <span class="text-sm font-black text-white font-mono block">
+                {{ now()->format('d/m/Y H:i:s') }}
+            </span>
+            <span class="text-[10px] text-slate-500 block">Zona: {{ config('app.timezone') }}</span>
+        </div>
     </div>
 
     @if(session('success'))
@@ -58,46 +69,124 @@
             @csrf
             @method('PUT')
 
-            <!-- Seccion 1: Fechas y Multas -->
+            <!-- Seccion 1: Día y Hora de Corte y Fecha Límite -->
             <div class="space-y-4">
-                <h3 class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider border-b border-slate-800 pb-2">
-                    1. Fechas de Corte y Sanciones por Adeudo
-                </h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <!-- Fecha y Hora de Corte -->
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                            Fecha y Hora de Corte <span class="text-rose-400">*</span>
-                        </label>
-                        <input type="datetime-local" name="fecha_corte" id="fecha_corte"
-                            value="{{ old('fecha_corte', $configuracion->fecha_corte ? $configuracion->fecha_corte->format('Y-m-d\TH:i') : '') }}" required
-                            {{ !$puedeEditar ? 'disabled' : '' }}
-                            class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed @error('fecha_corte') border-rose-500 @enderror"
-                            style="color-scheme: dark;">
-                        @error('fecha_corte')
-                            <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
-                        @enderror
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h3 class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider">
+                        1. Reglas Periódicas de Corte y Fecha Límite de Pago
+                    </h3>
+                    <span class="text-[11px] text-slate-400 font-medium">
+                        Cálculo automático: siguiente mes solo cuando el día y hora límite se anteponen al corte
+                    </span>
+                </div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <!-- Parámetros de Corte -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-indigo-500/20 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-black text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                                ✂️ Fecha de Corte
+                            </span>
+                            <span class="text-[10px] text-slate-400 font-mono">Día del mes y hora</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">
+                                    Día del Mes (1-31) <span class="text-rose-400">*</span>
+                                </label>
+                                <input type="number" name="dia_corte" min="1" max="31"
+                                    value="{{ old('dia_corte', $configuracion->dia_corte ?? 10) }}" required
+                                    {{ !$puedeEditar ? 'disabled' : '' }}
+                                    class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-bold focus:outline-none focus:border-indigo-500 @error('dia_corte') border-rose-500 @enderror">
+                                @error('dia_corte')
+                                    <p class="text-[10px] text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">
+                                    Hora de Corte <span class="text-rose-400">*</span>
+                                </label>
+                                <input type="time" name="hora_corte"
+                                    value="{{ old('hora_corte', substr($configuracion->hora_corte ?? '22:20', 0, 5)) }}" required
+                                    {{ !$puedeEditar ? 'disabled' : '' }}
+                                    class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-bold focus:outline-none focus:border-indigo-500"
+                                    style="color-scheme: dark;">
+                                @error('hora_corte')
+                                    <p class="text-[10px] text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
+
+                        <div class="text-[11px] text-slate-400">
+                            Próximo corte: <strong class="text-indigo-300 font-mono">{{ $configuracion->fechaCorteCalculada()->format('d/m/Y H:i') }}</strong>
+                        </div>
                     </div>
 
-                    <!-- Fecha y Hora Límite de Pago -->
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                            Fecha y Hora Límite de Pago <span class="text-rose-400">*</span>
-                        </label>
-                        <input type="datetime-local" name="fecha_limite_pago" id="fecha_limite_pago"
-                            value="{{ old('fecha_limite_pago', $configuracion->fecha_limite_pago ? $configuracion->fecha_limite_pago->format('Y-m-d\TH:i') : '') }}" required
-                            {{ !$puedeEditar ? 'disabled' : '' }}
-                            class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed @error('fecha_limite_pago') border-rose-500 @enderror"
-                            style="color-scheme: dark;">
-                        @error('fecha_limite_pago')
-                            <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
-                        @enderror
+                    <!-- Parámetros de Fecha Límite de Pago -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-amber-500/20 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                                📅 Fecha Límite de Pago
+                            </span>
+                            <span class="text-[10px] text-slate-400 font-mono">Día del mes y hora</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">
+                                    Día del Mes (1-31) <span class="text-rose-400">*</span>
+                                </label>
+                                <input type="number" name="dia_limite_pago" min="1" max="31"
+                                    value="{{ old('dia_limite_pago', $configuracion->dia_limite_pago ?? 15) }}" required
+                                    {{ !$puedeEditar ? 'disabled' : '' }}
+                                    class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-bold focus:outline-none focus:border-amber-500 @error('dia_limite_pago') border-rose-500 @enderror">
+                                @error('dia_limite_pago')
+                                    <p class="text-[10px] text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">
+                                    Hora Límite <span class="text-rose-400">*</span>
+                                </label>
+                                <input type="time" name="hora_limite_pago"
+                                    value="{{ old('hora_limite_pago', substr($configuracion->hora_limite_pago ?? '23:59', 0, 5)) }}" required
+                                    {{ !$puedeEditar ? 'disabled' : '' }}
+                                    class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-bold focus:outline-none focus:border-amber-500"
+                                    style="color-scheme: dark;">
+                                @error('hora_limite_pago')
+                                    <p class="text-[10px] text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
+
+                        <div class="text-[11px] text-slate-400">
+                            Próximo vencimiento: <strong class="text-amber-300 font-mono">{{ $configuracion->fechaLimitePagoCalculada()->format('d/m/Y H:i') }}</strong>
+                            @if($configuracion->esLimiteSiguienteMes())
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 inline-block ml-1">
+                                    Siguiente Mes (Antepuesto)
+                                </span>
+                            @else
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 inline-block ml-1">
+                                    Mismo Mes
+                                </span>
+                            @endif
+                        </div>
                     </div>
                 </div>
 
-                <div>
+                <!-- Nota informativa de la regla de anteposición -->
+                <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 text-xs flex items-center gap-2">
+                    <span class="text-indigo-400 font-bold">💡 Regla de Anteposición:</span>
+                    <span>Si el día y la hora límite son posteriores al corte dentro del mes (ej. día 10 a las 10:00 PM y día 10 a las 10:01 PM), se mantienen en el <strong>mismo mes</strong>. Si el día u hora límite son anteriores o iguales (ej. día 10 a las 10:00 PM o día 01), se calculan para el <strong>siguiente mes</strong>.</span>
+                </div>
+
+                <!-- Multa por Adeudo -->
+                <div class="pt-1">
                     <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                        Multa por Adeudo ($) <span class="text-rose-400">*</span>
+                        Multa por Adeudo Vencido ($) <span class="text-rose-400">*</span>
                     </label>
                     <div class="relative max-w-xs">
                         <span class="absolute left-3.5 top-2.5 text-slate-500 text-sm">$</span>
@@ -106,6 +195,7 @@
                             {{ !$puedeEditar ? 'disabled' : '' }}
                             class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-rose-400 font-semibold focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed @error('multa_adeudo') border-rose-500 @enderror">
                     </div>
+                    <span class="text-[10px] text-slate-500 mt-1 block">Monto que se cargará de forma automática al superar el día y hora límite si hay adeudo pendiente.</span>
                 </div>
             </div>
 
@@ -162,12 +252,68 @@
                 </div>
             </div>
 
+            <!-- Seccion 3: Parámetros del Sistema de Puntos -->
+            <div class="space-y-4 pt-2">
+                <h3 class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider border-b border-slate-800 pb-2">
+                    3. Parámetros del Sistema de Puntos
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <!-- Monto Base en Productos -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-indigo-500/20">
+                        <label class="block text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">
+                            Monto Base en Productos ($) <span class="text-rose-400">*</span>
+                        </label>
+                        <div class="relative mt-2">
+                            <span class="absolute left-3 top-2 text-slate-500 text-sm">$</span>
+                            <input type="number" step="0.01" min="1" name="monto_base_puntos"
+                                value="{{ old('monto_base_puntos', $configuracion->monto_base_puntos ?? 1200) }}" required
+                                {{ !$puedeEditar ? 'disabled' : '' }}
+                                class="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-bold focus:outline-none focus:border-indigo-500 disabled:opacity-50">
+                        </div>
+                        <span class="text-[10px] text-slate-500 mt-1 block">Por defecto: $1,200.00</span>
+                    </div>
+
+                    <!-- Puntos Otorgados por Bloque -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-indigo-500/20">
+                        <label class="block text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">
+                            Puntos por Monto Base <span class="text-rose-400">*</span>
+                        </label>
+                        <div class="relative mt-2">
+                            <input type="number" step="1" min="1" name="puntos_por_monto_base"
+                                value="{{ old('puntos_por_monto_base', $configuracion->puntos_por_monto_base ?? 3) }}" required
+                                {{ !$puedeEditar ? 'disabled' : '' }}
+                                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-bold focus:outline-none focus:border-indigo-500 disabled:opacity-50">
+                        </div>
+                        <span class="text-[10px] text-slate-500 mt-1 block">Por defecto: 3 puntos</span>
+                    </div>
+
+                    <!-- Valor en Dinero por Punto -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-emerald-500/20">
+                        <label class="block text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">
+                            Valor por Punto ($) <span class="text-rose-400">*</span>
+                        </label>
+                        <div class="relative mt-2">
+                            <span class="absolute left-3 top-2 text-slate-500 text-sm">$</span>
+                            <input type="number" step="0.01" min="0" name="valor_punto"
+                                value="{{ old('valor_punto', $configuracion->valor_punto ?? 2.00) }}" required
+                                {{ !$puedeEditar ? 'disabled' : '' }}
+                                class="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-emerald-400 font-bold focus:outline-none focus:border-emerald-500 disabled:opacity-50">
+                        </div>
+                        <span class="text-[10px] text-slate-500 mt-1 block">Por defecto: $2.00 por punto</span>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs">
+                    <strong>Fórmula Aplicada:</strong> Puntos = floor(Total en Productos / ${{ number_format($configuracion->monto_base_puntos ?? 1200, 0) }}) &times; {{ $configuracion->puntos_por_monto_base ?? 3 }} puntos (Redondeo hacia abajo en pago anticipado).
+                </div>
+            </div>
+
             <!-- Motivo del Cambio -->
             <div class="pt-2">
                 <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                     Motivo del Cambio
                 </label>
-                <textarea name="motivo" rows="2" placeholder="Describe brevemente la razón del cambio (ej. Ajuste de porcentajes por meta anual)..."
+                <textarea name="motivo" rows="2" placeholder="Describe brevemente la razón del cambio (ej. Ajuste de día y hora de corte y fecha límite)..."
                     {{ !$puedeEditar ? 'disabled' : '' }}
                     class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">{{ old('motivo') }}</textarea>
                 <span class="text-[11px] text-slate-500 mt-1 block">Opcional. Se registrará en el historial de cambios de configuración.</span>
@@ -179,33 +325,48 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
-                        Guardar Configuración y Ganancias
+                        Guardar Configuración General
                     </button>
                 </div>
             @endif
         </form>
     </div>
 
-    <!-- Configuración Actual Vigente -->
+    <!-- Resumen de Configuración Vigente -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
         <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">
-            Resumen de Ganancias por Categoría Vigentes
+            Resumen de Ciclo Periódico Vigente
         </h3>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div class="bg-slate-950 rounded-xl p-4 border border-amber-900/30">
-                <span class="text-xs text-amber-500 block font-bold">Cobre</span>
-                <span class="text-2xl font-black text-white mt-1 block">{{ number_format($configuracion->comision_cobre, 2) }}%</span>
-                <span class="text-[10px] text-slate-500">Ganancia por vale colocado</span>
+            <div class="bg-slate-950 rounded-xl p-4 border border-indigo-500/20">
+                <span class="text-xs text-indigo-400 block font-bold">Corte Periódico</span>
+                <span class="text-base font-black text-white mt-1 block">
+                    Día {{ $configuracion->dia_corte ?? 10 }} a las {{ substr($configuracion->hora_corte ?? '22:20', 0, 5) }} hrs
+                </span>
+                <span class="text-[10px] text-slate-400">Próximo: {{ $configuracion->fechaCorteCalculada()->format('d/m/Y H:i') }}</span>
             </div>
-            <div class="bg-slate-950 rounded-xl p-4 border border-slate-400/30">
-                <span class="text-xs text-slate-300 block font-bold">Plata</span>
-                <span class="text-2xl font-black text-white mt-1 block">{{ number_format($configuracion->comision_plata, 2) }}%</span>
-                <span class="text-[10px] text-slate-500">Ganancia por vale colocado</span>
+
+            <div class="bg-slate-950 rounded-xl p-4 border border-amber-500/20">
+                <span class="text-xs text-amber-400 block font-bold">Fecha Límite de Pago</span>
+                <span class="text-base font-black text-amber-400 mt-1 block">
+                    Día {{ $configuracion->dia_limite_pago ?? 15 }} a las {{ substr($configuracion->hora_limite_pago ?? '23:59', 0, 5) }} hrs
+                </span>
+                <span class="text-[10px] text-slate-400">
+                    Próximo: {{ $configuracion->fechaLimitePagoCalculada()->format('d/m/Y H:i') }}
+                    @if($configuracion->esLimiteSiguienteMes())
+                        (Siguiente Mes)
+                    @else
+                        (Mismo Mes)
+                    @endif
+                </span>
             </div>
-            <div class="bg-slate-950 rounded-xl p-4 border border-amber-400/30">
-                <span class="text-xs text-amber-400 block font-bold">Oro</span>
-                <span class="text-2xl font-black text-amber-400 mt-1 block">{{ number_format($configuracion->comision_oro, 2) }}%</span>
-                <span class="text-[10px] text-slate-500">Ganancia por vale colocado</span>
+
+            <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
+                <span class="text-xs text-slate-400 block font-bold">Multa por Adeudo</span>
+                <span class="text-lg font-black text-rose-400 mt-1 block">
+                    ${{ number_format($configuracion->multa_adeudo, 2) }}
+                </span>
+                <span class="text-[10px] text-slate-500">Sanción por atraso</span>
             </div>
         </div>
     </div>

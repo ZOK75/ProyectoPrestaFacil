@@ -13,9 +13,9 @@
                     <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    Préstamos y Pagos
+                    Préstamos y Cartera
                 </h1>
-                <p class="text-xs text-slate-400 mt-0.5">Control de referencias, prevales y cobros</p>
+                <p class="text-xs text-slate-400 mt-0.5">Control de referencias y estado de cuenta</p>
             </div>
 
             @auth
@@ -31,6 +31,45 @@
                 @endif
             @endauth
         </div>
+
+        <!-- Banner de Estado de Periodo de Cobranza & Puntos -->
+        @auth
+            @if(Auth::user()->esDistribuidor() && isset($configuracion))
+                @php
+                    $ahora = now();
+                    $fechaCorte = $configuracion->fecha_corte;
+                    $fechaLimite = $configuracion->fecha_limite_pago;
+                    $esAntesDeCorte = $fechaCorte && $ahora->lessThan($fechaCorte);
+                    $esPeriodoATiempo = $fechaCorte && $fechaLimite && $ahora->greaterThanOrEqualTo($fechaCorte) && $ahora->lessThanOrEqualTo($fechaLimite);
+                    $esPeriodoVencido = $fechaLimite && $ahora->greaterThan($fechaLimite);
+                @endphp
+
+                <div class="mb-3 p-3 rounded-xl border text-xs
+                    @if($esAntesDeCorte) bg-emerald-500/10 border-emerald-500/30 text-emerald-300
+                    @elseif($esPeriodoATiempo) bg-amber-500/10 border-amber-500/30 text-amber-300
+                    @else bg-rose-500/10 border-rose-500/30 text-rose-300 @endif">
+                    <div class="flex items-center justify-between font-bold pb-1 mb-1 border-b border-white/10">
+                        <span>
+                            @if($esAntesDeCorte) 🟢 Periodo Anticipado Activo (Gana Puntos)
+                            @elseif($esPeriodoATiempo) 🟡 Corte Realizado (Pago a Tiempo)
+                            @else 🔴 Periodo Vencido (Multa & -20% Puntos) @endif
+                        </span>
+                        <span class="font-mono text-[10px]">
+                            Puntos: {{ Auth::user()->puntos ?? 0 }}
+                        </span>
+                    </div>
+                    <p class="text-[11px] leading-tight opacity-90">
+                        @if($esAntesDeCorte)
+                            Liquida antes del <strong>{{ $fechaCorte->format('d/m/Y H:i') }}</strong> para acumular puntos por productos otorgados.
+                        @elseif($esPeriodoATiempo)
+                            Liquida antes del <strong>{{ $fechaLimite->format('d/m/Y H:i') }}</strong> para evitar multas de ${{ number_format($configuracion->multa_adeudo, 0) }}.
+                        @else
+                            La fecha límite venció el <strong>{{ $fechaLimite->format('d/m/Y H:i') }}</strong>. Se aplicó multa por adeudo.
+                        @endif
+                    </p>
+                </div>
+            @endif
+        @endauth
 
         <!-- Ficha de Crédito Disponible & Tope de Vale -->
         @auth
@@ -197,11 +236,11 @@
 
                 <!-- Botones Móviles Táctiles -->
                 <div class="flex items-center gap-2 pt-1">
-                    <a href="{{ route('prestamos.show', $prestamo) }}" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold text-center transition flex items-center justify-center gap-1">
+                    <a href="{{ route('prestamos.show', $prestamo) }}" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold text-center transition flex items-center justify-center gap-1">
                         Estado de Cuenta
                     </a>
 
-                    @if(!$prestamo->estaPagado())
+                    @if(!$prestamo->estaPagado() && (!Auth::check() || !Auth::user()->esDistribuidor()))
                         <a href="{{ route('prestamos.pago', $prestamo) }}" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold text-center shadow-lg transition flex items-center justify-center gap-1">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>

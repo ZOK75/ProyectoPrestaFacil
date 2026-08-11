@@ -189,7 +189,7 @@
                                             Comparar / Revisar
                                         </a>
 
-                                        @if($sol->esPendiente())
+                                        @if($sol->esPendiente() && !$operador->esAdministrador())
                                             <!-- Botón Rápido Aprobar -->
                                             <form method="POST" action="{{ route('solicitudes-clientes.aprobar', $sol) }}" onsubmit="return confirm('¿Aprobar inmediatamente esta solicitud para {{ $sol->cliente?->nombre }}?');">
                                                 @csrf

@@ -27,7 +27,7 @@ class ClienteController extends Controller
     }
 
     /**
-     * Verifica que el usuario tenga acceso a clientes (Distribuidores y Gerentes).
+     * Verifica que el usuario tenga acceso a clientes.
      */
     private function verificarAcceso(): ?\Illuminate\Http\RedirectResponse
     {
@@ -35,6 +35,13 @@ class ClienteController extends Controller
         if (!$operador) {
             return redirect()->route('login');
         }
+
+        if ($operador->esGerenteGeneral() || $operador->esGerenteSucursal()) {
+            $ruta = $operador->esGerenteGeneral() ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
+            return redirect()->route($ruta)
+                ->with('error', 'Acceso denegado: El rol gerencial no tiene permisos para acceder al módulo de clientes.');
+        }
+
         return null;
     }
 
@@ -50,7 +57,7 @@ class ClienteController extends Controller
         $operador = $this->operador();
         $query = Cliente::with(['createdBy', 'desactivadoPor', 'solicitudPendiente']);
 
-        // Si es distribuidor, filtra los clientes creados por él o de su sucursal
+        // Si es distribuidor, filtra los clientes creados por él
         if ($operador->esDistribuidor()) {
             $query->where('created_by_user_id', $operador->id);
         }
@@ -100,6 +107,11 @@ class ClienteController extends Controller
 
         $operador = $this->operador();
 
+        if ($operador->esAdministrador()) {
+            return redirect()->route('clientes.index')
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar clientes.');
+        }
+
         return view('clientes.create', compact('operador'));
     }
 
@@ -113,6 +125,12 @@ class ClienteController extends Controller
         }
 
         $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
+            return redirect()->route('clientes.index')
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar clientes.');
+        }
+
         $data = $request->validated();
 
         // Almacenar el archivo INE PDF
@@ -161,6 +179,13 @@ class ClienteController extends Controller
             return $redirect;
         }
 
+        $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
+            return redirect()->route('clientes.index')
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede editar clientes.');
+        }
+
         if (!$cliente->activo) {
             return redirect()->route('clientes.index')
                 ->with('info', "El cliente '{$cliente->nombre}' está desactivado y no puede ser modificado.");
@@ -168,19 +193,16 @@ class ClienteController extends Controller
 
         if ($cliente->tieneSolicitudPendiente()) {
             return redirect()->route('clientes.index')
-                ->with('warning', "El cliente '{$cliente->nombre}' ya tiene una solicitud pendiente de autorización en Gerencia.");
+                ->with('warning', "El cliente '{$cliente->nombre}' ya tiene una solicitud pendiente de autorización.");
         }
 
         $cliente->load(['createdBy', 'desactivadoPor']);
-        $operador = $this->operador();
 
         return view('clientes.edit', compact('cliente', 'operador'));
     }
 
     /**
-     * Actualizar datos del cliente:
-     * - Si el operador es Distribuidor: Genera una solicitud de actualización a Gerencia.
-     * - Si el operador es Gerente: Aplica la actualización directamente.
+     * Actualizar datos del cliente.
      */
     public function update(UpdateClienteRequest $request, Cliente $cliente)
     {
@@ -188,6 +210,13 @@ class ClienteController extends Controller
             return $redirect;
         }
 
+        $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
+            return redirect()->route('clientes.index')
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede modificar clientes.');
+        }
+
         if (!$cliente->activo) {
             return redirect()->route('clientes.index')
                 ->with('info', "El cliente '{$cliente->nombre}' está desactivado y no puede ser modificado.");
@@ -195,13 +224,12 @@ class ClienteController extends Controller
 
         if ($cliente->tieneSolicitudPendiente()) {
             return redirect()->route('clientes.index')
-                ->with('warning', "El cliente '{$cliente->nombre}' ya tiene una solicitud pendiente de autorización en Gerencia.");
+                ->with('warning', "El cliente '{$cliente->nombre}' ya tiene una solicitud pendiente de autorización.");
         }
 
-        $operador = $this->operador();
         $data = $request->validated();
 
-        // FLUJO DISTRIBUIDOR: Envía solicitud de actualización a Gerencia
+        // FLUJO DISTRIBUIDOR: Envía solicitud de actualización
         if ($operador->esDistribuidor()) {
             $pdfIneNuevo = null;
             $pdfComprobanteNuevo = null;
@@ -232,10 +260,9 @@ class ClienteController extends Controller
             ]);
 
             return redirect()->route('clientes.index')
-                ->with('success', "Se ha enviado la Solicitud de Actualización para '{$cliente->nombre}'. Tu Gerente de Sucursal y el Gerente General han sido notificados para autorizar los cambios.");
+                ->with('success', "Se ha enviado la Solicitud de Actualización para '{$cliente->nombre}'.");
         }
 
-        // FLUJO GERENTE: Aplica directamente los cambios
         if ($request->hasFile('pdf_ine')) {
             if ($cliente->path_ine_pdf && Storage::disk('public')->exists($cliente->path_ine_pdf)) {
                 Storage::disk('public')->delete($cliente->path_ine_pdf);
@@ -257,14 +284,19 @@ class ClienteController extends Controller
     }
 
     /**
-     * Desactivar cliente:
-     * - Si el operador es Distribuidor: Genera una solicitud de desactivación a Gerencia.
-     * - Si el operador es Gerente: Desactiva directamente al cliente.
+     * Desactivar cliente.
      */
     public function destroy(Request $request, Cliente $cliente)
     {
         if ($redirect = $this->verificarAcceso()) {
             return $redirect;
+        }
+
+        $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
+            return redirect()->route('clientes.index')
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede desactivar clientes.');
         }
 
         if (!$cliente->activo) {
@@ -274,12 +306,10 @@ class ClienteController extends Controller
 
         if ($cliente->tieneSolicitudPendiente()) {
             return redirect()->route('clientes.index')
-                ->with('warning', "El cliente '{$cliente->nombre}' ya tiene una solicitud pendiente de autorización en Gerencia.");
+                ->with('warning', "El cliente '{$cliente->nombre}' ya tiene una solicitud pendiente de autorización.");
         }
 
-        $operador = $this->operador();
-
-        // FLUJO DISTRIBUIDOR: Envía solicitud de desactivación a Gerencia
+        // FLUJO DISTRIBUIDOR: Envía solicitud de desactivación
         if ($operador->esDistribuidor()) {
             SolicitudCliente::create([
                 'tipo' => 'desactivacion',
@@ -292,10 +322,10 @@ class ClienteController extends Controller
             ]);
 
             return redirect()->route('clientes.index')
-                ->with('success', "Se ha enviado la Solicitud de Desactivación para '{$cliente->nombre}'. Tu Gerente de Sucursal y el Gerente General han sido notificados para autorizar la baja.");
+                ->with('success', "Se ha enviado la Solicitud de Desactivación para '{$cliente->nombre}'.");
         }
 
-        // FLUJO GERENTE: Desactivación inmediata
+        // Desactivación inmediata
         $cliente->update([
             'activo' => false,
             'desactivado_at' => now(),

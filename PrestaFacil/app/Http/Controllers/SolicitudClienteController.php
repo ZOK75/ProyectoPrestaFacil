@@ -20,34 +20,37 @@ class SolicitudClienteController extends Controller
     }
 
     /**
-     * Verifica que el usuario tenga permisos gerenciales para gestionar solicitudes.
+     * Verifica que el usuario tenga permisos de auditoría para ver solicitudes.
      */
-    private function verificarAccesoGerente(): ?\Illuminate\Http\RedirectResponse
+    private function verificarAccesoAuditor(): ?\Illuminate\Http\RedirectResponse
     {
         $operador = $this->operador();
-        if (!$operador->esGerenteGeneral() && !$operador->esGerenteSucursal()) {
-            return redirect()->route('producto-vales.index')
-                ->with('error', 'Acceso denegado: Este módulo de autorizaciones es exclusivo para Gerentes.');
+
+        if ($operador->esGerenteGeneral() || $operador->esGerenteSucursal()) {
+            $ruta = $operador->esGerenteGeneral() ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
+            return redirect()->route($ruta)
+                ->with('error', 'Acceso denegado: El rol gerencial no tiene permisos para acceder al módulo de solicitudes.');
         }
+
+        if (!$operador->esAdministrador()) {
+            return redirect()->route('producto-vales.index')
+                ->with('error', 'Acceso denegado: Este módulo es exclusivo para Administradores de auditoría.');
+        }
+
         return null;
     }
 
     /**
-     * Bandeja de solicitudes de clientes para Gerentes (General y Sucursal).
+     * Bandeja de solicitudes de clientes para Administrador (Auditoría).
      */
     public function index(Request $request)
     {
-        if ($redirect = $this->verificarAccesoGerente()) {
+        if ($redirect = $this->verificarAccesoAuditor()) {
             return $redirect;
         }
 
         $operador = $this->operador();
         $query = SolicitudCliente::with(['cliente', 'distribuidor', 'sucursal', 'aprobadoPor', 'rechazadoPor']);
-
-        // Gerente de Sucursal solo ve solicitudes de su propia sucursal
-        if ($operador->esGerenteSucursal()) {
-            $query->where('sucursal_id', $operador->sucursal_id);
-        }
 
         // Filtro por estado (default: ver pendientes primero si no se especifica)
         if ($request->filled('estado')) {
@@ -59,8 +62,8 @@ class SolicitudClienteController extends Controller
             $query->where('tipo', $request->input('tipo'));
         }
 
-        // Filtro por sucursal (solo Gerente General)
-        if ($request->filled('sucursal_id') && $operador->esGerenteGeneral()) {
+        // Filtro por sucursal
+        if ($request->filled('sucursal_id')) {
             $query->where('sucursal_id', $request->input('sucursal_id'));
         }
 
@@ -84,9 +87,6 @@ class SolicitudClienteController extends Controller
             ->withQueryString();
 
         $baseCountQuery = SolicitudCliente::query();
-        if ($operador->esGerenteSucursal()) {
-            $baseCountQuery->where('sucursal_id', $operador->sucursal_id);
-        }
 
         $stats = [
             'total' => (clone $baseCountQuery)->count(),
@@ -107,10 +107,10 @@ class SolicitudClienteController extends Controller
     {
         $operador = $this->operador();
 
-        // Validar acceso: Gerente General ve todas; Gerente Sucursal ve de su sucursal; Distribuidor ve las suyas
-        if ($operador->esGerenteSucursal() && $solicitud->sucursal_id != $operador->sucursal_id) {
-            return redirect()->route('solicitudes-clientes.index')
-                ->with('error', 'No tienes permiso para ver solicitudes de otra sucursal.');
+        if ($operador->esGerenteGeneral() || $operador->esGerenteSucursal()) {
+            $ruta = $operador->esGerenteGeneral() ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
+            return redirect()->route($ruta)
+                ->with('error', 'Acceso denegado: El rol gerencial no tiene permisos para acceder al módulo de solicitudes.');
         }
 
         if ($operador->esDistribuidor() && $solicitud->distribuidor_id != $operador->id) {
@@ -125,60 +125,27 @@ class SolicitudClienteController extends Controller
 
     /**
      * Aprobar la solicitud y aplicar los cambios directamente en el cliente.
-     * Regla: Con que un solo gerente (de sucursal o general) acepte, queda aprobada.
+     * Restringido para Administrador (solo lectura) y Gerentes.
      */
     public function aprobar(Request $request, SolicitudCliente $solicitud)
     {
-        if ($redirect = $this->verificarAccesoGerente()) {
+        if ($redirect = $this->verificarAccesoAuditor()) {
             return $redirect;
         }
 
-        $operador = $this->operador();
-
-        if ($operador->esGerenteSucursal() && $solicitud->sucursal_id != $operador->sucursal_id) {
-            return back()->with('error', 'No puedes autorizar solicitudes de otra sucursal.');
-        }
-
-        if (!$solicitud->esPendiente()) {
-            return back()->with('error', 'Esta solicitud ya fue procesada anteriormente por otro gerente.');
-        }
-
-        $observaciones = $request->input('observaciones_resolucion');
-        $solicitud->aplicarAprobacion($operador, $observaciones);
-
-        $accion = $solicitud->esDesactivacion() ? 'desactivación' : 'actualización de datos';
-        return redirect()->route('solicitudes-clientes.index')
-            ->with('success', "La solicitud de {$accion} para el cliente '{$solicitud->cliente->nombre}' ha sido APROBADA con éxito.");
+        return back()->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
     }
 
     /**
      * Rechazar la solicitud de cliente.
+     * Restringido para Administrador (solo lectura) y Gerentes.
      */
     public function rechazar(Request $request, SolicitudCliente $solicitud)
     {
-        if ($redirect = $this->verificarAccesoGerente()) {
+        if ($redirect = $this->verificarAccesoAuditor()) {
             return $redirect;
         }
 
-        $operador = $this->operador();
-
-        if ($operador->esGerenteSucursal() && $solicitud->sucursal_id != $operador->sucursal_id) {
-            return back()->with('error', 'No puedes resolver solicitudes de otra sucursal.');
-        }
-
-        if (!$solicitud->esPendiente()) {
-            return back()->with('error', 'Esta solicitud ya fue procesada anteriormente.');
-        }
-
-        $request->validate([
-            'motivo_rechazo' => 'required|string|max:500',
-        ], [
-            'motivo_rechazo.required' => 'Debes ingresar el motivo del rechazo para informar al distribuidor.',
-        ]);
-
-        $solicitud->aplicarRechazo($operador, $request->input('motivo_rechazo'));
-
-        return redirect()->route('solicitudes-clientes.index')
-            ->with('info', "La solicitud #{$solicitud->id} ha sido RECHAZADA.");
+        return back()->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
     }
 }

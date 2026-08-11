@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<html lang="es" class="h-full bg-white">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'PrestaFácil') }}</title>
+    <title>{{ config('app.name', 'PrestaFacil') }}</title>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,8 +30,8 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
     </style>
 </head>
-<body class="h-full bg-slate-950 text-slate-100 antialiased flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="w-full max-w-md space-y-6">
+<body class="font-sans text-slate-800 antialiased bg-white min-h-screen flex items-center justify-center p-4 sm:p-6">
+    <div class="w-full flex items-center justify-center">
         {{ $slot }}
     </div>
 </body>

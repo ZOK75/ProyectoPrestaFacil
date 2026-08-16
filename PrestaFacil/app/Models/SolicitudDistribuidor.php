@@ -15,7 +15,8 @@ class SolicitudDistribuidor extends Model
     protected $fillable = [
         'nombres',
         'apellidos',
-        'acta_nacimiento',
+        'telefono',
+        'fecha_nacimiento',
         'curp',
         'rfc',
         'lugar_nacimiento',
@@ -31,6 +32,7 @@ class SolicitudDistribuidor extends Model
         'coordinador_id',
         'sucursal_id',
         'verificador_id',
+        'user_id',
         'estado',
         'observaciones_resolucion',
         'resolved_at',
@@ -38,6 +40,7 @@ class SolicitudDistribuidor extends Model
 
     protected $casts = [
         'datos_familiares' => 'array',
+        'fecha_nacimiento' => 'date',
         'resolved_at' => 'datetime',
     ];
 
@@ -54,6 +57,11 @@ class SolicitudDistribuidor extends Model
     public function verificador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'verificador_id');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function getNombreCompletoAttribute(): string

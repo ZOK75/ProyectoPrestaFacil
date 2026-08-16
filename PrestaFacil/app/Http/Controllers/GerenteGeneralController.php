@@ -59,13 +59,28 @@ class GerenteGeneralController extends Controller
 
         $sucursales = Sucursal::where('activo', true)->orderBy('nombre')->get();
 
+        // Solicitudes de crédito pendientes globales
+        $solicitudesCreditoPendientes = \App\Models\SolicitudCredito::where('estado', 'pendiente')
+            ->with(['distribuidor', 'coordinador'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Solicitudes de distribuidores aprobadas por el verificador pero pendientes de cuenta a nivel global
+        $solicitudesAprobadasSinCuenta = \App\Models\SolicitudDistribuidor::where('estado', 'aprobado')
+            ->whereNull('user_id')
+            ->with(['coordinador', 'verificador', 'sucursal'])
+            ->orderBy('resolved_at', 'desc')
+            ->get();
+
         return view('gerente-general.dashboard', compact(
             'solicitudesPendientes',
             'totalSolicitudesPendientes',
             'distribuidores',
             'statsPrestamos',
             'sucursales',
-            'sucursalId'
+            'sucursalId',
+            'solicitudesCreditoPendientes',
+            'solicitudesAprobadasSinCuenta'
         ));
     }
 }

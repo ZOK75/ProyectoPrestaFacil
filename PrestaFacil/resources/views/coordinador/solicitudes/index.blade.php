@@ -8,12 +8,12 @@
     <!-- Header -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-white tracking-tight">Solicitudes de Distribuidores</h1>
-            <p class="text-slate-400 text-sm mt-1">Gestiona las solicitudes de alta para nuevos distribuidores.</p>
+            <h1 class="text-2xl font-bold text-white tracking-tight">Solicitudes de Distribuidoras</h1>
+            <p class="text-slate-400 text-sm mt-1">Gestiona y consulta las solicitudes de alta para nuevas distribuidoras en tu sucursal.</p>
         </div>
         <a href="{{ route('coordinador.solicitudes.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-sm font-semibold transition">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            Nueva Solicitud
+            Nueva Solicitud Interna
         </a>
     </div>
 
@@ -30,7 +30,8 @@
                 <thead>
                     <tr class="bg-slate-800/50 text-slate-300 text-xs uppercase tracking-wider">
                         <th class="p-4 font-semibold">Candidato</th>
-                        <th class="p-4 font-semibold">Fecha</th>
+                        <th class="p-4 font-semibold">Teléfono</th>
+                        <th class="p-4 font-semibold">Fecha de Registro</th>
                         <th class="p-4 font-semibold">Estado</th>
                         <th class="p-4 font-semibold text-right">Acciones</th>
                     </tr>
@@ -40,7 +41,10 @@
                         <tr class="hover:bg-slate-800/20 transition-colors">
                             <td class="p-4">
                                 <div class="text-slate-200 font-semibold text-sm">{{ $solicitud->nombres }} {{ $solicitud->apellidos }}</div>
-                                <div class="text-slate-500 text-xs">CURP: {{ $solicitud->curp }}</div>
+                                <div class="text-slate-500 text-xs">CURP: {{ $solicitud->curp }} &bull; RFC: {{ $solicitud->rfc }}</div>
+                            </td>
+                            <td class="p-4 text-sm text-slate-300 font-mono">
+                                {{ $solicitud->telefono }}
                             </td>
                             <td class="p-4 text-sm text-slate-400">
                                 {{ $solicitud->created_at->format('d/m/Y H:i') }}
@@ -57,13 +61,16 @@
                                 @endif
                             </td>
                             <td class="p-4 text-right">
-                                <div class="flex items-center justify-end gap-2">
-                                    <button class="text-slate-400 hover:text-white transition text-sm">Ver</button>
+                                <div class="flex items-center justify-end gap-3">
+                                    <a href="{{ route('coordinador.solicitudes.show', $solicitud) }}" 
+                                       class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-medium transition">
+                                        Ver Detalle
+                                    </a>
                                     @if($solicitud->estado === 'en espera')
                                         <form action="{{ route('coordinador.solicitudes.enviar-verificacion', $solicitud) }}" method="POST" class="inline">
                                             @csrf
-                                            <button type="submit" class="px-3 py-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 rounded-lg text-xs font-medium transition" onclick="return confirm('¿Enviar a verificación?')">
-                                                Enviar a Verificador
+                                            <button type="submit" class="px-3 py-1.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 rounded-lg text-xs font-medium transition" onclick="return confirm('¿Confirmas que los datos son legítimos y deseas enviar la solicitud a verificación presencial?')">
+                                                Validar y Enviar
                                             </button>
                                         </form>
                                     @endif
@@ -72,8 +79,8 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="p-8 text-center text-slate-500 text-sm">
-                                No tienes solicitudes creadas.
+                            <td colspan="5" class="p-8 text-center text-slate-500 text-sm">
+                                No se encontraron solicitudes registradas para tu sucursal.
                             </td>
                         </tr>
                     @endforelse

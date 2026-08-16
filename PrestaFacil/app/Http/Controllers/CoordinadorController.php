@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\SolicitudDistribuidor;
+use App\Models\SolicitudCredito;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -16,22 +18,32 @@ class CoordinadorController extends Controller
         $user = Auth::user();
         
         // El coordinador administra a los distribuidores de su sucursal
-        $distribuidores = \App\Models\User::whereHas('rol', function($q) {
+        $distribuidores = User::whereHas('rol', function($q) {
                 $q->where('nombre', 'Distribuidor')
                   ->orWhere('nombre', 'Distribuidora');
             })
+            ->where('activo', true)
             ->where('sucursal_id', $user->sucursal_id)
             ->get();
 
-        return view('coordinador.dashboard', compact('distribuidores'));
+        // Obtener historial de solicitudes de incremento de crédito solicitadas por este coordinador
+        $solicitudesCredito = SolicitudCredito::where('coordinador_id', $user->id)
+            ->with(['distribuidor', 'gerente'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('coordinador.dashboard', compact('distribuidores', 'solicitudesCredito'));
     }
 
     /**
-     * Listado de solicitudes de distribuidor creadas por este coordinador.
+     * Listado de solicitudes de distribuidor de la sucursal.
      */
     public function index()
     {
-        $solicitudes = SolicitudDistribuidor::where('coordinador_id', Auth::id())
+        $user = Auth::user();
+
+        // Mostrar todas las solicitudes de la misma sucursal
+        $solicitudes = SolicitudDistribuidor::where('sucursal_id', $user->sucursal_id)
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -39,7 +51,7 @@ class CoordinadorController extends Controller
     }
 
     /**
-     * Formulario para crear una nueva solicitud de distribuidor.
+     * Formulario para crear una nueva solicitud de distribuidor de forma interna.
      */
     public function create()
     {
@@ -47,37 +59,68 @@ class CoordinadorController extends Controller
     }
 
     /**
-     * Guardar una nueva solicitud de distribuidor.
+     * Guardar una nueva solicitud de distribuidor de forma interna.
      */
     public function store(Request $request)
     {
         $request->validate([
             'nombres' => 'required|string|max:255',
             'apellidos' => 'required|string|max:255',
-            'acta_nacimiento' => 'nullable|string|max:255',
-            'curp' => 'required|string|max:18',
-            'rfc' => 'required|string|max:13',
+            'telefono' => 'required|string|max:20',
+            'fecha_nacimiento' => 'required|date|before:today',
+            'curp' => 'required|string|size:18|regex:/^[A-Z]{4}[0-9]{6}[H,M][A-Z]{5}[0-9,A-Z][0-9]$/i',
+            'rfc' => 'required|string|min:12|max:13|regex:/^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/i',
             'lugar_nacimiento' => 'nullable|string|max:255',
             'calle' => 'required|string|max:255',
             'colonia' => 'required|string|max:255',
             'codigo_postal' => 'required|string|max:10',
-            'estado_republica' => 'required|string|max:255',
             'ciudad' => 'required|string|max:255',
+            'estado_republica' => 'required|string|max:255',
             'datos_familiares' => 'nullable|array',
             'datos_vehiculos' => 'nullable|string',
-            'datos_casa' => 'nullable|string',
+            'datos_casa' => 'required|string|max:1000',
             'referencias_laborales' => 'nullable|string',
         ]);
 
-        $data = $request->all();
-        $data['coordinador_id'] = Auth::id();
-        $data['sucursal_id'] = Auth::user()->sucursal_id;
-        $data['estado'] = 'en espera'; // Estado inicial
-
-        SolicitudDistribuidor::create($data);
+        SolicitudDistribuidor::create([
+            'nombres' => $request->nombres,
+            'apellidos' => $request->apellidos,
+            'telefono' => $request->telefono,
+            'fecha_nacimiento' => $request->fecha_nacimiento,
+            'curp' => strtoupper($request->curp),
+            'rfc' => strtoupper($request->rfc),
+            'lugar_nacimiento' => $request->lugar_nacimiento,
+            'calle' => $request->calle,
+            'colonia' => $request->colonia,
+            'codigo_postal' => $request->codigo_postal,
+            'ciudad' => $request->ciudad,
+            'estado_republica' => $request->estado_republica,
+            'datos_familiares' => $request->datos_familiares,
+            'datos_vehiculos' => $request->datos_vehiculos,
+            'datos_casa' => $request->datos_casa,
+            'referencias_laborales' => $request->referencias_laborales,
+            'coordinador_id' => Auth::id(),
+            'sucursal_id' => Auth::user()->sucursal_id,
+            'estado' => 'en espera',
+        ]);
 
         return redirect()->route('coordinador.solicitudes.index')
                          ->with('success', 'Solicitud de distribuidora creada exitosamente y puesta en espera.');
+    }
+
+    /**
+     * Ver el detalle de una solicitud de distribuidora.
+     */
+    public function show(SolicitudDistribuidor $solicitud)
+    {
+        // Validar que la solicitud pertenezca a la misma sucursal
+        if ($solicitud->sucursal_id !== Auth::user()->sucursal_id) {
+            abort(403, 'No tienes permiso para ver esta solicitud.');
+        }
+
+        $solicitud->load(['coordinador', 'sucursal', 'verificador']);
+
+        return view('coordinador.solicitudes.show', compact('solicitud'));
     }
 
     /**
@@ -85,8 +128,8 @@ class CoordinadorController extends Controller
      */
     public function enviarAVerificacion(SolicitudDistribuidor $solicitud)
     {
-        if ($solicitud->coordinador_id !== Auth::id()) {
-            abort(403);
+        if ($solicitud->sucursal_id !== Auth::user()->sucursal_id) {
+            abort(403, 'Acceso denegado.');
         }
 
         $solicitud->update([
@@ -94,6 +137,39 @@ class CoordinadorController extends Controller
         ]);
 
         return redirect()->route('coordinador.solicitudes.index')
-                         ->with('success', 'La solicitud ha sido enviada al Verificador.');
+                         ->with('success', 'La solicitud ha sido enviada al Verificador para la evaluación presencial.');
+    }
+
+    /**
+     * Registrar solicitud de incremento de límite de crédito para un distribuidor
+     */
+    public function solicitarCredito(Request $request, User $distribuidor)
+    {
+        $coordinador = Auth::user();
+
+        // Validaciones de seguridad
+        if (!$distribuidor->esDistribuidor() || $distribuidor->sucursal_id !== $coordinador->sucursal_id) {
+            abort(403, 'Acceso denegado: El distribuidor no pertenece a tu sucursal.');
+        }
+
+        $request->validate([
+            'limite_nuevo' => 'required|numeric|min:' . ($distribuidor->limite_credito + 0.01),
+            'motivo' => 'required|string|max:500',
+        ], [
+            'limite_nuevo.min' => 'El nuevo límite debe ser mayor al límite actual ($' . number_format($distribuidor->limite_credito, 2) . ').',
+        ]);
+
+        // Crear la solicitud
+        SolicitudCredito::create([
+            'distribuidor_id' => $distribuidor->id,
+            'coordinador_id' => $coordinador->id,
+            'limite_actual' => $distribuidor->limite_credito,
+            'limite_nuevo' => $request->limite_nuevo,
+            'motivo' => $request->motivo,
+            'estado' => 'pendiente',
+        ]);
+
+        return redirect()->route('coordinador.dashboard')
+            ->with('success', 'Solicitud de incremento de crédito enviada al Gerente de Sucursal para su autorización.');
     }
 }

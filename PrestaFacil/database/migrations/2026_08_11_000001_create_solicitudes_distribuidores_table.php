@@ -17,7 +17,8 @@ return new class extends Migration
             // Datos Personales
             $table->string('nombres');
             $table->string('apellidos');
-            $table->string('acta_nacimiento')->nullable();
+            $table->string('telefono');
+            $table->date('fecha_nacimiento');
             $table->string('curp');
             $table->string('rfc');
             $table->string('lugar_nacimiento')->nullable();
@@ -39,6 +40,7 @@ return new class extends Migration
             $table->foreignId('coordinador_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('sucursal_id')->constrained('sucursals')->onDelete('cascade');
             $table->foreignId('verificador_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
             
             // Estado y Control
             $table->enum('estado', ['en espera', 'en espera de verificacion', 'aprobado', 'rechazado'])->default('en espera');

@@ -75,7 +75,7 @@
                                 Préstamos
                             </a>
                         @else
-                            <!-- Opciones para Gerentes y Administración -->
+                            <!-- Opciones para Gerentes, Coordinadores, Verificadores y Administración -->
                             @if(Auth::user()->esGerenteGeneral())
                                 <a href="{{ route('gerente-general.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('gerente-general.dashboard') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                     Dashboard
@@ -83,6 +83,17 @@
                             @elseif(Auth::user()->esGerenteSucursal())
                                 <a href="{{ route('gerente-sucursal.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('gerente-sucursal.dashboard') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                     Dashboard
+                                </a>
+                            @elseif(Auth::user()->esCoordinador())
+                                <a href="{{ route('coordinador.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('coordinador.dashboard') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Dashboard
+                                </a>
+                                <a href="{{ route('coordinador.solicitudes.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('coordinador.solicitudes.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Solicitudes
+                                </a>
+                            @elseif(Auth::user()->esVerificador())
+                                <a href="{{ route('verificador.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('verificador.dashboard') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Evaluaciones
                                 </a>
                             @endif
 

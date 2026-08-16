@@ -109,6 +109,21 @@ class User extends Authenticatable
         return strtolower($this->rol?->nombre ?? '') === 'coordinador';
     }
 
+    public function esVerificador(): bool
+    {
+        return strtolower($this->rol?->nombre ?? '') === 'verificador';
+    }
+
+    public function solicitudesCreditoComoDistribuidor(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SolicitudCredito::class, 'distribuidor_id')->orderBy('created_at', 'desc');
+    }
+
+    public function solicitudesCreditoComoCoordinador(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SolicitudCredito::class, 'coordinador_id')->orderBy('created_at', 'desc');
+    }
+
     /**
      * Obtiene el porcentaje de ganancia según su categoría de distribuidor.
      */

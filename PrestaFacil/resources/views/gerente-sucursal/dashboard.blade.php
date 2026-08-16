@@ -149,6 +149,206 @@
         @endif
     </div>
 
+    <!-- Sección: Solicitudes de Incremento de Crédito Pendientes -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+        <div class="p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Solicitudes de Incremento de Crédito (Distribuidoras)
+                </h2>
+                <p class="text-slate-400 text-xs mt-0.5">Autoriza o rechaza las peticiones de aumento de límite de crédito enviadas por tus coordinadores.</p>
+            </div>
+        </div>
+
+        @if($solicitudesCreditoPendientes->isEmpty())
+            <div class="p-8 text-center text-slate-500 text-sm">
+                🎉 No hay solicitudes de incremento de crédito pendientes.
+            </div>
+        @else
+            <div class="overflow-x-auto" x-data="{ openCommentId: null }">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-950/60 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                        <tr>
+                            <th class="px-6 py-3.5">Distribuidora</th>
+                            <th class="px-6 py-3.5">Coordinador</th>
+                            <th class="px-6 py-3.5 text-right">Límite Actual</th>
+                            <th class="px-6 py-3.5 text-right">Nuevo Límite</th>
+                            <th class="px-6 py-3.5">Motivo</th>
+                            <th class="px-6 py-3.5 text-right">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        @foreach($solicitudesCreditoPendientes as $sol)
+                            <tr class="hover:bg-slate-800/40 transition">
+                                <td class="px-6 py-4">
+                                    <div class="font-semibold text-white text-sm">{{ $sol->distribuidor?->name }}</div>
+                                    <div class="text-xs text-slate-500">{{ $sol->distribuidor?->email }}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-xs font-medium text-slate-200">{{ $sol->coordinador?->name }}</div>
+                                </td>
+                                <td class="px-6 py-4 text-right font-mono text-slate-400 text-xs">
+                                    ${{ number_format($sol->limite_actual, 2) }}
+                                </td>
+                                <td class="px-6 py-4 text-right font-mono text-emerald-400 font-bold text-sm">
+                                    ${{ number_format($sol->limite_nuevo, 2) }}
+                                </td>
+                                <td class="px-6 py-4 text-xs text-slate-400 max-w-xs whitespace-normal">
+                                    "{{ $sol->motivo }}"
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button @click="openCommentId = (openCommentId === {{ $sol->id }} ? null : {{ $sol->id }})"
+                                                class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-300 border border-slate-700 transition">
+                                            Responder
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <!-- Fila de respuesta/comentario -->
+                            <tr x-show="openCommentId === {{ $sol->id }}" class="bg-slate-950/40" style="display: none;">
+                                <td colspan="6" class="px-6 py-4">
+                                    <form method="POST" action="{{ route('solicitudes-credito.procesar', $sol->id) }}" class="space-y-3">
+                                        @csrf
+                                        <input type="hidden" name="accion" id="accion_sucursal_{{ $sol->id }}">
+                                        
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Observaciones / Retroalimentación</label>
+                                            <textarea name="observaciones" rows="2" placeholder="Opcional. Escribe notas sobre tu decisión..."
+                                                      class="w-full bg-slate-900 border border-slate-850 rounded-xl text-white px-4 py-2.5 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none transition"></textarea>
+                                        </div>
+
+                                        <div class="flex justify-end gap-2">
+                                            <button type="submit" onclick="document.getElementById('accion_sucursal_{{ $sol->id }}').value = 'rechazar'; return confirm('¿Rechazar este incremento de crédito?')"
+                                                    class="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
+                                                ✕ Rechazar
+                                            </button>
+                                            <button type="submit" onclick="document.getElementById('accion_sucursal_{{ $sol->id }}').value = 'aprobar'; return confirm('¿Aprobar este incremento de crédito?')"
+                                                    class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/20 text-xs font-bold transition">
+                                                ✓ Aprobar Incremento
+                                            </button>
+                                        </div>
+                                    </form>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </div>
+
+    <!-- Sección: Solicitudes de Distribuidoras Aprobadas (Pendiente de Cuenta) -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden" 
+         x-data="{ showAccountModal: false, selSolId: '', selSolName: '' }">
+        
+        <div class="p-6 border-b border-slate-800">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                </svg>
+                Solicitudes de Distribuidoras Aprobadas (Pendiente de Cuenta)
+            </h2>
+            <p class="text-slate-400 text-xs mt-0.5">Asigna el correo institucional y contraseña para dar de alta definitiva en el sistema a las distribuidoras ya verificadas.</p>
+        </div>
+
+        @if($solicitudesAprobadasSinCuenta->isEmpty())
+            <div class="p-8 text-center text-slate-500 text-sm">
+                🎉 No hay distribuidoras aprobadas pendientes de asignación de cuenta.
+            </div>
+        @else
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-950/60 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                        <tr>
+                            <th class="px-6 py-3.5">Candidata</th>
+                            <th class="px-6 py-3.5">Teléfono</th>
+                            <th class="px-6 py-3.5">Verificado Por</th>
+                            <th class="px-6 py-3.5">Coordinador</th>
+                            <th class="px-6 py-3.5 text-right">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        @foreach($solicitudesAprobadasSinCuenta as $sol)
+                            <tr class="hover:bg-slate-800/40 transition">
+                                <td class="px-6 py-4">
+                                    <div class="font-semibold text-white text-sm">{{ $sol->nombre_completo }}</div>
+                                    <div class="text-xs text-slate-500">CURP: {{ $sol->curp }}</div>
+                                </td>
+                                <td class="px-6 py-4 font-mono text-xs text-slate-300">
+                                    {{ $sol->telefono }}
+                                </td>
+                                <td class="px-6 py-4 text-xs">
+                                    <span class="text-emerald-400 font-semibold">{{ $sol->verificador?->name ?? 'N/A' }}</span>
+                                    <span class="block text-[10px] text-slate-500">Aprobado el {{ $sol->resolved_at?->format('d/m/Y') }}</span>
+                                </td>
+                                <td class="px-6 py-4 text-xs text-slate-400">
+                                    {{ $sol->coordinador?->name }}
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <button @click="selSolId = '{{ $sol->id }}'; selSolName = '{{ $sol->nombre_completo }}'; showAccountModal = true"
+                                            class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow-md shadow-emerald-950/20 transition">
+                                        Crear Cuenta
+                                    </button>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+
+        <!-- Modal de Creación de Cuenta (Alpine.js) -->
+        <div x-show="showAccountModal" class="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none" style="display: none;" x-transition>
+            <!-- Overlay -->
+            <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" @click="showAccountModal = false"></div>
+            
+            <!-- Modal content -->
+            <div class="relative w-full max-w-md mx-auto my-6 px-4 z-50">
+                <div class="relative flex flex-col w-full bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl outline-none focus:outline-none p-6 text-left">
+                    <!-- Header -->
+                    <div class="flex items-start justify-between pb-3 border-b border-slate-800">
+                        <h3 class="text-lg font-bold text-white">Crear Cuenta de Acceso</h3>
+                        <button type="button" @click="showAccountModal = false" class="text-slate-400 hover:text-white text-lg font-bold leading-none">&times;</button>
+                    </div>
+                    
+                    <!-- Body -->
+                    <form :action="`/solicitudes-distribuidor/${selSolId}/crear-cuenta`" method="POST" class="mt-4 space-y-4">
+                        @csrf
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Distribuidora</label>
+                            <input type="text" readonly :value="selSolName" class="w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-300 px-4 py-2.5 text-sm focus:outline-none select-none">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Correo Electrónico Corporativo *</label>
+                            <input type="email" name="email" required placeholder="ejemplo@prestafacil.com"
+                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl text-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Contraseña Inicial *</label>
+                            <input type="password" name="password" required placeholder="Mínimo 6 caracteres"
+                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl text-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition">
+                        </div>
+
+                        <div class="flex justify-end gap-3 pt-4 border-t border-slate-800 mt-6">
+                            <button type="button" @click="showAccountModal = false" class="px-5 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold transition">
+                                Cancelar
+                            </button>
+                            <button type="submit" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20 text-xs font-bold tracking-wide transition">
+                                Registrar y Activar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Sección Principal: Préstamos Activos por Distribuidora de esta Sucursal -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden space-y-6">
         <div class="p-6 border-b border-slate-800">

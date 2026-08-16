@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Cliente extends Model
 {
-    use HasFactory;
+    use HasUuids, HasFactory;
 
     protected $table = 'clientes';
 
@@ -75,5 +77,13 @@ class Cliente extends Model
     public function tieneSolicitudPendiente(): bool
     {
         return $this->solicitudes()->where('estado', 'pendiente')->exists();
+    }
+
+    /**
+     * Préstamos/Vales del cliente.
+     */
+    public function prestamos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Prestamo::class, 'cliente_id')->orderBy('created_at', 'desc');
     }
 }

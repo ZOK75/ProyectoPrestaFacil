@@ -13,13 +13,13 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
 
-            $table->foreignId('rol_id')
+            $table->foreignUuid('rol_id')
                 ->nullable()
                 ->after('password')
                 ->constrained('roles')
                 ->nullOnDelete();
 
-            $table->foreignId('sucursal_id')
+            $table->foreignUuid('sucursal_id')
                 ->nullable()
                 ->after('rol_id')
                 ->constrained('sucursales')

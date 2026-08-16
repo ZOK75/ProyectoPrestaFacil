@@ -2,15 +2,24 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Prestamo;
+use App\Models\Configuracion;
+use App\Models\SolicitudCliente;
+use App\Models\RelacionCobranza;
+use App\Models\NotificacionCajero;
 
 class User extends Authenticatable
 {
+    use HasUuids;
+
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 
@@ -27,6 +36,7 @@ class User extends Authenticatable
         'sucursal_id',
         'categoria_distribuidor',
         'limite_credito',
+        'limite_credito_anterior',
         'referencia_pago_distribuidor',
         'puntos',
         'activo',
@@ -57,6 +67,7 @@ class User extends Authenticatable
             'activo' => 'boolean',
             'desactivado_at' => 'datetime',
             'limite_credito' => 'decimal:2',
+            'limite_credito_anterior' => 'decimal:2',
             'puntos' => 'integer',
         ];
     }
@@ -84,6 +95,38 @@ class User extends Authenticatable
         return $this->belongsTo(User::class, 'desactivado_by_user_id');
     }
 
+    /**
+     * Préstamos otorgados / colocados por este usuario.
+     */
+    public function prestamos(): HasMany
+    {
+        return $this->hasMany(Prestamo::class, 'created_by_user_id');
+    }
+
+    /**
+     * Solicitudes de clientes registradas por este usuario.
+     */
+    public function solicitudesClientes(): HasMany
+    {
+        return $this->hasMany(SolicitudCliente::class, 'distribuidor_id');
+    }
+
+    /**
+     * Relaciones de cobranza de este distribuidor.
+     */
+    public function relacionesCobranza(): HasMany
+    {
+        return $this->hasMany(RelacionCobranza::class, 'distribuidora_id');
+    }
+
+    /**
+     * Notificaciones recibidas por este usuario.
+     */
+    public function notificaciones(): HasMany
+    {
+        return $this->hasMany(NotificacionCajero::class, 'user_id');
+    }
+
     // ──────────────────────────────────────────
     // Helpers de Rol
     // ──────────────────────────────────────────
@@ -91,6 +134,26 @@ class User extends Authenticatable
     public function esGerenteGeneral(): bool
     {
         return strtolower($this->rol?->nombre ?? '') === 'gerente general';
+    }
+
+    public function esAdministrador(): bool
+    {
+        return strtolower($this->rol?->nombre ?? '') === 'administrador';
+    }
+
+    public function esAdminGeneralOAdmin(): bool
+    {
+        return $this->esGerenteGeneral() || $this->esAdministrador();
+    }
+
+    public function puedeModificar(): bool
+    {
+        // El rol de Administrador es estrictamente de solo lectura / auditoría
+        if ($this->esAdministrador()) {
+            return false;
+        }
+
+        return true;
     }
 
     public function esGerenteSucursal(): bool
@@ -104,10 +167,7 @@ class User extends Authenticatable
         return in_array($nombre, ['distribuidor', 'distribuidora']);
     }
 
-    public function esCoordinador(): bool
-    {
-        return strtolower($this->rol?->nombre ?? '') === 'coordinador';
-    }
+
 
     public function esVerificador(): bool
     {
@@ -122,6 +182,59 @@ class User extends Authenticatable
     public function solicitudesCreditoComoCoordinador(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(SolicitudCredito::class, 'coordinador_id')->orderBy('created_at', 'desc');
+    }
+
+    public function esCajero(): bool
+    {
+        $nombre = strtolower($this->rol?->nombre ?? '');
+        return in_array($nombre, ['cajero', 'cajera', 'caja']);
+    }
+
+    public function esCoordinador(): bool
+    {
+        $nombre = strtolower($this->rol?->nombre ?? '');
+        return in_array($nombre, ['coordinador', 'coordinadora']);
+    }
+
+    /**
+     * Determina si el usuario puede autorizar solicitudes operativas.
+     */
+    public function puedeAutorizar(?string $tipo = null, ?string $sucursalId = null): bool
+    {
+        if ($this->esAdministrador() || $this->esGerenteGeneral() || $this->esGerenteSucursal()) {
+            return false;
+        }
+
+        if ($this->esCoordinador()) {
+            if ($sucursalId && $this->sucursal_id) {
+                return $this->sucursal_id == $sucursalId;
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Conteo de solicitudes pendientes para vista de gerentes.
+     */
+    public function conteoSolicitudesPendientes(): int
+    {
+        if ($this->esGerenteSucursal()) {
+            return 0;
+        }
+
+        return SolicitudCliente::where('estado', 'pendiente')->count();
+    }
+
+    /**
+     * Conteo de notificaciones sin leer de este usuario.
+     */
+    public function conteoNotificacionesSinLeer(): int
+    {
+        return NotificacionCajero::where('user_id', $this->id)
+            ->where('leida', false)
+            ->count();
     }
 
     /**
@@ -171,6 +284,33 @@ class User extends Authenticatable
     }
 
     /**
+     * Calcula los puntos acumulados por el distribuidor según el total de productos otorgados.
+     * Fórmula: floor(Total en productos / Monto base) * Puntos base
+     */
+    public function puntosAcumulados(): int
+    {
+        if (!$this->esDistribuidor()) {
+            return 0;
+        }
+
+        $config = Configuracion::actual();
+        $totalProductos = floatval(Prestamo::where('created_by_user_id', $this->id)->sum('monto_prestamo'));
+
+        return $config->calcularPuntosPorMonto($totalProductos);
+    }
+
+    /**
+     * Devuelve el equivalente en dinero de los puntos acumulados.
+     */
+    public function valorPuntosEnDinero(): float
+    {
+        $config = Configuracion::actual();
+        $valorPorPunto = floatval($config->valor_punto ?? 2.00);
+
+        return $this->puntosAcumulados() * $valorPorPunto;
+    }
+
+    /**
      * Devuelve la referencia de pago bancaria única del distribuidor.
      */
     public function referenciaPago(): string
@@ -183,20 +323,16 @@ class User extends Authenticatable
     }
 
     /**
-     * Devuelve los roles que este usuario tiene permiso de asignar al crear usuarios.
-     * Regla: Ningún rol puede crear usuarios con el rol Distribuidor / Distribuidora.
+     * Devuelve los roles que este usuario tiene permiso de asignar.
      */
     public function rolesPermitidos()
     {
         $query = Rol::query();
 
-        // Bloquear permanentemente la creación de distribuidores desde el módulo de usuarios
-        $query->whereNotIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']);
-
         if ($this->esGerenteGeneral()) {
             $query->where('nombre', '!=', 'Gerente General');
         } elseif ($this->esGerenteSucursal()) {
-            $query->whereNotIn('nombre', ['Gerente General', 'Gerente de Sucursal']);
+            $query->whereNotIn('nombre', ['Gerente General', 'Gerente de Sucursal', 'Administrador']);
         } else {
             return Rol::where('id', 0)->get();
         }
@@ -221,19 +357,12 @@ class User extends Authenticatable
     }
 
     /**
-     * Solicitudes de clientes enviadas por este distribuidor.
+     * Determina si la distribuidora está bloqueada por morosidad.
+     * TODO: Implementar lógica real con tabla de strikes
      */
-    public function solicitudesEnviadas(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function esMorosa(): bool
     {
-        return $this->hasMany(SolicitudCliente::class, 'distribuidor_id')->orderBy('created_at', 'desc');
-    }
-
-    /**
-     * Préstamos / Vales otorgados por este usuario (distribuidor).
-     */
-    public function prestamos(): \Illuminate\Database\Eloquent\Relations\HasMany
-    {
-        return $this->hasMany(Prestamo::class, 'created_by_user_id')->orderBy('created_at', 'desc');
+        return false;
     }
 
     /**
@@ -242,23 +371,5 @@ class User extends Authenticatable
     public function solicitudesDistribuidoresCreadas(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(SolicitudDistribuidor::class, 'coordinador_id')->orderBy('created_at', 'desc');
-    }
-
-    /**
-     * Conteo de solicitudes pendientes visibles para este gerente (campana de notificaciones).
-     */
-    public function conteoSolicitudesPendientes(): int
-    {
-        if ($this->esGerenteGeneral()) {
-            return SolicitudCliente::where('estado', 'pendiente')->count();
-        }
-
-        if ($this->esGerenteSucursal() && $this->sucursal_id) {
-            return SolicitudCliente::where('estado', 'pendiente')
-                ->where('sucursal_id', $this->sucursal_id)
-                ->count();
-        }
-
-        return 0;
     }
 }

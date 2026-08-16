@@ -15,9 +15,9 @@ class StoreUserRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'min:3', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'confirmed', Password::defaults()],
+            'password' => ['required', 'string', 'confirmed', Password::min(12)],
             'rol_id' => ['required', 'exists:roles,id'],
             'sucursal_id' => ['required', 'exists:sucursales,id'],
             'categoria_distribuidor' => ['nullable', 'in:cobre,plata,oro'],
@@ -28,10 +28,12 @@ class StoreUserRequest extends FormRequest
     {
         return [
             'name.required' => 'El nombre del usuario es obligatorio.',
+            'name.min' => 'El nombre del usuario debe tener al menos 3 caracteres.',
             'email.required' => 'El correo electrónico es obligatorio.',
             'email.email' => 'Ingresa un correo electrónico válido.',
-            'email.unique' => 'Este correo electrónico ya está registrado.',
+            'email.unique' => 'Este correo electrónico ya está registrado en el sistema.',
             'password.required' => 'La contraseña es obligatoria.',
+            'password.min' => 'La contraseña debe tener un mínimo de 12 caracteres.',
             'password.confirmed' => 'Las contraseñas no coinciden.',
             'rol_id.required' => 'Debes seleccionar un rol para el usuario.',
             'rol_id.exists' => 'El rol seleccionado no es válido.',

@@ -28,7 +28,7 @@ class UserSeeder extends Seeder
             ['email' => 'gerente.general@prestafacil.com'],
             [
                 'name' => 'Admin General',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('x4_#opSX]1/<[>T/0Z4B(z'),
                 'email_verified_at' => now(),
                 'rol_id' => $gerenteGeneral?->id,
                 'sucursal_id' => null,
@@ -40,7 +40,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Carlos López',
                 'email' => 'gerente.centro@prestafacil.com',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('J&(081rmhF<Lg15beL|4DF'),
                 'email_verified_at' => now(),
                 'rol_id' => $gerenteSucursal?->id,
                 'sucursal_id' => $sucursalCentro?->id,
@@ -49,7 +49,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'María García',
                 'email' => 'gerente.norte@prestafacil.com',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('mQ7<DMxL4exf6Q.p1K7-]l'),
                 'email_verified_at' => now(),
                 'rol_id' => $gerenteSucursal?->id,
                 'sucursal_id' => $sucursalNorte?->id,
@@ -58,7 +58,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Jorge Fernández',
                 'email' => 'gerente.sur@prestafacil.com',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('N^d}]oD327)_0K[11b;{t]'),
                 'email_verified_at' => now(),
                 'rol_id' => $gerenteSucursal?->id,
                 'sucursal_id' => $sucursalSur?->id,
@@ -67,7 +67,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Ana Martínez',
                 'email' => 'distribuidor.centro@prestafacil.com',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('63vq+pY9]n<17H|E)15.X)'),
                 'email_verified_at' => now(),
                 'rol_id' => $distribuidor?->id,
                 'sucursal_id' => $sucursalCentro?->id,
@@ -76,7 +76,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Pedro Sánchez',
                 'email' => 'cajero.norte@prestafacil.com',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('\y$;8F6&+N%Vz2IB=siTr<'),
                 'email_verified_at' => now(),
                 'rol_id' => $cajero?->id,
                 'sucursal_id' => $sucursalNorte?->id,
@@ -85,7 +85,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Elena Morales',
                 'email' => 'coordinador.centro@prestafacil.com',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('U8"a[cGU?~6Uz]Y;}n-9a5'),
                 'email_verified_at' => now(),
                 'rol_id' => $coordinador?->id,
                 'sucursal_id' => $sucursalCentro?->id,
@@ -94,7 +94,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Luis Ramírez',
                 'email' => 'verificador.sur@prestafacil.com',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('sF1i{?1yOx:P2jA(TdN0jq'),
                 'email_verified_at' => now(),
                 'rol_id' => $verificador?->id,
                 'sucursal_id' => $sucursalSur?->id,
@@ -103,7 +103,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Soporte Técnico',
                 'email' => 'admin.sistema@prestafacil.com',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('N5f5p#342V8lYg5jaky};]'),
                 'email_verified_at' => now(),
                 'rol_id' => $administrador?->id,
                 'sucursal_id' => null,
@@ -112,7 +112,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Roberto Gómez (Baja)',
                 'email' => 'roberto.inactivo@prestafacil.com',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('yoRz:g8$H6]Z34|NO0-0C*'),
                 'email_verified_at' => now(),
                 'rol_id' => $distribuidor?->id,
                 'sucursal_id' => $sucursalCentro?->id,

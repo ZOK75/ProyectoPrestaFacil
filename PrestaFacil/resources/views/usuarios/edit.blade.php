@@ -46,11 +46,12 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                        Nueva Contraseña
+                        Nueva Contraseña (Opcional)
                     </label>
-                    <input type="password" name="password"
+                    <input type="password" name="password" minlength="12"
                         class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 @error('password') border-rose-500 @enderror"
-                        placeholder="Dejar vacío para no cambiar">
+                        placeholder="Mínimo 12 caracteres (o dejar vacío)">
+                    <span class="text-[10px] text-slate-500 mt-1 block">Dejar vacío si no deseas modificarla.</span>
                     @error('password')
                         <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
                     @enderror
@@ -59,7 +60,7 @@
                     <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                         Confirmar Nueva Contraseña
                     </label>
-                    <input type="password" name="password_confirmation"
+                    <input type="password" name="password_confirmation" minlength="12"
                         class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                         placeholder="Repite la nueva contraseña">
                 </div>

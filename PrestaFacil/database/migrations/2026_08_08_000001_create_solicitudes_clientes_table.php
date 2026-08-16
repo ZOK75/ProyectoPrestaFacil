@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('solicitudes_clientes', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
 
             // Tipo de solicitud: 'actualizacion' o 'desactivacion'
             $table->enum('tipo', ['actualizacion', 'desactivacion']);
@@ -21,17 +21,17 @@ return new class extends Migration
             $table->enum('estado', ['pendiente', 'aprobada', 'rechazada'])->default('pendiente');
 
             // Cliente sobre el que se hace la solicitud
-            $table->foreignId('cliente_id')
+            $table->foreignUuid('cliente_id')
                 ->constrained('clientes')
                 ->cascadeOnDelete();
 
             // Distribuidor que origina la solicitud
-            $table->foreignId('distribuidor_id')
+            $table->foreignUuid('distribuidor_id')
                 ->constrained('users')
                 ->cascadeOnDelete();
 
             // Sucursal a la que pertenece el cliente/distribuidor
-            $table->foreignId('sucursal_id')
+            $table->foreignUuid('sucursal_id')
                 ->nullable()
                 ->constrained('sucursales')
                 ->nullOnDelete();
@@ -48,12 +48,12 @@ return new class extends Migration
             $table->string('pdf_comprobante_nuevo')->nullable();
 
             // Resolución por parte de Gerencia (General o Sucursal)
-            $table->foreignId('aprobado_por_user_id')
+            $table->foreignUuid('aprobado_por_user_id')
                 ->nullable()
                 ->constrained('users')
                 ->nullOnDelete();
 
-            $table->foreignId('rechazado_por_user_id')
+            $table->foreignUuid('rechazado_por_user_id')
                 ->nullable()
                 ->constrained('users')
                 ->nullOnDelete();

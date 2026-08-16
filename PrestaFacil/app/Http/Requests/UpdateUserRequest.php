@@ -18,7 +18,7 @@ class UpdateUserRequest extends FormRequest
         $userId = $this->route('usuario')?->id ?? $this->route('usuario');
 
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'min:3', 'max:255'],
             'email' => [
                 'required',
                 'string',
@@ -27,7 +27,7 @@ class UpdateUserRequest extends FormRequest
                 'max:255',
                 Rule::unique('users', 'email')->ignore($userId),
             ],
-            'password' => ['nullable', 'string', 'confirmed', Password::defaults()],
+            'password' => ['nullable', 'string', 'confirmed', Password::min(12)],
             'rol_id' => ['required', 'exists:roles,id'],
             'sucursal_id' => ['required', 'exists:sucursales,id'],
             'categoria_distribuidor' => ['nullable', 'in:cobre,plata,oro'],
@@ -40,9 +40,11 @@ class UpdateUserRequest extends FormRequest
     {
         return [
             'name.required' => 'El nombre del usuario es obligatorio.',
+            'name.min' => 'El nombre del usuario debe tener al menos 3 caracteres.',
             'email.required' => 'El correo electrónico es obligatorio.',
             'email.email' => 'Ingresa un correo electrónico válido.',
             'email.unique' => 'Este correo ya lo usa otro usuario.',
+            'password.min' => 'La nueva contraseña debe tener un mínimo de 12 caracteres.',
             'password.confirmed' => 'Las contraseñas no coinciden.',
             'rol_id.required' => 'Debes seleccionar un rol.',
             'rol_id.exists' => 'El rol seleccionado no es válido.',

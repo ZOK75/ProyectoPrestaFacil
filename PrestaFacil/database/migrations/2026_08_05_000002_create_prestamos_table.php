@@ -12,14 +12,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('prestamos', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
 
             // Referencia única de la cuenta
             $table->string('referencia', 50)->unique();
 
             // Relaciones
-            $table->foreignId('cliente_id')->constrained('clientes')->cascadeOnDelete();
-            $table->foreignId('producto_vale_id')->constrained('producto_vales')->cascadeOnDelete();
+            $table->foreignUuid('cliente_id')->constrained('clientes')->cascadeOnDelete();
+            $table->foreignUuid('producto_vale_id')->constrained('producto_vales')->cascadeOnDelete();
 
             // Clasificación (prevale vs vale)
             $table->enum('tipo', ['prevale', 'vale'])->default('prevale');
@@ -39,9 +39,9 @@ return new class extends Migration
             $table->boolean('activo')->default(true);
 
             // Auditoría y Desactivación
-            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('desactivado_at')->nullable();
-            $table->foreignId('desactivado_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('desactivado_by_user_id')->nullable()->constrained('users')->nullOnDelete();
 
             $table->timestamps();
         });

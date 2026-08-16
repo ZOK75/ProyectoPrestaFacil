@@ -15,17 +15,35 @@
                 <p class="text-sm text-slate-500 mt-1">Ingresa tus credenciales para acceder</p>
             </div>
 
+
+
+
             <!-- Estado de Sesión -->
             <x-auth-session-status class="mb-4" :status="session('status')" />
 
+
+
+
+
             <form method="POST" action="{{ route('login') }}" class="space-y-5">
                 @csrf
+
+
+
+
+
+
+
+
+
+
 
                 <!-- Correo Electrónico -->
                 <div>
                     <label for="email" class="block text-sm font-medium text-slate-700 mb-1">
                         Correo electrónico
                     </label>
+
                     <input id="email" 
                            type="email" 
                            name="email" 
@@ -38,11 +56,13 @@
                     <x-input-error :messages="$errors->get('email')" class="mt-2" />
                 </div>
 
+
                 <!-- Contraseña -->
                 <div>
                     <label for="password" class="block text-sm font-medium text-slate-700 mb-1">
                         Contraseña
                     </label>
+
                     <input id="password" 
                            type="password" 
                            name="password" 
@@ -52,6 +72,7 @@
                            class="w-full px-4 py-3 bg-white border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl text-slate-800 placeholder-slate-400 text-sm transition duration-150 ease-in-out outline-none">
                     <x-input-error :messages="$errors->get('password')" class="mt-2" />
                 </div>
+
 
       
 
@@ -64,6 +85,12 @@
                 </div>
             </form>
 
+
+
+
+
+
         </div>
+
     </div>
-</x-guest-layout>
+</x-guest-layout> 

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es" class="h-full bg-slate-900 text-slate-100">
 <head>
     <meta charset="UTF-8">
@@ -61,7 +61,7 @@
             </div>
 
             <div class="flex items-center space-x-4">
-                <nav class="flex items-center space-x-1">
+                <nav class="flex items-center space-x-1 overflow-x-auto">
                     @auth
                         @if(Auth::user()->esDistribuidor())
                             <!-- Opciones para Distribuidor -->
@@ -74,9 +74,33 @@
                             <a href="{{ route('prestamos.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('prestamos.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                 Préstamos
                             </a>
+                        @elseif(Auth::user()->esCajero())
+                            <!-- Opciones para Cajero -->
+                            <a href="{{ route('cajero.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('cajero.dashboard') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Caja
+                            </a>
+                            <a href="{{ route('cajero.buscar-folio') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('cajero.buscar-folio') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Buscar Folio
+                            </a>
+                            <a href="{{ route('cajero.abonos.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('cajero.abonos.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Abonos
+                            </a>
+                            <a href="{{ route('cajero.conciliaciones.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('cajero.conciliaciones.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Conciliación
+                            </a>
+                            <a href="{{ route('cajero.canje-puntos.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('cajero.canje-puntos.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Canje
+                            </a>
+                        @elseif(Auth::user()->esCoordinador())
+                            <!-- Opciones para Coordinador -->
+                            <a href="{{ route('autorizaciones.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('autorizaciones.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Autorizaciones
+                            </a>
                         @else
                             <!-- Opciones para Gerentes, Coordinadores, Verificadores y Administración -->
                             @if(Auth::user()->esGerenteGeneral())
+                            <!-- Opciones para Gerentes y Administrador -->
+                            @if(Auth::user()->esGerenteGeneral() || Auth::user()->esAdministrador())
                                 <a href="{{ route('gerente-general.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('gerente-general.dashboard') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                     Dashboard
                                 </a>
@@ -100,12 +124,43 @@
                             <a href="{{ route('producto-vales.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('producto-vales.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                 Vales
                             </a>
+
                             <a href="{{ route('usuarios.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('usuarios.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                 Usuarios
                             </a>
-                            @if(Auth::user()->esGerenteGeneral())
+
+                            <!-- Módulos de Auditoría (Exclusivos para Administrador) -->
+                            @if(Auth::user()->esAdministrador())
+                                <a href="{{ route('clientes.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('clientes.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Clientes
+                                </a>
+
+                                <a href="{{ route('prestamos.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('prestamos.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Préstamos
+                                </a>
+
+                                <a href="{{ route('solicitudes-clientes.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('solicitudes-clientes.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Solicitudes
+                                </a>
+
+                                <a href="{{ route('autorizaciones.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('autorizaciones.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Autorizaciones
+                                </a>
+                            @endif
+
+                            @if(Auth::user()->esGerenteGeneral() || Auth::user()->esAdministrador())
                                 <a href="{{ route('configuracion-general.edit') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('configuracion-general.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
                                     Configuración
+                                </a>
+                            @endif
+
+                            @if(Auth::user()->esAdministrador())
+                                <!-- Módulo de Logs exclusivo para Administrador -->
+                                <a href="{{ route('logs.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1 {{ request()->routeIs('logs.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    Logs
                                 </a>
                             @endif
                         @endif
@@ -113,8 +168,27 @@
                 </nav>
 
                 @auth
-                    <!-- Campana de Notificaciones de Solicitudes (Gerentes) -->
-                    @if(Auth::user()->esGerenteGeneral() || Auth::user()->esGerenteSucursal())
+                    <!-- Campana de Notificaciones para Distribuidor -->
+                    @if(Auth::user()->esDistribuidor())
+                        @php
+                            $conteoNotifDist = \App\Models\NotificacionCajero::where('user_id', Auth::id())->where('leida', false)->count();
+                        @endphp
+                        <a href="{{ route('notificaciones.index') }}" 
+                           class="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition border border-transparent hover:border-slate-700" 
+                           title="Notificaciones y Avisos de Cobranza">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                            </svg>
+                            @if($conteoNotifDist > 0)
+                                <span class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500 text-[10px] font-black text-white shadow-lg shadow-indigo-500/40 animate-bounce">
+                                    {{ $conteoNotifDist > 9 ? '9+' : $conteoNotifDist }}
+                                </span>
+                            @endif
+                        </a>
+                    @endif
+
+                    <!-- Campana de Notificaciones de Solicitudes (Exclusivo para Administrador) -->
+                    @if(Auth::user()->esAdministrador())
                         @php
                             $conteoNotif = Auth::user()->conteoSolicitudesPendientes();
                         @endphp
@@ -127,6 +201,25 @@
                             @if($conteoNotif > 0)
                                 <span class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-black text-slate-950 shadow-lg shadow-amber-500/40 animate-bounce">
                                     {{ $conteoNotif > 9 ? '9+' : $conteoNotif }}
+                                </span>
+                            @endif
+                        </a>
+                    @endif
+
+                    <!-- Campana de Notificaciones (Cajeros y Coordinadores) -->
+                    @if(Auth::user()->esCajero() || Auth::user()->esCoordinador())
+                        @php
+                            $conteoNotifCajero = Auth::user()->conteoNotificacionesSinLeer();
+                        @endphp
+                        <a href="{{ route('cajero.notificaciones') }}" 
+                           class="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition border border-transparent hover:border-slate-700" 
+                           title="Notificaciones">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                            </svg>
+                            @if($conteoNotifCajero > 0)
+                                <span class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-lg shadow-rose-500/40 animate-bounce">
+                                    {{ $conteoNotifCajero > 9 ? '9+' : $conteoNotifCajero }}
                                 </span>
                             @endif
                         </a>

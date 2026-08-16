@@ -54,9 +54,10 @@
                     <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                         Contraseña <span class="text-rose-400">*</span>
                     </label>
-                    <input type="password" name="password" required
+                    <input type="password" name="password" required minlength="12"
                         class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 @error('password') border-rose-500 @enderror"
-                        placeholder="Mínimo 8 caracteres">
+                        placeholder="Mínimo 12 caracteres">
+                    <span class="text-[10px] text-slate-500 mt-1 block">Debe contener al menos 12 caracteres.</span>
                     @error('password')
                         <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
                     @enderror
@@ -65,7 +66,7 @@
                     <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                         Confirmar Contraseña <span class="text-rose-400">*</span>
                     </label>
-                    <input type="password" name="password_confirmation" required
+                    <input type="password" name="password_confirmation" required minlength="12"
                         class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                         placeholder="Repite la contraseña">
                 </div>

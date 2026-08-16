@@ -69,8 +69,8 @@ class UserController extends Controller
             $query->where('rol_id', $request->input('rol_id'));
         }
 
-        // Filtro por sucursal (solo gerente general)
-        if ($request->filled('sucursal_id') && $operador->esGerenteGeneral()) {
+        // Filtro por sucursal (gerente general y administrador)
+        if ($request->filled('sucursal_id') && ($operador->esGerenteGeneral() || $operador->esAdministrador())) {
             $query->where('sucursal_id', $request->input('sucursal_id'));
         }
 
@@ -91,11 +91,16 @@ class UserController extends Controller
     }
 
     /**
-     * Formulario de alta de usuario. No permitido para Distribuidor.
+     * Formulario de alta de usuario. No permitido para Distribuidor ni Administrador (solo lectura).
      */
     public function create()
     {
         $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar usuarios.');
+        }
 
         if ($operador->esDistribuidor()) {
             return redirect()->route('usuarios.index')
@@ -114,6 +119,11 @@ class UserController extends Controller
     public function store(StoreUserRequest $request)
     {
         $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar usuarios.');
+        }
 
         if ($operador->esDistribuidor()) {
             return redirect()->route('usuarios.index')
@@ -169,11 +179,16 @@ class UserController extends Controller
     }
 
     /**
-     * Formulario de edición. No permitido para Distribuidor.
+     * Formulario de edición. No permitido para Distribuidor ni Administrador.
      */
     public function edit(User $usuario)
     {
         $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede modificar usuarios.');
+        }
 
         if ($operador->esDistribuidor()) {
             return redirect()->route('usuarios.index')
@@ -198,6 +213,11 @@ class UserController extends Controller
     public function update(UpdateUserRequest $request, User $usuario)
     {
         $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede modificar usuarios.');
+        }
 
         if ($operador->esDistribuidor()) {
             return redirect()->route('usuarios.index')
@@ -245,11 +265,16 @@ class UserController extends Controller
     }
 
     /**
-     * Desactivar un usuario (sin eliminar registros de la BD). No permitido para Distribuidor.
+     * Desactivar un usuario (sin eliminar registros de la BD). No permitido para Distribuidor ni Administrador.
      */
     public function destroy(User $usuario)
     {
         $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede desactivar usuarios.');
+        }
 
         if ($operador->esDistribuidor()) {
             return redirect()->route('usuarios.index')

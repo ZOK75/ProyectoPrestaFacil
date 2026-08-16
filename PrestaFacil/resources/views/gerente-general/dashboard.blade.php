@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Panel de Gerencia General - PrestaFácil')
 
@@ -141,6 +141,338 @@
             </a>
         </div>
 
+        @if($solicitudesPendientes->isEmpty())
+            <div class="p-8 text-center text-slate-500 text-sm">
+                🎉 No hay solicitudes pendientes de aprobación en este momento.
+            </div>
+        @else
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-950/60 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                        <tr>
+                            <th class="px-6 py-3.5">Folio / Fecha</th>
+                            <th class="px-6 py-3.5">Cliente</th>
+                            <th class="px-6 py-3.5">Distribuidor / Sucursal</th>
+                            <th class="px-6 py-3.5">Tipo</th>
+                            <th class="px-6 py-3.5 text-right">Acción Rápida</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        @foreach($solicitudesPendientes as $sol)
+                            <tr class="hover:bg-slate-800/40 transition">
+                                <td class="px-6 py-4">
+                                    <span class="font-mono text-xs text-indigo-400 font-bold">#SOL-{{ str_pad($sol->id, 5, '0', STR_PAD_LEFT) }}</span>
+                                    <span class="block text-xs text-slate-500">{{ $sol->created_at->format('d/m/Y H:i') }}</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="font-semibold text-white">{{ $sol->cliente?->nombre }}</div>
+                                    <div class="text-xs text-slate-500 font-mono">CURP: {{ $sol->cliente?->curp }}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-xs font-medium text-slate-200">{{ $sol->distribuidor?->name }}</div>
+                                    <div class="text-xs text-indigo-400">{{ $sol->sucursal?->nombre ?? 'Sin Sucursal' }}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    @if($sol->esActualizacion())
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                            Actualización
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                            Baja / Desactivación
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <a href="{{ route('solicitudes-clientes.show', $sol) }}" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-300 border border-slate-700 transition">
+                                            Revisar
+                                        </a>
+                                        <form method="POST" action="{{ route('solicitudes-clientes.aprobar', $sol) }}" onsubmit="return confirm('¿Aprobar solicitud para {{ $sol->cliente?->nombre }}?');">
+                                            @csrf
+                                            <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition">
+                                                ✓ Aceptar
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </div>
+
+    <!-- Sección: Solicitudes de Incremento de Crédito Pendientes -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+        <div class="p-6 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Solicitudes de Incremento de Crédito (Distribuidoras)
+                </h2>
+                <p class="text-slate-400 text-xs mt-0.5">Autorización global de aumentos de límite de crédito para distribuidoras de todas las sucursales.</p>
+            </div>
+        </div>
+
+        @if($solicitudesCreditoPendientes->isEmpty())
+            <div class="p-8 text-center text-slate-500 text-sm">
+                🎉 No hay solicitudes de incremento de crédito pendientes a nivel global.
+            </div>
+        @else
+            <div class="overflow-x-auto" x-data="{ openCommentId: null }">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-950/60 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                        <tr>
+                            <th class="px-6 py-3.5">Distribuidora / Sucursal</th>
+                            <th class="px-6 py-3.5">Coordinador</th>
+                            <th class="px-6 py-3.5 text-right">Límite Actual</th>
+                            <th class="px-6 py-3.5 text-right">Nuevo Límite</th>
+                            <th class="px-6 py-3.5">Motivo</th>
+                            <th class="px-6 py-3.5 text-right">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        @foreach($solicitudesCreditoPendientes as $sol)
+                            <tr class="hover:bg-slate-800/40 transition">
+                                <td class="px-6 py-4">
+                                    <div class="font-semibold text-white text-sm">{{ $sol->distribuidor?->name }}</div>
+                                    <div class="text-xs text-indigo-400 font-semibold">{{ $sol->distribuidor?->sucursal?->nombre ?? 'Sin Sucursal' }}</div>
+                                    <div class="text-[11px] text-slate-500">{{ $sol->distribuidor?->email }}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-xs font-medium text-slate-200">{{ $sol->coordinador?->name }}</div>
+                                </td>
+                                <td class="px-6 py-4 text-right font-mono text-slate-400 text-xs">
+                                    ${{ number_format($sol->limite_actual, 2) }}
+                                </td>
+                                <td class="px-6 py-4 text-right font-mono text-emerald-400 font-bold text-sm">
+                                    ${{ number_format($sol->limite_nuevo, 2) }}
+                                </td>
+                                <td class="px-6 py-4 text-xs text-slate-400 max-w-xs whitespace-normal">
+                                    "{{ $sol->motivo }}"
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button @click="openCommentId = (openCommentId === {{ $sol->id }} ? null : {{ $sol->id }})"
+                                                class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-300 border border-slate-700 transition">
+                                            Responder
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <!-- Fila de respuesta/comentario -->
+                            <tr x-show="openCommentId === {{ $sol->id }}" class="bg-slate-950/40" style="display: none;">
+                                <td colspan="6" class="px-6 py-4">
+                                    <form method="POST" action="{{ route('solicitudes-credito.procesar', $sol->id) }}" class="space-y-3">
+                                        @csrf
+                                        <input type="hidden" name="accion" id="accion_general_{{ $sol->id }}">
+                                        
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Observaciones / Retroalimentación</label>
+                                            <textarea name="observaciones" rows="2" placeholder="Opcional. Escribe notas sobre tu decisión..."
+                                                      class="w-full bg-slate-900 border border-slate-850 rounded-xl text-white px-4 py-2.5 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none transition"></textarea>
+                                        </div>
+
+                                        <div class="flex justify-end gap-2">
+                                            <button type="submit" onclick="document.getElementById('accion_general_{{ $sol->id }}').value = 'rechazar'; return confirm('¿Rechazar este incremento de crédito?')"
+                                                    class="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
+                                                ✕ Rechazar
+                                            </button>
+                                            <button type="submit" onclick="document.getElementById('accion_general_{{ $sol->id }}').value = 'aprobar'; return confirm('¿Aprobar este incremento de crédito?')"
+                                                    class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/20 text-xs font-bold transition">
+                                                ✓ Aprobar Incremento
+                                            </button>
+                                        </div>
+                                    </form>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </div>
+
+    <!-- Sección: Solicitudes de Distribuidoras Aprobadas (Pendiente de Cuenta) -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden" 
+         x-data="{ showAccountModal: false, selSolId: '', selSolName: '' }">
+        
+        <div class="p-6 border-b border-slate-800">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                </svg>
+                Solicitudes de Distribuidoras Aprobadas (Pendiente de Cuenta)
+            </h2>
+            <p class="text-slate-400 text-xs mt-0.5">Asigna el correo institucional y contraseña para dar de alta definitiva en el sistema a las distribuidoras ya verificadas a nivel nacional.</p>
+        </div>
+
+        @if($solicitudesAprobadasSinCuenta->isEmpty())
+            <div class="p-8 text-center text-slate-500 text-sm">
+                🎉 No hay distribuidoras aprobadas pendientes de asignación de cuenta.
+            </div>
+        @else
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-950/60 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                        <tr>
+                            <th class="px-6 py-3.5">Candidata / Sucursal</th>
+                            <th class="px-6 py-3.5">Teléfono</th>
+                            <th class="px-6 py-3.5">Verificado Por</th>
+                            <th class="px-6 py-3.5">Coordinador</th>
+                            <th class="px-6 py-3.5 text-right">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        @foreach($solicitudesAprobadasSinCuenta as $sol)
+                            <tr class="hover:bg-slate-800/40 transition">
+                                <td class="px-6 py-4">
+                                    <div class="font-semibold text-white text-sm">{{ $sol->nombre_completo }}</div>
+                                    <div class="text-xs text-indigo-400 font-semibold">{{ $sol->sucursal?->nombre ?? 'Sin Sucursal' }}</div>
+                                    <div class="text-xs text-slate-500">CURP: {{ $sol->curp }}</div>
+                                </td>
+                                <td class="px-6 py-4 font-mono text-xs text-slate-300">
+                                    {{ $sol->telefono }}
+                                </td>
+                                <td class="px-6 py-4 text-xs">
+                                    <span class="text-emerald-400 font-semibold">{{ $sol->verificador?->name ?? 'N/A' }}</span>
+                                    <span class="block text-[10px] text-slate-500">Aprobado el {{ $sol->resolved_at?->format('d/m/Y') }}</span>
+                                </td>
+                                <td class="px-6 py-4 text-xs text-slate-400">
+                                    {{ $sol->coordinador?->name }}
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <button @click="selSolId = '{{ $sol->id }}'; selSolName = '{{ $sol->nombre_completo }}'; showAccountModal = true"
+                                            class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow-md shadow-emerald-950/20 transition">
+                                        Crear Cuenta
+                                    </button>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+
+        <!-- Modal de Creación de Cuenta (Alpine.js) -->
+        <div x-show="showAccountModal" class="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden overflow-y-auto outline-none focus:outline-none" style="display: none;" x-transition>
+            <!-- Overlay -->
+            <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" @click="showAccountModal = false"></div>
+            
+            <!-- Modal content -->
+            <div class="relative w-full max-w-md mx-auto my-6 px-4 z-50">
+                <div class="relative flex flex-col w-full bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl outline-none focus:outline-none p-6 text-left">
+                    <!-- Header -->
+                    <div class="flex items-start justify-between pb-3 border-b border-slate-800">
+                        <h3 class="text-lg font-bold text-white">Crear Cuenta de Acceso</h3>
+                        <button type="button" @click="showAccountModal = false" class="text-slate-400 hover:text-white text-lg font-bold leading-none">&times;</button>
+                    </div>
+                    
+                    <!-- Body -->
+                    <form :action="`/solicitudes-distribuidor/${selSolId}/crear-cuenta`" method="POST" class="mt-4 space-y-4">
+                        @csrf
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Distribuidora</label>
+                            <input type="text" readonly :value="selSolName" class="w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-300 px-4 py-2.5 text-sm focus:outline-none select-none">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Correo Electrónico Corporativo *</label>
+                            <input type="email" name="email" required placeholder="ejemplo@prestafacil.com"
+                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl text-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Contraseña Inicial *</label>
+                            <input type="password" name="password" required placeholder="Mínimo 6 caracteres"
+                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl text-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition">
+                        </div>
+
+                        <div class="flex justify-end gap-3 pt-4 border-t border-slate-800 mt-6">
+                            <button type="button" @click="showAccountModal = false" class="px-5 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold transition">
+                                Cancelar
+                            </button>
+                            <button type="submit" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20 text-xs font-bold tracking-wide transition">
+                                Registrar y Activar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección Principal: Préstamos Activos por Distribuidora -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden space-y-6">
+        <div class="p-6 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                    Préstamos Activos por Distribuidora (Global)
+                </h2>
+                <p class="text-slate-400 text-xs mt-0.5">Control de cartera vigente, crédito ocupado y desglose de préstamos por distribuidor.</p>
+            </div>
+
+            <!-- Filtro de Sucursal -->
+            <form method="GET" action="{{ route('gerente-general.dashboard') }}" class="flex items-center gap-2">
+                <select name="sucursal_id" onchange="this.form.submit()" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                    <option value="">Todas las Sucursales</option>
+                    @foreach($sucursales as $sucursal)
+                        <option value="{{ $sucursal->id }}" {{ $sucursalId == $sucursal->id ? 'selected' : '' }}>
+                            {{ $sucursal->nombre }}
+                        </option>
+                    @endforeach
+                </select>
+                @if($sucursalId)
+                    <a href="{{ route('gerente-general.dashboard') }}" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition" title="Quitar Filtro">
+                        &times;
+                    </a>
+                @endif
+            </form>
+        </div>
+
+        @if($distribuidores->isEmpty())
+            <div class="p-12 text-center text-slate-500 text-sm">
+                No se encontraron distribuidores registrados en esta sucursal.
+            </div>
+        @else
+            <div class="p-6 pt-0 space-y-6">
+                @foreach($distribuidores as $dist)
+                    @php
+                        $activos = $dist->prestamos;
+                        $totalPrestado = $activos->sum('monto_prestamo');
+                        $totalAdeudo = $activos->sum('adeudo_pendiente');
+                        $totalPagado = $activos->sum('pagos_recibidos');
+                        $limite = floatval($dist->limite_credito ?? 20000.00);
+                        $disponible = max(0, $limite - $totalPrestado);
+                    @endphp
+
+                    <div x-data="{ open: false }" class="border border-slate-800 rounded-2xl bg-slate-950/50 overflow-hidden shadow-md">
+                        <!-- Cabecera de la Distribuidora -->
+                        <div class="p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 cursor-pointer hover:bg-slate-900/60 transition"
+                             @click="open = !open">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold text-lg">
+                                    {{ strtoupper(substr($dist->name, 0, 2)) }}
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h3 class="text-base font-bold text-white">{{ $dist->name }}</h3>
+                                        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 uppercase">
+                                            {{ $dist->categoria_distribuidor ?? 'Cobre' }}
+                                        </span>
+                                    </div>
+                                    <p class="text-xs text-slate-400 mt-0.5">
+                                        Sucursal: <span class="text-slate-300 font-semibold">{{ $dist->sucursal?->nombre ?? 'Sin Asignar' }}</span>
+                                        &bull; Ref: <span class="font-mono text-indigo-300">{{ $dist->referenciaPago() }}</span>
+                                    </p>
+                                </div>
         <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
             @foreach($sucursales as $sucursal)
                 <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-md">

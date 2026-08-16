@@ -36,12 +36,26 @@ class GerenteGeneralController extends Controller
             'vales_catalogo' => $valesActivos->count(),
         ];
 
+        $solicitudesCreditoPendientes = \App\Models\SolicitudCredito::where('estado', 'pendiente')
+            ->with(['distribuidor', 'coordinador'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Solicitudes de distribuidores aprobadas por el verificador pero pendientes de cuenta a nivel global
+        $solicitudesAprobadasSinCuenta = \App\Models\SolicitudDistribuidor::where('estado', 'aprobado')
+            ->whereNull('user_id')
+            ->with(['coordinador', 'verificador', 'sucursal'])
+            ->orderBy('resolved_at', 'desc')
+            ->get();
+
         return view('gerente-general.dashboard', compact(
             'operador',
             'sucursales',
             'valesActivos',
             'configuracion',
-            'statsCorporativas'
+            'statsCorporativas',
+            'solicitudesCreditoPendientes',
+            'solicitudesAprobadasSinCuenta'
         ));
     }
 }

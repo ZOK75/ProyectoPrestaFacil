@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\DistribuidorController;
@@ -26,10 +26,16 @@ Route::get('/', function () {
     if ($user->esGerenteGeneral() || $user->esAdministrador()) return redirect()->route('gerente-general.dashboard');
     if ($user->esGerenteSucursal()) return redirect()->route('gerente-sucursal.dashboard');
     if ($user->esDistribuidor()) return redirect()->route('distribuidor.dashboard');
+    if ($user->esCoordinador()) return redirect()->route('coordinador.dashboard');
+    if ($user->esVerificador()) return redirect()->route('verificador.dashboard');
     if ($user->esCajero()) return redirect()->route('cajero.dashboard');
     if ($user->esCoordinador()) return redirect()->route('autorizaciones.index');
     return redirect()->route('producto-vales.index');
 });
+
+// Postulación pública para Distribuidora
+Route::get('solicitar-registro-distribuidor/{coordinador}', [\App\Http\Controllers\PublicPostulacionController::class, 'create'])->name('postulacion.create');
+Route::post('solicitar-registro-distribuidor/{coordinador}', [\App\Http\Controllers\PublicPostulacionController::class, 'store'])->name('postulacion.store');
 
 // Todas las rutas del sistema requieren sesión activa (middleware 'auth')
 Route::middleware(['auth'])->group(function () {
@@ -40,6 +46,8 @@ Route::middleware(['auth'])->group(function () {
         if ($user->esGerenteGeneral() || $user->esAdministrador()) return redirect()->route('gerente-general.dashboard');
         if ($user->esGerenteSucursal()) return redirect()->route('gerente-sucursal.dashboard');
         if ($user->esDistribuidor()) return redirect()->route('distribuidor.dashboard');
+        if ($user->esCoordinador()) return redirect()->route('coordinador.dashboard');
+        if ($user->esVerificador()) return redirect()->route('verificador.dashboard');
         if ($user->esCajero()) return redirect()->route('cajero.dashboard');
         if ($user->esCoordinador()) return redirect()->route('autorizaciones.index');
         return redirect()->route('producto-vales.index');
@@ -92,6 +100,30 @@ Route::middleware(['auth'])->group(function () {
             ->name('distribuidor.dashboard');
     });
 
+    // 4. Coordinador Dashboard y Rutas
+    Route::prefix('coordinador')->name('coordinador.')->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\CoordinadorController::class, 'dashboard'])->name('dashboard');
+        Route::resource('solicitudes', \App\Http\Controllers\CoordinadorController::class);
+        Route::post('solicitudes/{solicitud}/enviar-verificacion', [\App\Http\Controllers\CoordinadorController::class, 'enviarAVerificacion'])->name('solicitudes.enviar-verificacion');
+        Route::post('distribuidores/{distribuidor}/solicitar-credito', [\App\Http\Controllers\CoordinadorController::class, 'solicitarCredito'])->name('distribuidores.solicitar-credito');
+    });
+
+    // 5. Verificador Dashboard y Rutas
+    Route::prefix('verificador')->name('verificador.')->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\VerificadorController::class, 'dashboard'])->name('dashboard');
+        Route::get('/solicitudes/{solicitud}', [\App\Http\Controllers\VerificadorController::class, 'showSolicitud'])->name('solicitudes.show');
+        Route::post('/solicitudes/{solicitud}/procesar', [\App\Http\Controllers\VerificadorController::class, 'procesarSolicitud'])->name('solicitudes.procesar');
+    });
+
+    // 6. Procesamiento de incremento de crédito y creación de cuenta de distribuidor
+    Route::post('solicitudes-credito/{solicitud}/procesar', [\App\Http\Controllers\SolicitudCreditoController::class, 'procesar'])->name('solicitudes-credito.procesar');
+    Route::post('solicitudes-distribuidor/{solicitud}/crear-cuenta', [\App\Http\Controllers\SolicitudDistribuidorCuentaController::class, 'crearCuenta'])->name('solicitudes-distribuidor.crear-cuenta');
+
+    // 4. Bandeja de Solicitudes y Notificaciones de Clientes (Gerencia)
+    Route::get('solicitudes-clientes', [SolicitudClienteController::class, 'index'])->name('solicitudes-clientes.index');
+    Route::get('solicitudes-clientes/{solicitud}', [SolicitudClienteController::class, 'show'])->name('solicitudes-clientes.show');
+    Route::post('solicitudes-clientes/{solicitud}/aprobar', [SolicitudClienteController::class, 'aprobar'])->name('solicitudes-clientes.aprobar');
+    Route::post('solicitudes-clientes/{solicitud}/rechazar', [SolicitudClienteController::class, 'rechazar'])->name('solicitudes-clientes.rechazar');
     // ──────────────────────────────────────────
     // 4. MÓDULO CAJERO
     // ──────────────────────────────────────────

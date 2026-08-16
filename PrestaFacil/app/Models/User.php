@@ -167,6 +167,23 @@ class User extends Authenticatable
         return in_array($nombre, ['distribuidor', 'distribuidora']);
     }
 
+
+
+    public function esVerificador(): bool
+    {
+        return strtolower($this->rol?->nombre ?? '') === 'verificador';
+    }
+
+    public function solicitudesCreditoComoDistribuidor(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SolicitudCredito::class, 'distribuidor_id')->orderBy('created_at', 'desc');
+    }
+
+    public function solicitudesCreditoComoCoordinador(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SolicitudCredito::class, 'coordinador_id')->orderBy('created_at', 'desc');
+    }
+
     public function esCajero(): bool
     {
         $nombre = strtolower($this->rol?->nombre ?? '');
@@ -346,5 +363,13 @@ class User extends Authenticatable
     public function esMorosa(): bool
     {
         return false;
+    }
+
+    /**
+     * Solicitudes de distribuidores creadas por este coordinador.
+     */
+    public function solicitudesDistribuidoresCreadas(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SolicitudDistribuidor::class, 'coordinador_id')->orderBy('created_at', 'desc');
     }
 }

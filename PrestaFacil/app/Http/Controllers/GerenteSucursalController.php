@@ -32,10 +32,29 @@ class GerenteSucursalController extends Controller
             'otros' => $personalSucursal->reject(fn($u) => $u->esDistribuidor() || $u->esCajero())->count(),
         ];
 
+        // Solicitudes pendientes de incremento de crédito para distribuidores de su sucursal
+        $solicitudesCreditoPendientes = \App\Models\SolicitudCredito::where('estado', 'pendiente')
+            ->whereHas('distribuidor', function ($q) use ($sucursalId) {
+                $q->where('sucursal_id', $sucursalId);
+            })
+            ->with(['distribuidor', 'coordinador'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Solicitudes de distribuidores aprobadas por el verificador pero pendientes de cuenta
+        $solicitudesAprobadasSinCuenta = \App\Models\SolicitudDistribuidor::where('sucursal_id', $sucursalId)
+            ->where('estado', 'aprobado')
+            ->whereNull('user_id')
+            ->with(['coordinador', 'verificador'])
+            ->orderBy('resolved_at', 'desc')
+            ->get();
+
         return view('gerente-sucursal.dashboard', compact(
             'operador',
             'personalSucursal',
-            'statsEquipo'
+            'statsEquipo',
+            'solicitudesCreditoPendientes',
+            'solicitudesAprobadasSinCuenta'
         ));
     }
 }

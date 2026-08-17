@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('solicitudes_distribuidores', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             
             // Datos Personales
             $table->string('nombres');
@@ -37,10 +37,10 @@ return new class extends Migration
             $table->text('referencias_laborales')->nullable();
             
             // Relaciones de Usuarios (Sistema)
-            $table->foreignId('coordinador_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('sucursal_id')->constrained('sucursals')->onDelete('cascade');
-            $table->foreignId('verificador_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('coordinador_id')->constrained('users')->onDelete('cascade');
+            $table->foreignUuid('sucursal_id')->constrained('sucursales')->onDelete('cascade');
+            $table->foreignUuid('verificador_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('user_id')->nullable()->constrained('users')->nullOnDelete();
             
             // Estado y Control
             $table->enum('estado', ['en espera', 'en espera de verificacion', 'aprobado', 'rechazado'])->default('en espera');

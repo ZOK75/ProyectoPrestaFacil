@@ -22,6 +22,9 @@ class AuthAllRolesTest extends TestCase
             $user = User::where('email', $email)->first();
             $this->assertNotNull($user, "El usuario $email debe existir en la base de datos.");
 
+            $user->password = bcrypt('password');
+            $user->save();
+
             $response = $this->post('/login', [
                 'email' => $email,
                 'password' => 'password',

@@ -32,6 +32,13 @@ class GerenteSucursalController extends Controller
             'otros' => $personalSucursal->reject(fn($u) => $u->esDistribuidor() || $u->esCajero())->count(),
         ];
 
+        // Distribuidores de la sucursal con sus préstamos
+        $distribuidores = User::where('sucursal_id', $sucursalId)
+            ->whereHas('rol', fn($q) => $q->whereIn('nombre', ['Distribuidor', 'distribuidor', 'Distribuidora', 'distribuidora']))
+            ->with(['prestamos' => fn($q) => $q->where('estado', 'activo')])
+            ->orderBy('name')
+            ->get();
+
         // Solicitudes pendientes de incremento de crédito para distribuidores de su sucursal
         $solicitudesCreditoPendientes = \App\Models\SolicitudCredito::where('estado', 'pendiente')
             ->whereHas('distribuidor', function ($q) use ($sucursalId) {
@@ -53,6 +60,7 @@ class GerenteSucursalController extends Controller
             'operador',
             'personalSucursal',
             'statsEquipo',
+            'distribuidores',
             'solicitudesCreditoPendientes',
             'solicitudesAprobadasSinCuenta'
         ));

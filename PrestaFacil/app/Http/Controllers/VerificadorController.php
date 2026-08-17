@@ -73,27 +73,26 @@ class VerificadorController extends Controller
         $verificador = Auth::user();
 
         if ($request->accion === 'aprobar') {
-            // Actualizar estado de la solicitud a aprobado
             $solicitud->update([
-                'estado' => 'aprobado',
+                'dictamen_verificador' => 'aceptado',
+                'comentarios_verificador' => $request->observaciones_resolucion,
                 'verificador_id' => $verificador->id,
-                'observaciones_resolucion' => $request->observaciones_resolucion,
-                'resolved_at' => now(),
+                'estado' => 'en espera', // Pasa al Gerente
             ]);
 
             return redirect()->route('verificador.dashboard')
-                ->with('success', "La solicitud para {$solicitud->nombre_completo} ha sido APROBADA. Se ha turnado a la Gerencia para la asignación de su cuenta oficial.");
+                ->with('success', "La solicitud para {$solicitud->nombre_completo} ha sido verificada y turnada a la Gerencia.");
         } else {
-            // Rechazar solicitud
+            // Rechazar solicitud por parte del Verificador (Gerente aún decidirá)
             $solicitud->update([
-                'estado' => 'rechazado',
+                'dictamen_verificador' => 'rechazado',
+                'comentarios_verificador' => $request->observaciones_resolucion,
                 'verificador_id' => $verificador->id,
-                'observaciones_resolucion' => $request->observaciones_resolucion,
-                'resolved_at' => now(),
+                'estado' => 'en espera', // Pasa al Gerente de todos modos
             ]);
 
             return redirect()->route('verificador.dashboard')
-                ->with('info', "La solicitud para {$solicitud->nombre_completo} ha sido RECHAZADA.");
+                ->with('info', "La solicitud para {$solicitud->nombre_completo} ha sido dictaminada como RECHAZADA. Se ha turnado a la Gerencia para la decisión final.");
         }
     }
 }

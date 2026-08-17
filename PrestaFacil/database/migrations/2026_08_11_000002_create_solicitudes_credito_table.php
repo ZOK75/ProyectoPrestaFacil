@@ -12,11 +12,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('solicitudes_credito', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             
-            $table->foreignId('distribuidor_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('coordinador_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('gerente_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUuid('distribuidor_id')->constrained('users')->onDelete('cascade');
+            $table->foreignUuid('coordinador_id')->constrained('users')->onDelete('cascade');
+            $table->foreignUuid('gerente_id')->nullable()->constrained('users')->nullOnDelete();
             
             $table->decimal('limite_actual', 10, 2);
             $table->decimal('limite_nuevo', 10, 2);

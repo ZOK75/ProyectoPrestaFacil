@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+
  
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  
 class Configuracion extends Model
 {
-    use HasUuids, HasFactory;
+    use HasUuids;
+    use HasFactory;
  
     protected $table = 'configuracion_generales';
  

@@ -48,7 +48,14 @@ class GerenteSucursalController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Solicitudes de distribuidores aprobadas por el verificador pero pendientes de cuenta
+        // Solicitudes en espera de la decisión final del gerente (dictaminadas por verificador)
+        $solicitudesEnEspera = \App\Models\SolicitudDistribuidor::where('sucursal_id', $sucursalId)
+            ->where('estado', 'en espera')
+            ->with(['coordinador', 'verificador'])
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
+        // Solicitudes de distribuidores aprobadas por el gerente pero pendientes de cuenta
         $solicitudesAprobadasSinCuenta = \App\Models\SolicitudDistribuidor::where('sucursal_id', $sucursalId)
             ->where('estado', 'aprobado')
             ->whereNull('user_id')
@@ -62,7 +69,56 @@ class GerenteSucursalController extends Controller
             'statsEquipo',
             'distribuidores',
             'solicitudesCreditoPendientes',
+            'solicitudesEnEspera',
             'solicitudesAprobadasSinCuenta'
         ));
+    }
+
+    /**
+     * Procesar la decisión final del Gerente (Aprobar o Rechazar)
+     * basándose en la solicitud "en espera" (después del Verificador).
+     */
+    public function decidirSolicitudDistribuidor(Request $request, $id)
+    {
+        $request->validate([
+            'accion' => 'required|in:aprobar,rechazar',
+            'observaciones_resolucion' => 'nullable|string|max:1000'
+        ]);
+
+        $solicitud = \App\Models\SolicitudDistribuidor::findOrFail($id);
+
+        if ($solicitud->sucursal_id !== Auth::user()->sucursal_id) {
+            abort(403, 'No tienes permiso para decidir sobre esta solicitud.');
+        }
+
+        if ($solicitud->estado !== 'en espera') {
+            return back()->with('error', 'Esta solicitud ya no está en espera de decisión.');
+        }
+
+        if ($request->accion === 'aprobar') {
+            $solicitud->estado = 'aprobado';
+            $solicitud->observaciones_resolucion = $request->observaciones_resolucion;
+            $solicitud->resolved_at = now();
+            $solicitud->save();
+
+            return redirect()->route('gerente-sucursal.dashboard')
+                ->with('success', "La solicitud de {$solicitud->nombre_completo} ha sido APROBADA. Ahora debes crear su cuenta para activar su acceso.");
+        } else {
+            $solicitud->estado = 'rechazado';
+            $solicitud->observaciones_resolucion = $request->observaciones_resolucion;
+            $solicitud->resolved_at = now();
+            $solicitud->save();
+
+            // Notificar al coordinador que fue rechazada (Paso 7/11)
+            \App\Models\NotificacionCajero::enviar(
+                $solicitud->coordinador_id,
+                'alerta',
+                'Solicitud Rechazada por Gerencia',
+                "La solicitud de {$solicitud->nombre_completo} fue rechazada por el Gerente. Verificador dictaminó: {$solicitud->dictamen_verificador}. Comentarios finales: " . ($request->observaciones_resolucion ?? 'Sin comentarios.')
+            );
+
+            return redirect()->route('gerente-sucursal.dashboard')
+                ->with('info', "La solicitud de {$solicitud->nombre_completo} ha sido RECHAZADA de forma definitiva.");
+        }
     }
 }

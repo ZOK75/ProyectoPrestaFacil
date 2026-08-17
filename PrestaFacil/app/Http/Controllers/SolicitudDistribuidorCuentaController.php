@@ -72,6 +72,14 @@ class SolicitudDistribuidorCuentaController extends Controller
             'user_id' => $user->id,
         ]);
 
+        // Notificar al coordinador que fue aprobada y se le crearon credenciales (Paso 13)
+        \App\Models\NotificacionCajero::enviar(
+            $solicitud->coordinador_id,
+            'informativa',
+            'Distribuidora Aprobada y Activada',
+            "La solicitud de {$solicitud->nombre_completo} ha sido aprobada por Gerencia. Se ha creado su cuenta de acceso con el correo: {$request->email} y contraseña: {$request->password}. El distribuidor ya puede iniciar sesión."
+        );
+
         $redirection = $operador->esGerenteGeneral() ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
 
         return redirect()->route($redirection)

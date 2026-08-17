@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\DistribuidorController;
@@ -77,6 +77,8 @@ Route::middleware(['auth'])->group(function () {
         Route::prefix('gerente-general')->group(function () {
             Route::get('/dashboard', [GerenteGeneralController::class, 'index'])
                 ->name('gerente-general.dashboard');
+            Route::post('/solicitudes-distribuidoras/{solicitud}/decidir', [GerenteGeneralController::class, 'decidirSolicitudDistribuidor'])
+                ->name('gerente-general.solicitudes.decidir');
         });
 
         // Configuración General del Sistema (Lectura para Administrador, Edición solo Gerente General)
@@ -90,6 +92,8 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:gerente_de_sucursal'])->prefix('gerente-sucursal')->group(function () {
         Route::get('/dashboard', [GerenteSucursalController::class, 'index'])
             ->name('gerente-sucursal.dashboard');
+        Route::post('/solicitudes-distribuidoras/{solicitud}/decidir', [GerenteSucursalController::class, 'decidirSolicitudDistribuidor'])
+            ->name('gerente-sucursal.solicitudes.decidir');
     });
 
     // ──────────────────────────────────────────

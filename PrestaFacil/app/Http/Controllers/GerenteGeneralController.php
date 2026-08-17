@@ -48,6 +48,12 @@ class GerenteGeneralController extends Controller
             ->orderBy('resolved_at', 'desc')
             ->get();
 
+        // Solicitudes en espera de la decisión final de la Gerencia
+        $solicitudesEnEspera = \App\Models\SolicitudDistribuidor::where('estado', 'en espera')
+            ->with(['coordinador', 'verificador', 'sucursal'])
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
         return view('gerente-general.dashboard', compact(
             'operador',
             'sucursales',
@@ -55,7 +61,52 @@ class GerenteGeneralController extends Controller
             'configuracion',
             'statsCorporativas',
             'solicitudesCreditoPendientes',
+            'solicitudesEnEspera',
             'solicitudesAprobadasSinCuenta'
         ));
+    }
+
+    /**
+     * Procesar la decisión final del Gerente General (Aprobar o Rechazar)
+     * basándose en la solicitud "en espera" (después del Verificador).
+     */
+    public function decidirSolicitudDistribuidor(Request $request, $id)
+    {
+        $request->validate([
+            'accion' => 'required|in:aprobar,rechazar',
+            'observaciones_resolucion' => 'nullable|string|max:1000'
+        ]);
+
+        $solicitud = \App\Models\SolicitudDistribuidor::findOrFail($id);
+
+        if ($solicitud->estado !== 'en espera') {
+            return back()->with('error', 'Esta solicitud ya no está en espera de decisión.');
+        }
+
+        if ($request->accion === 'aprobar') {
+            $solicitud->estado = 'aprobado';
+            $solicitud->observaciones_resolucion = $request->observaciones_resolucion;
+            $solicitud->resolved_at = now();
+            $solicitud->save();
+
+            return redirect()->route('gerente-general.dashboard')
+                ->with('success', "La solicitud de {$solicitud->nombre_completo} ha sido APROBADA. Ahora debes crear su cuenta para activar su acceso.");
+        } else {
+            $solicitud->estado = 'rechazado';
+            $solicitud->observaciones_resolucion = $request->observaciones_resolucion;
+            $solicitud->resolved_at = now();
+            $solicitud->save();
+
+            // Notificar al coordinador que fue rechazada (Paso 7/11)
+            \App\Models\NotificacionCajero::enviar(
+                $solicitud->coordinador_id,
+                'alerta',
+                'Solicitud Rechazada por Gerencia',
+                "La solicitud de {$solicitud->nombre_completo} fue rechazada por el Gerente General. Verificador dictaminó: {$solicitud->dictamen_verificador}. Comentarios finales: " . ($request->observaciones_resolucion ?? 'Sin comentarios.')
+            );
+
+            return redirect()->route('gerente-general.dashboard')
+                ->with('info', "La solicitud de {$solicitud->nombre_completo} ha sido RECHAZADA de forma definitiva.");
+        }
     }
 }

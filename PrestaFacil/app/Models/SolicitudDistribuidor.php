@@ -35,6 +35,8 @@ class SolicitudDistribuidor extends Model
         'verificador_id',
         'user_id',
         'estado',
+        'dictamen_verificador',
+        'comentarios_verificador',
         'observaciones_resolucion',
         'resolved_at',
     ];

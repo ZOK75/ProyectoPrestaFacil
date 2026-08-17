@@ -29,6 +29,13 @@ class ProductoValeController extends Controller
     public function index(Request $request)
     {
         $operador = $this->operador();
+        
+        // Bloquear acceso al Verificador
+        if ($operador && $operador->esVerificador()) {
+            return redirect()->route('verificador.dashboard')
+                ->with('error', 'Acceso denegado: Los Verificadores no tienen acceso al catálogo de vales.');
+        }
+
         $esGerenteGeneral = $operador ? $operador->esGerenteGeneral() : false;
         $esDistribuidor = $operador ? $operador->esDistribuidor() : false;
 
@@ -118,6 +125,13 @@ class ProductoValeController extends Controller
     {
         $productoVale->load(['createdBy', 'updatedBy']);
         $operador = $this->operador();
+
+        // Bloquear acceso al Verificador
+        if ($operador && $operador->esVerificador()) {
+            return redirect()->route('verificador.dashboard')
+                ->with('error', 'Acceso denegado: Los Verificadores no tienen acceso al catálogo de vales.');
+        }
+
         $esGerenteGeneral = $operador ? $operador->esGerenteGeneral() : false;
         $esDistribuidor = $operador ? $operador->esDistribuidor() : false;
 

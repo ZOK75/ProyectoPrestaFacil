@@ -53,6 +53,10 @@ class AuthenticatedSessionController extends Controller
             return redirect()->route('autorizaciones.index');
         }
 
+        if ($user->esVerificador()) {
+            return redirect()->route('verificador.dashboard');
+        }
+
         return redirect()->route('producto-vales.index');
     }
 

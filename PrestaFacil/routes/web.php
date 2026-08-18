@@ -29,13 +29,8 @@ Route::get('/', function () {
     if ($user->esCoordinador()) return redirect()->route('coordinador.dashboard');
     if ($user->esVerificador()) return redirect()->route('verificador.dashboard');
     if ($user->esCajero()) return redirect()->route('cajero.dashboard');
-    if ($user->esCoordinador()) return redirect()->route('autorizaciones.index');
     return redirect()->route('producto-vales.index');
 });
-
-// Postulación pública para Distribuidora
-Route::get('solicitar-registro-distribuidor/{coordinador}', [\App\Http\Controllers\PublicPostulacionController::class, 'create'])->name('postulacion.create');
-Route::post('solicitar-registro-distribuidor/{coordinador}', [\App\Http\Controllers\PublicPostulacionController::class, 'store'])->name('postulacion.store');
 
 // Todas las rutas del sistema requieren sesión activa (middleware 'auth')
 Route::middleware(['auth'])->group(function () {
@@ -49,7 +44,6 @@ Route::middleware(['auth'])->group(function () {
         if ($user->esCoordinador()) return redirect()->route('coordinador.dashboard');
         if ($user->esVerificador()) return redirect()->route('verificador.dashboard');
         if ($user->esCajero()) return redirect()->route('cajero.dashboard');
-        if ($user->esCoordinador()) return redirect()->route('autorizaciones.index');
         return redirect()->route('producto-vales.index');
     })->name('dashboard');
 
@@ -92,8 +86,27 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:gerente_de_sucursal'])->prefix('gerente-sucursal')->group(function () {
         Route::get('/dashboard', [GerenteSucursalController::class, 'index'])
             ->name('gerente-sucursal.dashboard');
-        Route::post('/solicitudes-distribuidoras/{solicitud}/decidir', [GerenteSucursalController::class, 'decidirSolicitudDistribuidor'])
+        Route::post('/solicitudes-distribuidoras/{solicitud}/decidir', [GerenteSucursalController::class, 'decidirSolicitudConCuenta'])
             ->name('gerente-sucursal.solicitudes.decidir');
+    });
+
+    // Comparación, Dictamen y Transferencias (Gerente de Sucursal o Gerente General / Administrador)
+    Route::middleware(['role:gerente_de_sucursal,gerente_general,administrador'])->group(function () {
+        // Vista comparativa y decisión directa
+        Route::get('/solicitudes-distribuidoras/{solicitud}/comparar', [GerenteSucursalController::class, 'compararSolicitudDistribuidor'])
+            ->name('gerente.solicitudes.comparar');
+        Route::get('/gerente-sucursal/solicitudes-distribuidoras/{solicitud}/comparar', [GerenteSucursalController::class, 'compararSolicitudDistribuidor'])
+            ->name('gerente-sucursal.solicitudes.comparar');
+        Route::get('/gerente-general/solicitudes-distribuidoras/{solicitud}/comparar', [GerenteSucursalController::class, 'compararSolicitudDistribuidor'])
+            ->name('gerente-general.solicitudes.comparar');
+        Route::post('/solicitudes-distribuidoras/{solicitud}/decidir-con-cuenta', [GerenteSucursalController::class, 'decidirSolicitudConCuenta'])
+            ->name('gerente.solicitudes.decidir-con-cuenta');
+
+        // Transferencias
+        Route::get('/gerente-sucursal/transferencias/{transferencia}/revisar', [GerenteSucursalController::class, 'revisarTransferencia'])
+            ->name('gerente-sucursal.transferencias.revisar');
+        Route::post('/gerente-sucursal/transferencias/{transferencia}/decidir', [GerenteSucursalController::class, 'decidirTransferencia'])
+            ->name('gerente-sucursal.transferencias.decidir');
     });
 
     // ──────────────────────────────────────────
@@ -105,11 +118,15 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // 4. Coordinador Dashboard y Rutas
-    Route::prefix('coordinador')->name('coordinador.')->group(function () {
+    Route::middleware(['role:coordinador'])->prefix('coordinador')->name('coordinador.')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\CoordinadorController::class, 'dashboard'])->name('dashboard');
+        Route::get('/prestamos', [\App\Http\Controllers\CoordinadorController::class, 'prestamos'])->name('prestamos');
         Route::resource('solicitudes', \App\Http\Controllers\CoordinadorController::class);
         Route::post('solicitudes/{solicitud}/enviar-verificacion', [\App\Http\Controllers\CoordinadorController::class, 'enviarAVerificacion'])->name('solicitudes.enviar-verificacion');
         Route::post('distribuidores/{distribuidor}/solicitar-credito', [\App\Http\Controllers\CoordinadorController::class, 'solicitarCredito'])->name('distribuidores.solicitar-credito');
+        Route::post('distribuidores/{distribuidor}/solicitar-transferencia', [\App\Http\Controllers\CoordinadorController::class, 'solicitarTransferencia'])->name('distribuidores.solicitar-transferencia');
+        Route::get('transferencias/{transferencia}/revisar', [\App\Http\Controllers\CoordinadorController::class, 'revisarTransferencia'])->name('transferencias.revisar');
+        Route::post('transferencias/{transferencia}/decidir', [\App\Http\Controllers\CoordinadorController::class, 'decidirTransferencia'])->name('transferencias.decidir');
     });
 
     // 5. Verificador Dashboard y Rutas
@@ -146,13 +163,15 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/vale/{prestamo}/verificar', [CajeroController::class, 'verificarDatosVale'])->name('cajero.vale.verificar');
         Route::post('/vale/{prestamo}/entregar', [CajeroController::class, 'entregarVale'])->name('cajero.vale.entregar');
         
-        // Módulo 3: Abonos y Pagos
+        // Módulo 3: Abonos y Pagos por Distribuidora
         Route::get('/abonos', [CajeroController::class, 'indexAbonos'])->name('cajero.abonos.index');
+        Route::post('/abonos/distribuidora/{distribuidora}', [CajeroController::class, 'registrarAbonoDistribuidora'])->name('cajero.abonos.distribuidora.store');
         Route::post('/abonos/{prestamo}', [CajeroController::class, 'registrarAbono'])->name('cajero.abonos.store');
         
         // Módulo 4: Conciliación
         Route::get('/conciliaciones', [CajeroController::class, 'indexConciliaciones'])->name('cajero.conciliaciones.index');
         Route::post('/conciliaciones', [CajeroController::class, 'solicitarConciliacion'])->name('cajero.conciliaciones.store');
+        Route::get('/conciliaciones/buscar-pagos', [CajeroController::class, 'buscarPagosParaConciliacion'])->name('cajero.conciliaciones.buscar-pagos');
         Route::get('/conciliaciones/{conciliacion}', [CajeroController::class, 'mostrarConciliacion'])->name('cajero.conciliaciones.show');
         
         // Módulo 5: Canje de Puntos

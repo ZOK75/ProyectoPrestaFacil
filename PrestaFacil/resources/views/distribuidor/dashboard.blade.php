@@ -196,6 +196,59 @@
         @endif
     </div>
 
+    <!-- Sección Móvil: Vales Pendientes de Entrega en Caja -->
+    @if(isset($prestamosPendientes) && $prestamosPendientes->isNotEmpty())
+        <div class="bg-slate-900 border border-amber-500/30 rounded-2xl p-4 shadow-xl space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                <h2 class="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-amber-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Vales Pendientes de Entrega en Ventanilla ({{ count($prestamosPendientes) }})
+                </h2>
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    En Caja
+                </span>
+            </div>
+
+            <div class="space-y-2.5">
+                @foreach($prestamosPendientes as $prestamo)
+                    <div class="bg-slate-950/80 border border-amber-500/20 rounded-xl p-3 space-y-2">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <span class="font-mono text-[10px] text-amber-400 font-bold block">{{ $prestamo->referencia }}</span>
+                                <span class="text-xs font-bold text-white block mt-0.5">{{ $prestamo->cliente?->nombre }}</span>
+                                <span class="text-[10px] text-slate-400">{{ $prestamo->productoVale?->nombre ?? 'Vale' }} &bull; ${{ number_format($prestamo->monto_prestamo, 2) }}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/10 text-amber-300 border border-amber-500/30 block">
+                                    ⏳ Por Entregar
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+                            <a href="{{ route('prestamos.show', $prestamo) }}" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold transition">
+                                Ver Ficha
+                            </a>
+
+                            <form action="{{ route('prestamos.destroy', $prestamo) }}" method="POST" onsubmit="return confirm('¿Estás seguro de desactivar y cancelar este vale pendiente? Se liberará la línea de crédito de inmediato.');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-[11px] font-bold transition flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                    Desactivar Vale
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <!-- Sección Móvil: Mis Vales / Préstamos Activos -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
         <div class="flex items-center justify-between pb-2 border-b border-slate-800">

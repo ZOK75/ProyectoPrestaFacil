@@ -101,7 +101,7 @@
                     <div>
                         @if($cliente->tieneSolicitudPendiente())
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 animate-pulse">
-                                ⏳ Solicitud en Revisión
+                                 Solicitud en Revisión
                             </span>
                         @elseif($cliente->activo)
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -161,7 +161,12 @@
                             </svg>
                         </a>
 
-                        <form action="{{ route('clientes.destroy', $cliente) }}" method="POST" class="inline-block" onsubmit="return confirm('{{ Auth::user()->esDistribuidor() ? '¿Enviar solicitud a Gerencia para desactivar al cliente ' . $cliente->nombre . '?' : '¿Desactivar al cliente ' . $cliente->nombre . '?' }}');">
+                        @php
+                            $mensajeConfirmacion = ($operador && $operador->esDistribuidor())
+                                ? "¿Enviar solicitud a Gerencia para desactivar al cliente {$cliente->nombre}?"
+                                : "¿Desactivar al cliente {$cliente->nombre}?";
+                        @endphp
+                        <form action="{{ route('clientes.destroy', $cliente) }}" method="POST" class="inline-block" onsubmit="return confirm('{{ $mensajeConfirmacion }}');">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="px-3 py-2 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-600 hover:text-white text-xs font-semibold transition" title="Desactivar">

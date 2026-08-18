@@ -54,6 +54,12 @@ class GerenteGeneralController extends Controller
             ->orderBy('updated_at', 'desc')
             ->get();
 
+        // Solicitudes de Traspaso de Distribuidora pendientes de autorización gerencial
+        $transferenciasPendientesGerente = \App\Models\SolicitudTransferencia::where('estado', 'pendiente_gerente')
+            ->with(['distribuidor', 'coordinadorEmisor', 'coordinadorReceptor', 'sucursalOrigen', 'sucursalDestino'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         return view('gerente-general.dashboard', compact(
             'operador',
             'sucursales',
@@ -62,7 +68,8 @@ class GerenteGeneralController extends Controller
             'statsCorporativas',
             'solicitudesCreditoPendientes',
             'solicitudesEnEspera',
-            'solicitudesAprobadasSinCuenta'
+            'solicitudesAprobadasSinCuenta',
+            'transferenciasPendientesGerente'
         ));
     }
 

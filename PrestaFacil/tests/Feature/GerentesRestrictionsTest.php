@@ -103,4 +103,73 @@ class GerentesRestrictionsTest extends TestCase
         $response->assertRedirect('/gerente-sucursal/dashboard');
         $response->assertSessionHas('error');
     }
+
+    public function test_gerentes_cannot_create_distribuidora_and_category_notice_is_removed()
+    {
+        $gerenteGeneralRol = Rol::firstOrCreate(['nombre' => 'Gerente General']);
+        $gerenteSucursalRol = Rol::firstOrCreate(['nombre' => 'Gerente de Sucursal']);
+        $rolDistribuidor = Rol::firstOrCreate(['nombre' => 'Distribuidor']);
+        $rolCajero = Rol::firstOrCreate(['nombre' => 'Cajero']);
+
+        $sucursal = Sucursal::firstOrCreate(['nombre' => 'Sucursal Central'], ['activo' => true]);
+
+        $gerenteGeneral = User::factory()->create([
+            'rol_id' => $gerenteGeneralRol->id,
+            'activo' => true,
+        ]);
+
+        $gerenteSucursal = User::factory()->create([
+            'rol_id' => $gerenteSucursalRol->id,
+            'sucursal_id' => $sucursal->id,
+            'activo' => true,
+        ]);
+
+        // 1. Gerente General visita /usuarios/create: no debe ver el rol Distribuidor ni el mensaje de categoría
+        $responseGG = $this->actingAs($gerenteGeneral)->get(route('usuarios.create'));
+        $responseGG->assertStatus(200);
+        $responseGG->assertDontSee('<option value="' . $rolDistribuidor->id . '">Distribuidor</option>', false);
+        $responseGG->assertDontSee('Categoría Inicial Automática:');
+        $responseGG->assertDontSee('Categoría Cobre');
+
+        // 2. Gerente de Sucursal visita /usuarios/create: no debe ver el rol Distribuidor ni el mensaje de categoría
+        $responseGS = $this->actingAs($gerenteSucursal)->get(route('usuarios.create'));
+        $responseGS->assertStatus(200);
+        $responseGS->assertDontSee('<option value="' . $rolDistribuidor->id . '">Distribuidor</option>', false);
+        $responseGS->assertDontSee('Categoría Inicial Automática:');
+        $responseGS->assertDontSee('Categoría Cobre');
+
+        // 3. Intento de POST con rol Distribuidor por Gerente General -> Debe ser rechazado
+        $responsePostGG = $this->actingAs($gerenteGeneral)->post(route('usuarios.store'), [
+            'name' => 'Intento Distribuidora GG',
+            'email' => 'intento.dist.gg@prestafacil.com',
+            'password' => 'PasswordSeguro123#',
+            'password_confirmation' => 'PasswordSeguro123#',
+            'rol_id' => $rolDistribuidor->id,
+            'sucursal_id' => $sucursal->id,
+        ]);
+        $responsePostGG->assertSessionHasErrors('rol_id');
+
+        // 4. Intento de POST con rol Distribuidor por Gerente de Sucursal -> Debe ser rechazado
+        $responsePostGS = $this->actingAs($gerenteSucursal)->post(route('usuarios.store'), [
+            'name' => 'Intento Distribuidora GS',
+            'email' => 'intento.dist.gs@prestafacil.com',
+            'password' => 'PasswordSeguro123#',
+            'password_confirmation' => 'PasswordSeguro123#',
+            'rol_id' => $rolDistribuidor->id,
+            'sucursal_id' => $sucursal->id,
+        ]);
+        $responsePostGS->assertSessionHasErrors('rol_id');
+
+        // 5. Creación de un rol permitido (ej. Cajero) debe funcionar normalmente
+        $responseValid = $this->actingAs($gerenteGeneral)->post(route('usuarios.store'), [
+            'name' => 'Cajero Valido',
+            'email' => 'cajero.valido@prestafacil.com',
+            'password' => 'PasswordSeguro123#',
+            'password_confirmation' => 'PasswordSeguro123#',
+            'rol_id' => $rolCajero->id,
+            'sucursal_id' => $sucursal->id,
+        ]);
+        $responseValid->assertRedirect(route('usuarios.index'));
+        $this->assertDatabaseHas('users', ['email' => 'cajero.valido@prestafacil.com']);
+    }
 }

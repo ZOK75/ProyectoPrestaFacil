@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\Conciliacion;
 use App\Models\Configuracion;
 use App\Models\NotificacionCajero;
+use App\Models\PagoPrestamo;
 use App\Models\Prestamo;
 use App\Models\RelacionCobranza;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -14,8 +17,9 @@ class CorteCobranzaService
 {
     /**
      * Revisa automáticamente la hora del servidor y procesa:
-     * 1. Corte automático y notificación a todas las distribuidoras.
-     * 2. Vencimiento de fecha límite y aplicación de multas por adeudo.
+     * 1. Corte automático, cálculo de puntos por liquidación de la cuota 15nal antes del corte
+     *    (considerando pagos normales y conciliaciones con fecha de pago anterior al corte).
+     * 2. Vencimiento de fecha límite y aplicación de multas por adeudo quincenal pendiente.
      */
     public function verificarYProcesarCortesYVencimientos(): array
     {
@@ -24,6 +28,7 @@ class CorteCobranzaService
         $resultados = [
             'cortes_notificados' => 0,
             'multas_aplicadas' => 0,
+            'puntos_otorgados' => 0,
         ];
 
         // Obtener todas las distribuidoras activas
@@ -38,25 +43,140 @@ class CorteCobranzaService
         DB::transaction(function () use ($config, $ahora, $distribuidoras, &$resultados) {
 
             // ─────────────────────────────────────────────────────────────
-            // 1. CORTE AUTOMÁTICO (al llegar o superar fecha_corte)
+            // 1. CORTE AUTOMÁTICO Y CÁLCULO DE PUNTOS (al llegar o superar fecha_corte)
             // ─────────────────────────────────────────────────────────────
             if ($config->fecha_corte && $ahora->greaterThanOrEqualTo($config->fecha_corte)) {
                 foreach ($distribuidoras as $dist) {
-                    $totalProductos = Prestamo::where('created_by_user_id', $dist->id)->sum('monto_prestamo');
-                    $adeudoTotal = Prestamo::where('created_by_user_id', $dist->id)->where('estado', 'activo')->sum('adeudo_pendiente');
+                    // REGLA 1: Solo procesar cortes ocurridos después de la fecha de alta del distribuidor
+                    if ($dist->created_at && $dist->created_at->startOfDay()->greaterThan($config->fecha_corte)) {
+                        continue;
+                    }
 
-                    $relacion = RelacionCobranza::firstOrCreate(
-                        [
+                    $totalProductos = floatval(Prestamo::where('created_by_user_id', $dist->id)->where('estado', 'activo')->sum('monto_prestamo'));
+                    $totalQuincenal = floatval(Prestamo::where('created_by_user_id', $dist->id)->where('estado', 'activo')->sum('cuota_quincenal'));
+                    $multasDistribuidora = floatval($dist->multas ?? 0.0);
+                    $total15nalExigible = $totalQuincenal + $multasDistribuidora;
+
+                    $relacion = RelacionCobranza::where('distribuidora_id', $dist->id)
+                        ->whereDate('fecha_corte', $config->fecha_corte->toDateString())
+                        ->orderBy('fecha_corte', 'desc')
+                        ->first();
+
+                    $montoPagado = $relacion ? floatval($relacion->monto_pagado) : 0.0;
+
+                    // Si no hay monto registrado en la relación, calcular pagos directos de préstamos
+                    if ($montoPagado <= 0) {
+                        $montoPagado = floatval(PagoPrestamo::whereHas('prestamo', fn($q) => $q->where('created_by_user_id', $dist->id))
+                            ->where('created_at', '<=', $config->fecha_corte)
+                            ->sum('monto_abonado'));
+                    }
+
+                    // Sumar pagos aprobados por conciliación cuya fecha de pago fue anterior a la fecha de corte
+                    $conciliacionesAnteriores = Conciliacion::where('distribuidora_id', $dist->id)
+                        ->whereIn('estado', ['conciliado', 'aprobada'])
+                        ->whereNotNull('fecha_pago')
+                        ->get();
+
+                    $montoConciliadoAnteriorAlCorte = 0.0;
+                    foreach ($conciliacionesAnteriores as $conc) {
+                        $fechaPagoConc = Carbon::parse($conc->fecha_pago);
+                        if ($fechaPagoConc->startOfDay()->lessThanOrEqualTo($config->fecha_corte->endOfDay())) {
+                            $montoConciliadoAnteriorAlCorte += floatval($conc->monto_corregido);
+                        }
+                    }
+
+                    $totalAbonadoValidoAntesCorte = $montoPagado + $montoConciliadoAnteriorAlCorte;
+                    $adeudo15nalPendiente = max(0.0, $total15nalExigible - $totalAbonadoValidoAntesCorte);
+
+                    // CONDICIÓN: Se liquidó el total 15nal antes de la fecha de corte
+                    $fueLiquidado15nalAntesCorte = ($total15nalExigible <= 0) || ($totalAbonadoValidoAntesCorte >= $total15nalExigible) || ($adeudo15nalPendiente <= 0);
+
+                    if ($fueLiquidado15nalAntesCorte) {
+                        $puntosGanados = 0;
+                        $estadoPago = 'pago_a_tiempo';
+
+                        // Si colocó productos y cubrió su cuota quincenal antes del corte -> Pago Anticipado con PUNTOS
+                        if ($totalProductos > 0) {
+                            $puntosGanados = $config->calcularPuntosPorMonto($totalProductos);
+                            $estadoPago = 'pago_anticipado';
+
+                            // Otorgar puntos si no se habían asignado ya en este corte
+                            $puntosYaAsignados = $relacion ? intval($relacion->puntos_ganados) : 0;
+                            if ($puntosYaAsignados <= 0 && $puntosGanados > 0) {
+                                $dist->increment('puntos', $puntosGanados);
+                                $resultados['puntos_otorgados'] += $puntosGanados;
+
+                                NotificacionCajero::create([
+                                    'user_id' => $dist->id,
+                                    'tipo' => 'pago_anticipado',
+                                    'titulo' => '🎉 ¡Puntos Otorgados al Corte!',
+                                    'mensaje' => "Liquidaste tu cuota quincenal antes del corte. ¡Has acumulado {$puntosGanados} puntos de bonificación por un total en vales de $" . number_format($totalProductos, 2) . "!",
+                                    'data' => [
+                                        'puntos' => $puntosGanados,
+                                        'total_productos' => $totalProductos,
+                                        'total_quincenal' => $total15nalExigible,
+                                    ],
+                                    'leida' => false,
+                                ]);
+                            } elseif ($puntosYaAsignados > 0) {
+                                $puntosGanados = $puntosYaAsignados;
+                            }
+                        }
+
+                        if ($relacion) {
+                            $relacion->update([
+                                'fecha_corte' => $config->fecha_corte,
+                                'fecha_limite_pago' => $config->fecha_limite_pago,
+                                'monto_total_periodo' => $total15nalExigible,
+                                'monto_pagado' => max($totalAbonadoValidoAntesCorte, $total15nalExigible),
+                                'adeudo_pendiente' => 0.00,
+                                'estado_pago' => $estadoPago,
+                                'puntos_ganados' => $puntosGanados,
+                                'puntos_descontados' => 0,
+                                'liquidado_at' => $relacion->liquidado_at ?? $ahora,
+                            ]);
+                        } else {
+                            $relacion = RelacionCobranza::create([
+                                'distribuidora_id' => $dist->id,
+                                'fecha_corte' => $config->fecha_corte,
+                                'fecha_limite_pago' => $config->fecha_limite_pago,
+                                'monto_total_periodo' => $total15nalExigible,
+                                'monto_pagado' => max($totalAbonadoValidoAntesCorte, $total15nalExigible),
+                                'adeudo_pendiente' => 0.00,
+                                'estado_pago' => $estadoPago,
+                                'puntos_ganados' => $puntosGanados,
+                                'puntos_descontados' => 0,
+                                'liquidado_at' => $ahora,
+                            ]);
+                        }
+                        continue;
+                    }
+
+                    // Si NO se liquidó la cuota quincenal antes del corte: No gana puntos (0 puntos), queda pendiente
+                    if ($relacion) {
+                        $relacion->update([
+                            'fecha_corte' => $config->fecha_corte,
+                            'fecha_limite_pago' => $config->fecha_limite_pago,
+                            'monto_total_periodo' => $total15nalExigible,
+                            'monto_pagado' => $totalAbonadoValidoAntesCorte,
+                            'adeudo_pendiente' => $adeudo15nalPendiente,
+                            'estado_pago' => 'pendiente',
+                            'puntos_ganados' => 0,
+                            'puntos_descontados' => 0,
+                        ]);
+                    } else {
+                        $relacion = RelacionCobranza::create([
                             'distribuidora_id' => $dist->id,
                             'fecha_corte' => $config->fecha_corte,
-                        ],
-                        [
                             'fecha_limite_pago' => $config->fecha_limite_pago,
-                            'monto_total_periodo' => $totalProductos,
-                            'adeudo_pendiente' => $adeudoTotal,
+                            'monto_total_periodo' => $total15nalExigible,
+                            'monto_pagado' => $totalAbonadoValidoAntesCorte,
+                            'adeudo_pendiente' => $adeudo15nalPendiente,
                             'estado_pago' => 'pendiente',
-                        ]
-                    );
+                            'puntos_ganados' => 0,
+                            'puntos_descontados' => 0,
+                        ]);
+                    }
 
                     // Si no se ha notificado este corte a la distribuidora
                     if (!$relacion->corte_notificado_at) {
@@ -68,6 +188,7 @@ class CorteCobranzaService
                             'data' => [
                                 'fecha_corte' => $config->fecha_corte->toIso8601String(),
                                 'fecha_limite' => $config->fecha_limite_pago ? $config->fecha_limite_pago->toIso8601String() : null,
+                                'total_quincenal' => $total15nalExigible,
                                 'url' => route('prestamos.relacion-pdf', [], false),
                             ],
                             'leida' => false,
@@ -75,8 +196,9 @@ class CorteCobranzaService
 
                         $relacion->update([
                             'corte_notificado_at' => $ahora,
-                            'adeudo_pendiente' => $adeudoTotal,
-                            'monto_total_periodo' => $totalProductos,
+                            'adeudo_pendiente' => $adeudo15nalPendiente,
+                            'monto_total_periodo' => $total15nalExigible,
+                            'monto_pagado' => $totalAbonadoValidoAntesCorte,
                         ]);
 
                         $resultados['cortes_notificados']++;
@@ -89,46 +211,64 @@ class CorteCobranzaService
             // ─────────────────────────────────────────────────────────────
             if ($config->fecha_limite_pago && $ahora->greaterThanOrEqualTo($config->fecha_limite_pago)) {
                 foreach ($distribuidoras as $dist) {
+                    // REGLA 1: No aplicar sanciones por cortes previos a su alta
+                    if ($dist->created_at && $dist->created_at->startOfDay()->greaterThan($config->fecha_corte)) {
+                        continue;
+                    }
+
+                    $totalQuincenal = floatval(Prestamo::where('created_by_user_id', $dist->id)->where('estado', 'activo')->sum('cuota_quincenal'));
+                    $multasDistribuidora = floatval($dist->multas ?? 0.0);
+                    $total15nalExigible = $totalQuincenal + $multasDistribuidora;
+
                     $relacion = RelacionCobranza::where('distribuidora_id', $dist->id)
                         ->where('fecha_corte', $config->fecha_corte)
                         ->first();
 
-                    if ($relacion && !$relacion->multa_aplicada_at && $relacion->estado_pago === 'pendiente') {
-                        $prestamosConAdeudo = Prestamo::where('created_by_user_id', $dist->id)
-                            ->where('estado', 'activo')
-                            ->where('adeudo_pendiente', '>', 0)
-                            ->get();
+                    $montoPagado = $relacion ? floatval($relacion->monto_pagado) : 0.0;
+                    $adeudo15nalPendiente = $relacion ? floatval($relacion->adeudo_pendiente) : max(0.0, $total15nalExigible - $montoPagado);
 
-                        if ($prestamosConAdeudo->isNotEmpty()) {
-                            $montoMulta = floatval($config->multa_adeudo ?? 300.00);
-
-                            // Aplicar la multa al primer préstamo activo con adeudo
-                            $primerPrestamo = $prestamosConAdeudo->first();
-                            $primerPrestamo->update([
-                                'multas' => $primerPrestamo->multas + $montoMulta,
-                                'adeudo_pendiente' => $primerPrestamo->adeudo_pendiente + $montoMulta,
-                            ]);
-
+                    // Si su cuota quincenal está en 0.00, se toma por pagada/liquidada
+                    if ($adeudo15nalPendiente <= 0 || ($relacion && $relacion->monto_pagado >= $relacion->monto_total_periodo)) {
+                        if ($relacion && $relacion->estado_pago === 'pendiente') {
                             $relacion->update([
-                                'multa_aplicada' => $montoMulta,
-                                'multa_aplicada_at' => $ahora,
-                                'adeudo_pendiente' => $relacion->adeudo_pendiente + $montoMulta,
+                                'monto_total_periodo' => $total15nalExigible,
+                                'monto_pagado' => max($montoPagado, $total15nalExigible),
+                                'estado_pago' => 'pago_a_tiempo',
+                                'adeudo_pendiente' => 0.00,
+                                'liquidado_at' => $ahora,
                             ]);
-
-                            NotificacionCajero::create([
-                                'user_id' => $dist->id,
-                                'tipo' => 'multa_adeudo_aplicada',
-                                'titulo' => '⚠️ Multa por Adeudo Vencido',
-                                'mensaje' => 'La fecha límite de pago (' . $config->fecha_limite_pago->format('d/m/Y H:i') . ') ha vencido con saldo pendiente. Se ha aplicado una multa por adeudo de $' . number_format($montoMulta, 2) . ' a tu cuenta.',
-                                'data' => [
-                                    'multa' => $montoMulta,
-                                    'fecha_limite' => $config->fecha_limite_pago->toIso8601String(),
-                                ],
-                                'leida' => false,
-                            ]);
-
-                            $resultados['multas_aplicadas']++;
                         }
+                        continue;
+                    }
+
+                    // REGLA 3: Las multas son por distribuidora y actualizan la relación
+                    if ($relacion && !$relacion->multa_aplicada_at && $relacion->estado_pago === 'pendiente') {
+                        $montoMulta = floatval($config->multa_adeudo ?? 300.00);
+
+                        // Multa por distribuidora
+                        $dist->increment('multas', $montoMulta);
+
+                        $relacion->update([
+                            'monto_total_periodo' => $total15nalExigible,
+                            'monto_pagado' => $montoPagado,
+                            'multa_aplicada' => $montoMulta,
+                            'multa_aplicada_at' => $ahora,
+                            'adeudo_pendiente' => $adeudo15nalPendiente + $montoMulta,
+                        ]);
+
+                        NotificacionCajero::create([
+                            'user_id' => $dist->id,
+                            'tipo' => 'multa_adeudo_aplicada',
+                            'titulo' => '⚠️ Multa por Adeudo Vencido',
+                            'mensaje' => 'La fecha límite de pago (' . $config->fecha_limite_pago->format('d/m/Y H:i') . ') ha vencido con saldo pendiente. Se ha aplicado una multa por adeudo de $' . number_format($montoMulta, 2) . ' a tu cuenta.',
+                            'data' => [
+                                'multa' => $montoMulta,
+                                'fecha_limite' => $config->fecha_limite_pago->toIso8601String(),
+                            ],
+                            'leida' => false,
+                        ]);
+
+                        $resultados['multas_aplicadas']++;
                     }
                 }
             }
@@ -138,12 +278,11 @@ class CorteCobranzaService
     }
 
     /**
-     * Evalúa la liquidación de la relación de la distribuidora y aplica las reglas de puntos:
-     * 1. Pago Anticipado (< fecha_corte): Acumula puntos según fórmula floor(Total/MontoBase)*PuntosBase.
-     * 2. Pago a Tiempo (>= fecha_corte y <= fecha_limite): 0 puntos.
-     * 3. Pago Atrasado (> fecha_limite): Pierde el 20% de los puntos que ya tenga acumulados.
+     * Actualiza la relación de cobranza cuando se registra un abono de la distribuidora.
+     * IMPORTANTE: No calcula ni otorga puntos en el momento del abono. Los puntos se
+     * procesan exclusivamente al momento del corte oficial.
      */
-    public function evaluarLiquidacionRelacion(User $distribuidora): ?RelacionCobranza
+    public function actualizarRelacionPorAbono(User $distribuidora, float $montoAbonado = 0.0): ?RelacionCobranza
     {
         if (!$distribuidora->esDistribuidor()) {
             return null;
@@ -152,113 +291,44 @@ class CorteCobranzaService
         $config = Configuracion::actual();
         $ahora = now();
 
-        // Verificar si la distribuidora ya tiene todas sus cuentas en adeudo 0
-        $adeudoRestante = Prestamo::where('created_by_user_id', $distribuidora->id)
+        $totalQuincenal = floatval(Prestamo::where('created_by_user_id', $distribuidora->id)
             ->where('estado', 'activo')
-            ->where('adeudo_pendiente', '>', 0)
-            ->sum('adeudo_pendiente');
+            ->sum('cuota_quincenal'));
 
-        if ($adeudoRestante > 0) {
-            return null; // Aún mantiene adeudo pendiente
-        }
+        $multasRestantes = floatval($distribuidora->multas ?? 0.0);
+        $total15nalExigible = $totalQuincenal + $multasRestantes;
 
-        $relacion = RelacionCobranza::firstOrCreate(
-            [
+        $relacion = RelacionCobranza::where('distribuidora_id', $distribuidora->id)
+            ->orderBy('fecha_corte', 'desc')
+            ->first();
+
+        if (!$relacion) {
+            $montoPagado = $montoAbonado;
+            $adeudoPendiente15nal = max(0.0, $total15nalExigible - $montoPagado);
+
+            $relacion = RelacionCobranza::create([
                 'distribuidora_id' => $distribuidora->id,
                 'fecha_corte' => $config->fecha_corte,
-            ],
-            [
                 'fecha_limite_pago' => $config->fecha_limite_pago,
-                'monto_total_periodo' => Prestamo::where('created_by_user_id', $distribuidora->id)->sum('monto_prestamo'),
-                'adeudo_pendiente' => 0,
-                'estado_pago' => 'pendiente',
-            ]
-        );
-
-        if ($relacion->estado_pago !== 'pendiente') {
-            return $relacion; // Ya fue evaluada y liquidada
-        }
-
-        // ─────────────────────────────────────────────────────────────
-        // CASO 1: Pago Anticipado (antes del corte)
-        // ─────────────────────────────────────────────────────────────
-        if ($config->fecha_corte && $ahora->lessThan($config->fecha_corte)) {
-            $totalProductos = floatval(Prestamo::where('created_by_user_id', $distribuidora->id)->sum('monto_prestamo'));
-            $puntosGanados = $config->calcularPuntosPorMonto($totalProductos);
-
-            $distribuidora->puntos = intval($distribuidora->puntos ?? 0) + $puntosGanados;
-            $distribuidora->save();
-
-            $relacion->update([
-                'estado_pago' => 'pago_anticipado',
-                'puntos_ganados' => $puntosGanados,
-                'puntos_descontados' => 0,
-                'adeudo_pendiente' => 0,
-                'liquidado_at' => $ahora,
-            ]);
-
-            NotificacionCajero::create([
-                'user_id' => $distribuidora->id,
-                'tipo' => 'pago_anticipado',
-                'titulo' => '🎉 ¡Pago Anticipado Registrado!',
-                'mensaje' => "Tu relación de cobranza fue liquidada antes del corte. ¡Has acumulado {$puntosGanados} puntos de bonificación!",
-                'data' => ['puntos' => $puntosGanados],
-                'leida' => false,
-            ]);
-
-            return $relacion;
-        }
-
-        // ─────────────────────────────────────────────────────────────
-        // CASO 2: Pago a Tiempo (entre corte y fecha límite)
-        // ─────────────────────────────────────────────────────────────
-        if ($config->fecha_limite_pago && $ahora->lessThanOrEqualTo($config->fecha_limite_pago)) {
-            $relacion->update([
-                'estado_pago' => 'pago_a_tiempo',
+                'monto_total_periodo' => $total15nalExigible,
+                'monto_pagado' => $montoPagado,
+                'adeudo_pendiente' => $adeudoPendiente15nal,
+                'estado_pago' => $adeudoPendiente15nal <= 0 ? 'pago_a_tiempo' : 'pendiente',
                 'puntos_ganados' => 0,
                 'puntos_descontados' => 0,
-                'adeudo_pendiente' => 0,
-                'liquidado_at' => $ahora,
+                'liquidado_at' => $adeudoPendiente15nal <= 0 ? $ahora : null,
             ]);
+        } else {
+            $relacion->monto_total_periodo = $total15nalExigible;
+            $relacion->monto_pagado = floatval($relacion->monto_pagado) + $montoAbonado;
+            $adeudoPendiente15nal = max(0.0, $total15nalExigible - floatval($relacion->monto_pagado));
+            $relacion->adeudo_pendiente = $adeudoPendiente15nal;
 
-            NotificacionCajero::create([
-                'user_id' => $distribuidora->id,
-                'tipo' => 'pago_a_tiempo',
-                'titulo' => '✅ Pago a Tiempo Registrado',
-                'mensaje' => 'Tu relación de cobranza ha sido liquidada con éxito dentro de la fecha límite establecida (sin acumulación de puntos).',
-                'data' => ['puntos' => 0],
-                'leida' => false,
-            ]);
-
-            return $relacion;
+            if ($adeudoPendiente15nal <= 0 && $relacion->estado_pago === 'pendiente') {
+                $relacion->liquidado_at = $ahora;
+            }
+            $relacion->save();
         }
-
-        // ─────────────────────────────────────────────────────────────
-        // CASO 3: Pago Atrasado (después de la fecha límite)
-        // ─────────────────────────────────────────────────────────────
-        $puntosActuales = intval($distribuidora->puntos ?? 0);
-        $puntosDescontados = intval(ceil($puntosActuales * 0.20)); // Pierde el 20% de sus puntos actuales
-        $nuevosPuntos = max(0, $puntosActuales - $puntosDescontados);
-
-        $distribuidora->puntos = $nuevosPuntos;
-        $distribuidora->save();
-
-        $relacion->update([
-            'estado_pago' => 'pago_atrasado',
-            'puntos_ganados' => 0,
-            'puntos_descontados' => $puntosDescontados,
-            'adeudo_pendiente' => 0,
-            'liquidado_at' => $ahora,
-        ]);
-
-        NotificacionCajero::create([
-            'user_id' => $distribuidora->id,
-            'tipo' => 'pago_atrasado',
-            'titulo' => '⚠️ Pago Atrasado Registrado',
-            'mensaje' => "Tu relación de cobranza fue liquidada posterior a la fecha límite. Se ha aplicado el recargo correspondiente y se descontó el 20% de tus puntos acumulados ({$puntosDescontados} pts).",
-            'data' => ['puntos_descontados' => $puntosDescontados, 'puntos_restantes' => $nuevosPuntos],
-            'leida' => false,
-        ]);
 
         return $relacion;
     }

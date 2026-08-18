@@ -109,6 +109,7 @@ class CajeroController extends Controller
 
         DB::transaction(function () use ($prestamo, $request, $cajera) {
             $prestamo->update([
+                'estado' => 'activo',
                 'estado_entrega' => 'entregado',
                 'entregado_por_user_id' => $cajera->id,
                 'entregado_at' => now(),
@@ -117,14 +118,47 @@ class CajeroController extends Controller
                 'sucursal_entrega_id' => $cajera->sucursal_id,
             ]);
 
-            AuditService::registrar('ENTREGA_PREVALE', "Prevale {$prestamo->referencia} entregado", [
+            $prestamo->loadMissing(['cliente', 'createdBy.coordinador', 'createdBy.sucursal']);
+            $nombreSucursal = $cajera->sucursal?->nombre ?? 'Sucursal';
+
+            // 1. Notificar a la Distribuidora
+            if ($prestamo->created_by_user_id) {
+                NotificacionCajero::enviar(
+                    $prestamo->created_by_user_id,
+                    'prestamo_cobrado',
+                    '¡Préstamo Cobrado en Ventanilla!',
+                    "El cliente {$prestamo->cliente->nombre} cobró exitosamente el prevale con Referencia {$prestamo->referencia} por un monto de $" . number_format($prestamo->monto_prestamo, 2) . " con el cajero {$cajera->name} en {$nombreSucursal}. El préstamo ahora está activo.",
+                    [
+                        'url' => route('prestamos.show', $prestamo),
+                        'entidad_tipo' => 'prestamos',
+                        'entidad_id' => $prestamo->id,
+                    ]
+                );
+            }
+
+            // 2. Notificar al Coordinador de la distribuidora
+            if ($prestamo->createdBy && $prestamo->createdBy->coordinador_id) {
+                NotificacionCajero::enviar(
+                    $prestamo->createdBy->coordinador_id,
+                    'prestamo_cobrado',
+                    'Préstamo Cobrado por Cliente',
+                    "El cliente {$prestamo->cliente->nombre} (Distribuidora: {$prestamo->createdBy->name}) cobró el prevale {$prestamo->referencia} por $" . number_format($prestamo->monto_prestamo, 2) . " en la sucursal {$nombreSucursal}.",
+                    [
+                        'url' => route('prestamos.show', $prestamo),
+                        'entidad_tipo' => 'prestamos',
+                        'entidad_id' => $prestamo->id,
+                    ]
+                );
+            }
+
+            AuditService::registrar('ENTREGA_PREVALE', "Prevale {$prestamo->referencia} entregado/cobrado", [
                 'entidad_tipo' => 'prestamos',
                 'entidad_id' => $prestamo->id,
                 'despues' => $prestamo->toArray(),
             ]);
         });
 
-        return redirect()->route('cajero.dashboard')->with('success', 'Prevale entregado con éxito.');
+        return redirect()->route('cajero.dashboard')->with('success', 'Prevale entregado y activado con éxito.');
     }
 
     /**
@@ -202,6 +236,7 @@ class CajeroController extends Controller
 
         DB::transaction(function () use ($prestamo, $request, $cajera) {
             $prestamo->update([
+                'estado' => 'activo',
                 'estado_entrega' => 'entregado',
                 'entregado_por_user_id' => $cajera->id,
                 'entregado_at' => now(),
@@ -210,42 +245,173 @@ class CajeroController extends Controller
                 'sucursal_entrega_id' => $cajera->sucursal_id,
             ]);
 
-            AuditService::registrar('ENTREGA_VALE_DIGITAL', "Vale {$prestamo->referencia} entregado", [
+            $prestamo->loadMissing(['cliente', 'createdBy.coordinador', 'createdBy.sucursal']);
+            $nombreSucursal = $cajera->sucursal?->nombre ?? 'Sucursal';
+
+            // 1. Notificar a la Distribuidora
+            if ($prestamo->created_by_user_id) {
+                NotificacionCajero::enviar(
+                    $prestamo->created_by_user_id,
+                    'prestamo_cobrado',
+                    '¡Vale Cobrado en Ventanilla!',
+                    "El cliente {$prestamo->cliente->nombre} cobró exitosamente el vale con Referencia {$prestamo->referencia} por un monto de $" . number_format($prestamo->monto_prestamo, 2) . " con el cajero {$cajera->name} en {$nombreSucursal}. El préstamo ahora está activo.",
+                    [
+                        'url' => route('prestamos.show', $prestamo),
+                        'entidad_tipo' => 'prestamos',
+                        'entidad_id' => $prestamo->id,
+                    ]
+                );
+            }
+
+            // 2. Notificar al Coordinador de la distribuidora
+            if ($prestamo->createdBy && $prestamo->createdBy->coordinador_id) {
+                NotificacionCajero::enviar(
+                    $prestamo->createdBy->coordinador_id,
+                    'prestamo_cobrado',
+                    'Vale Cobrado por Cliente',
+                    "El cliente {$prestamo->cliente->nombre} (Distribuidora: {$prestamo->createdBy->name}) cobró el vale {$prestamo->referencia} por $" . number_format($prestamo->monto_prestamo, 2) . " en la sucursal {$nombreSucursal}.",
+                    [
+                        'url' => route('prestamos.show', $prestamo),
+                        'entidad_tipo' => 'prestamos',
+                        'entidad_id' => $prestamo->id,
+                    ]
+                );
+            }
+
+            AuditService::registrar('ENTREGA_VALE_DIGITAL', "Vale {$prestamo->referencia} entregado/cobrado", [
                 'entidad_tipo' => 'prestamos',
                 'entidad_id' => $prestamo->id,
                 'despues' => $prestamo->toArray(),
             ]);
         });
 
-        return redirect()->route('cajero.dashboard')->with('success', 'Vale digital entregado con éxito.');
+        return redirect()->route('cajero.dashboard')->with('success', 'Vale digital entregado y activado con éxito.');
     }
 
     /**
-     * MÓDULO 3: ABONOS - INDEX
+     * MÓDULO 3: ABONOS POR DISTRIBUIDORA - INDEX
      */
     public function indexAbonos(Request $request)
     {
-        $query = Prestamo::with('cliente')
-            ->where('estado', 'activo')
-            ->where('estado_entrega', 'entregado');
+        $query = User::whereHas('rol', function($q) {
+                $q->whereIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']);
+            })
+            ->where('activo', true)
+            ->with(['sucursal', 'prestamos' => function($qp) {
+                $qp->where('estado', 'activo');
+            }]);
             
         if ($request->filled('buscar')) {
             $busqueda = $request->buscar;
             $query->where(function($q) use ($busqueda) {
-                $q->where('referencia', 'like', "%{$busqueda}%")
-                  ->orWhereHas('cliente', function($qc) use ($busqueda) {
-                      $qc->where('nombre', 'like', "%{$busqueda}%");
-                  });
+                $q->where('name', 'like', "%{$busqueda}%")
+                  ->orWhere('email', 'like', "%{$busqueda}%")
+                  ->orWhere('referencia_pago_distribuidor', 'like', "%{$busqueda}%")
+                  ->orWhere('id', 'like', "%{$busqueda}%");
             });
         }
         
-        $prestamos = $query->paginate(20);
+        $distribuidoras = $query->paginate(15)->withQueryString();
         
-        return view('cajero.abonos.index', compact('prestamos'));
+        return view('cajero.abonos.index', compact('distribuidoras'));
     }
 
     /**
-     * MÓDULO 3: ABONOS - REGISTRAR
+     * MÓDULO 3: ABONOS POR DISTRIBUIDORA - REGISTRAR
+     */
+    public function registrarAbonoDistribuidora(Request $request, User $distribuidora)
+    {
+        $request->validate([
+            'monto_abonado' => 'required|numeric|min:0.01',
+            'referencia_pago' => 'required|string',
+            'metodo_pago' => 'required|in:efectivo,transferencia,tarjeta',
+            'observaciones' => 'nullable|string|max:500',
+        ]);
+
+        // Validar que la referencia ingresada coincida con la referencia oficial de la distribuidora
+        $refIngresada = strtoupper(trim($request->referencia_pago));
+        $refOficial = strtoupper(trim($distribuidora->referenciaPago()));
+        if ($refIngresada !== $refOficial) {
+            return back()->withErrors([
+                'referencia_pago' => "La referencia ingresada '{$request->referencia_pago}' no coincide con la referencia bancaria oficial ({$distribuidora->referenciaPago()}). Verifica la referencia o solicita una Conciliación."
+            ])->withInput();
+        }
+
+        $cajera = $this->cajera();
+        $ahora = now();
+
+        DB::transaction(function () use ($distribuidora, $request, $cajera, $ahora) {
+            $montoRestante = floatval($request->monto_abonado);
+
+            // 1. Amortizar multas de la distribuidora si las tiene
+            if ($distribuidora->multas > 0) {
+                $abonoMultas = min($montoRestante, floatval($distribuidora->multas));
+                $distribuidora->decrement('multas', $abonoMultas);
+                $montoRestante -= $abonoMultas;
+            }
+
+            // 2. Distribuir a los préstamos activos con adeudo pendiente
+            $prestamos = Prestamo::where('created_by_user_id', $distribuidora->id)
+                ->where('estado', 'activo')
+                ->where('adeudo_pendiente', '>', 0)
+                ->orderBy('created_at', 'asc')
+                ->get();
+
+            foreach ($prestamos as $prestamo) {
+                if ($montoRestante <= 0) {
+                    break;
+                }
+
+                $pagoPrestamo = min($montoRestante, floatval($prestamo->adeudo_pendiente));
+
+                $pago = PagoPrestamo::create([
+                    'prestamo_id' => $prestamo->id,
+                    'folio_pago' => 'PAG-' . strtoupper(uniqid()),
+                    'numero_quincena' => $prestamo->pagos_realizados + 1,
+                    'monto_abonado' => $pagoPrestamo,
+                    'metodo_pago' => $request->metodo_pago,
+                    'observaciones' => ($request->observaciones ? $request->observaciones . ' | ' : '') . "Abono distribuidora (Ref: {$request->referencia_pago})",
+                    'registrado_por_user_id' => $cajera->id,
+                ]);
+
+                $prestamo->increment('pagos_recibidos', $pagoPrestamo);
+                $prestamo->decrement('adeudo_pendiente', $pagoPrestamo);
+                $prestamo->increment('pagos_realizados');
+
+                if ($prestamo->adeudo_pendiente <= 0) {
+                    $prestamo->update(['estado' => 'finalizado']);
+                }
+
+                $montoRestante -= $pagoPrestamo;
+            }
+
+            // 3. Actualizar la relación de cobranza con este abono y evaluar reglas
+            $corteService = app(\App\Services\CorteCobranzaService::class);
+            $corteService->actualizarRelacionPorAbono($distribuidora, floatval($request->monto_abonado));
+
+            // 4. Notificar a la distribuidora
+            NotificacionCajero::enviar(
+                $distribuidora->id,
+                'abono_registrado',
+                'Abono Recibido en Caja',
+                "Se ha registrado un abono de $" . number_format($request->monto_abonado, 2) . " a tu cuenta (Ref: {$request->referencia_pago}) por el cajero {$cajera->name}.",
+                [
+                    'monto' => $request->monto_abonado,
+                    'metodo_pago' => $request->metodo_pago,
+                ]
+            );
+
+            AuditService::registrar('ABONO_DISTRIBUIDORA', "Abono de \${$request->monto_abonado} para {$distribuidora->name} (Ref: {$request->referencia_pago})", [
+                'distribuidora_id' => $distribuidora->id,
+                'monto' => $request->monto_abonado,
+            ]);
+        });
+
+        return back()->with('success', "Abono de $" . number_format($request->monto_abonado, 2) . " registrado correctamente para {$distribuidora->name}.");
+    }
+
+    /**
+     * MÓDULO 3: ABONOS POR PRÉSTAMO INDIVIDUAL (FALLBACK)
      */
     public function registrarAbono(RegistrarAbonoRequest $request, Prestamo $prestamo)
     {
@@ -254,30 +420,13 @@ class CajeroController extends Controller
         $distribuidora = $prestamo->createdBy;
 
         DB::transaction(function () use ($prestamo, $request, $cajera, $ahora, $distribuidora) {
-            $tipoPago = $this->validacionService->determinarTipoPago($ahora);
-            
-            // Si es tardío y la distribuidora cae en morosidad
-            if ($tipoPago === 'tardio' && $this->validacionService->esMorosa($distribuidora)) {
-                $puntosPerdidos = $this->validacionService->aplicarPenalizacionMorosidad($distribuidora);
-                if ($puntosPerdidos > 0) {
-                    $distribuidora->decrement('puntos', $puntosPerdidos);
-                    AuditService::registrar('PENALIZACION_PUNTOS', "Se restaron {$puntosPerdidos} puntos por morosidad a {$distribuidora->name}");
-                }
-            }
-
-            // Si es anticipado
-            if ($tipoPago === 'anticipado') {
-                $puntosGanados = $this->validacionService->calcularPuntosAbono('anticipado');
-                $distribuidora->increment('puntos', $puntosGanados);
-            }
-
             $pago = PagoPrestamo::create([
                 'prestamo_id' => $prestamo->id,
                 'folio_pago' => 'PAG-' . strtoupper(uniqid()),
                 'numero_quincena' => $prestamo->pagos_realizados + 1,
                 'monto_abonado' => $request->monto_abonado,
                 'metodo_pago' => $request->metodo_pago,
-                'observaciones' => $request->observaciones . " [Tipo: $tipoPago]",
+                'observaciones' => $request->observaciones,
                 'registrado_por_user_id' => $cajera->id,
             ]);
 
@@ -287,6 +436,11 @@ class CajeroController extends Controller
 
             if ($prestamo->adeudo_pendiente <= 0) {
                 $prestamo->update(['estado' => 'finalizado']);
+            }
+
+            if ($distribuidora) {
+                $corteService = app(\App\Services\CorteCobranzaService::class);
+                $corteService->actualizarRelacionPorAbono($distribuidora, floatval($request->monto_abonado));
             }
 
             AuditService::registrar('REGISTRO_ABONO', "Abono de \${$request->monto_abonado} a {$prestamo->referencia}", [
@@ -305,22 +459,66 @@ class CajeroController extends Controller
     {
         $cajera = $this->cajera();
         
-        $conciliaciones = Conciliacion::with(['prestamo.cliente', 'autorizador'])
-            ->where('solicitante_id', $cajera->id)
-            ->orderBy('created_at', 'desc')
-            ->paginate(15);
+        $query = Conciliacion::with(['prestamo.cliente', 'distribuidora', 'autorizador', 'conciliadoPor'])
+            ->orderBy('created_at', 'desc');
 
-        // Para el modal de nueva conciliación
-        $prestamosActivos = Prestamo::where('estado', 'activo')->get();
+        if ($request->filled('buscar')) {
+            $b = $request->buscar;
+            $query->where(function($q) use ($b) {
+                $q->where('referencia_original', 'like', "%{$b}%")
+                  ->orWhere('referencia_conciliacion', 'like', "%{$b}%")
+                  ->orWhere('motivo', 'like', "%{$b}%")
+                  ->orWhereHas('distribuidora', fn($qd) => $qd->where('name', 'like', "%{$b}%"));
+            });
+        }
 
-        return view('cajero.conciliaciones.index', compact('conciliaciones', 'prestamosActivos'));
+        $conciliaciones = $query->paginate(15)->withQueryString();
+
+        $prestamosActivos = Prestamo::where('estado', 'activo')->with('cliente')->get();
+        $distribuidoras = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']))->where('activo', true)->get();
+
+        return view('cajero.conciliaciones.index', compact('conciliaciones', 'prestamosActivos', 'distribuidoras'));
+    }
+
+    /**
+     * Búsqueda dinámica de pagos para conciliación por monto o fecha.
+     */
+    public function buscarPagosParaConciliacion(Request $request)
+    {
+        $query = PagoPrestamo::with(['prestamo.cliente', 'prestamo.createdBy']);
+
+        if ($request->filled('monto')) {
+            $query->where('monto_abonado', floatval($request->monto));
+        }
+
+        if ($request->filled('fecha')) {
+            $query->whereDate('created_at', $request->fecha);
+        }
+
+        if ($request->filled('folio')) {
+            $query->where('folio_pago', 'like', "%{$request->folio}%");
+        }
+
+        $pagos = $query->orderBy('created_at', 'desc')->take(20)->get();
+
+        return response()->json($pagos);
     }
 
     /**
      * MÓDULO 4: CONCILIACIONES - SOLICITAR
      */
-    public function solicitarConciliacion(SolicitarConciliacionRequest $request)
+    public function solicitarConciliacion(Request $request)
     {
+        $request->validate([
+            'motivo' => 'required|string|max:500',
+            'monto_original' => 'required|numeric|min:0.01',
+            'monto_corregido' => 'required|numeric|min:0.01',
+            'referencia_conciliacion' => 'nullable|string|max:100',
+            'referencia_original' => 'nullable|string|max:100',
+            'fecha_pago' => 'nullable|date',
+            'evidencia' => 'nullable|file|max:5120',
+        ]);
+
         $cajera = $this->cajera();
         
         $path = null;
@@ -330,12 +528,19 @@ class CajeroController extends Controller
 
         DB::transaction(function () use ($request, $cajera, $path) {
             $conciliacion = Conciliacion::create([
-                'prestamo_id' => $request->prestamo_id,
+                'prestamo_id' => $request->prestamo_id ?: null,
+                'pago_prestamo_id' => $request->pago_prestamo_id ?: null,
+                'distribuidora_id' => $request->distribuidora_id ?: null,
+                'referencia_original' => $request->referencia_original,
+                'referencia_conciliacion' => $request->referencia_conciliacion,
+                'fecha_pago' => $request->fecha_pago,
+                'metodo_pago' => $request->metodo_pago ?? 'transferencia',
                 'monto_original' => $request->monto_original,
                 'monto_corregido' => $request->monto_corregido,
                 'motivo' => $request->motivo,
                 'evidencia_path' => $path,
                 'solicitante_id' => $cajera->id,
+                'estado' => 'pendiente',
             ]);
 
             $solicitud = SolicitudAutorizacion::create([
@@ -344,8 +549,15 @@ class CajeroController extends Controller
                 'sucursal_id' => $cajera->sucursal_id,
                 'entidad_tipo' => 'conciliaciones',
                 'entidad_id' => $conciliacion->id,
-                'datos_originales' => ['monto_original' => $request->monto_original],
-                'datos_propuestos' => ['monto_corregido' => $request->monto_corregido],
+                'datos_originales' => [
+                    'monto_original' => $request->monto_original,
+                    'referencia_original' => $request->referencia_original,
+                ],
+                'datos_propuestos' => [
+                    'monto_corregido' => $request->monto_corregido,
+                    'referencia_conciliacion' => $request->referencia_conciliacion,
+                    'fecha_pago' => $request->fecha_pago,
+                ],
                 'motivo' => $request->motivo,
                 'evidencia_path' => $path,
             ]);
@@ -354,11 +566,11 @@ class CajeroController extends Controller
                 $cajera->sucursal_id,
                 'NUEVA_CONCILIACION',
                 'Solicitud de Conciliación Manual',
-                "La cajera {$cajera->name} solicita una corrección de abono",
+                "La cajera {$cajera->name} solicita una corrección/conciliación de pago (Ref: {$request->referencia_conciliacion})",
                 ['entidad_tipo' => 'solicitudes_autorizacion', 'entidad_id' => $solicitud->id]
             );
 
-            AuditService::registrar('SOLICITUD_CONCILIACION', "Conciliación para préstamo ID {$request->prestamo_id}");
+            AuditService::registrar('SOLICITUD_CONCILIACION', "Conciliación por \${$request->monto_corregido} con referencia {$request->referencia_conciliacion}");
         });
 
         return back()->with('success', 'Solicitud de conciliación enviada a Coordinación.');
@@ -366,6 +578,7 @@ class CajeroController extends Controller
     
     public function mostrarConciliacion(Conciliacion $conciliacion)
     {
+        $conciliacion->load(['prestamo.cliente', 'distribuidora', 'autorizador', 'conciliadoPor']);
         return view('cajero.conciliaciones.show', compact('conciliacion'));
     }
 

@@ -50,7 +50,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         if ($user->esCoordinador()) {
-            return redirect()->route('autorizaciones.index');
+            return redirect()->route('coordinador.dashboard');
         }
 
         if ($user->esVerificador()) {

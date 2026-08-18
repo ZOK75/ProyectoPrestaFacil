@@ -78,6 +78,38 @@
             </div>
         </div>
 
+        <!-- Expedientes Digitales PDF (INE y Comprobante) -->
+        <div class="pt-1 border-t border-slate-800/80 space-y-2">
+            <span class="text-[10px] font-bold text-slate-400 uppercase block">Expedientes Digitales Adjuntos:</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                @if($prestamo->cliente->path_ine_pdf)
+                    <a href="{{ Storage::url($prestamo->cliente->path_ine_pdf) }}" target="_blank" class="flex items-center justify-between p-2.5 bg-slate-950 border border-slate-700 hover:border-indigo-500 rounded-xl text-xs text-indigo-300 font-bold transition">
+                        <span class="flex items-center gap-1.5">
+                            📄 Ver PDF INE
+                        </span>
+                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                    </a>
+                @else
+                    <div class="p-2 bg-slate-950/60 border border-slate-800 rounded-xl text-[10px] text-slate-500 italic">
+                        Sin PDF INE
+                    </div>
+                @endif
+
+                @if($prestamo->cliente->path_comprobante_pdf)
+                    <a href="{{ Storage::url($prestamo->cliente->path_comprobante_pdf) }}" target="_blank" class="flex items-center justify-between p-2.5 bg-slate-950 border border-slate-700 hover:border-indigo-500 rounded-xl text-xs text-indigo-300 font-bold transition">
+                        <span class="flex items-center gap-1.5">
+                            🏠 Ver Comprobante
+                        </span>
+                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                    </a>
+                @else
+                    <div class="p-2 bg-slate-950/60 border border-slate-800 rounded-xl text-[10px] text-slate-500 italic">
+                        Sin Comprobante
+                    </div>
+                @endif
+            </div>
+        </div>
+
         <!-- Checkboxes de Verificación -->
         <div class="space-y-3 pt-2">
             <label class="flex items-start gap-3 p-3 border border-slate-800 rounded-xl cursor-pointer hover:bg-slate-800/50 transition-colors" :class="{'bg-emerald-900/20 border-emerald-500/30': ineCoincide}">

@@ -132,16 +132,24 @@ class PrestamoController extends Controller
             ->orderBy('monto_prestamo', 'asc')
             ->get();
 
-        // Obtener clientes activos
-        $clientes = Cliente::where('activo', true)
-            ->orderBy('nombre', 'asc')
-            ->get();
+        // Obtener clientes activos (si es distribuidor, solo los que él registró)
+        $clientesQuery = Cliente::where('activo', true);
+
+        if ($operador && $operador->esDistribuidor()) {
+            $clientesQuery->where('created_by_user_id', $operador->id);
+        }
+
+        $clientes = $clientesQuery->orderBy('nombre', 'asc')->get();
 
         $clienteSeleccionado = null;
         $tipoAsignacion = 'prevale';
 
         if ($request->filled('cliente_id')) {
-            $clienteSeleccionado = Cliente::find($request->input('cliente_id'));
+            $clienteSeleccionadoQuery = Cliente::where('id', $request->input('cliente_id'))->where('activo', true);
+            if ($operador && $operador->esDistribuidor()) {
+                $clienteSeleccionadoQuery->where('created_by_user_id', $operador->id);
+            }
+            $clienteSeleccionado = $clienteSeleccionadoQuery->first();
             if ($clienteSeleccionado) {
                 $tieneHistorial = Prestamo::where('cliente_id', $clienteSeleccionado->id)->exists();
                 $tipoAsignacion = $tieneHistorial ? 'vale' : 'prevale';
@@ -173,14 +181,20 @@ class PrestamoController extends Controller
             return back()->withErrors(['cliente_id' => 'Este cliente está desactivado.'])->withInput();
         }
 
-        // 1. Solo se permite 1 préstamo activo por cliente
-        $prestamoActivo = Prestamo::where('cliente_id', $cliente->id)
-            ->where('estado', 'activo')
+        // Si es distribuidor, validar que el cliente haya sido registrado por él
+        if ($operador && $operador->esDistribuidor() && $cliente->created_by_user_id !== $operador->id) {
+            return back()->withErrors(['cliente_id' => 'Solo puedes asignar vales a clientes registrados por ti.'])->withInput();
+        }
+
+        // 1. Solo se permite 1 préstamo activo o pendiente por cliente
+        $prestamoExistente = Prestamo::where('cliente_id', $cliente->id)
+            ->whereIn('estado', ['activo', 'pendiente'])
             ->first();
 
-        if ($prestamoActivo) {
+        if ($prestamoExistente) {
+            $estadoTexto = $prestamoExistente->estado === 'pendiente' ? 'pendiente de entrega en ventanilla' : 'activo';
             return back()->withErrors([
-                'cliente_id' => "No es posible otorgar un nuevo vale. El cliente '{$cliente->nombre}' ya cuenta con un préstamo activo pendiente de liquidar (Referencia: {$prestamoActivo->referencia})."
+                'cliente_id' => "No es posible otorgar un nuevo vale. El cliente '{$cliente->nombre}' ya cuenta con un préstamo {$estadoTexto} (Referencia: {$prestamoExistente->referencia})."
             ])->withInput();
         }
 
@@ -214,6 +228,7 @@ class PrestamoController extends Controller
         $prefijo = strtoupper($tipo);
         $referencia = "REF-{$prefijo}-" . date('Ymd') . "-" . str_pad(rand(100, 999), 3, '0', STR_PAD_LEFT);
 
+        // El préstamo se crea en estado 'pendiente' hasta que el cajero lo entregue
         $prestamo = Prestamo::create([
             'referencia' => $referencia,
             'cliente_id' => $cliente->id,
@@ -227,14 +242,54 @@ class PrestamoController extends Controller
             'adeudo_pendiente' => $vale->monto_total_pagar,
             'pagos_recibidos' => 0,
             'multas' => 0,
-            'estado' => 'activo',
+            'estado' => 'pendiente',
+            'estado_entrega' => 'pendiente',
+            'limite_credito_anterior' => $operador?->limite_credito,
             'activo' => true,
             'created_by_user_id' => Auth::id() ?? $operador?->id,
         ]);
 
         $tipoTexto = strtoupper($tipo);
         return redirect()->route('prestamos.show', $prestamo)
-            ->with('success', "¡Asignación exitosa! Se generó el {$tipoTexto} con Referencia {$referencia} para {$cliente->nombre}. Saldo de crédito actualizado.");
+            ->with('success', "¡Asignación exitosa! Se generó el {$tipoTexto} con Referencia {$referencia} para {$cliente->nombre}. El préstamo se encuentra PENDIENTE hasta que el cajero realice la entrega en ventanilla.");
+    }
+
+    /**
+     * Desactivar / Cancelar un vale o préstamo pendiente por el distribuidor.
+     */
+    public function destroy(Prestamo $prestamo)
+    {
+        $operador = $this->operador();
+
+        if ($redirect = $this->verificarBloqueoGerencial($operador)) {
+            return $redirect;
+        }
+
+        if ($operador && $operador->esAdministrador()) {
+            return redirect()->route('prestamos.show', $prestamo)
+                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
+        }
+
+        // Si es distribuidor, verificar que sea el creador del préstamo
+        if ($operador && $operador->esDistribuidor() && $prestamo->created_by_user_id !== $operador->id) {
+            return back()->with('error', 'No tienes permiso para desactivar este préstamo.');
+        }
+
+        // REGLA CRUCIAL: Solo préstamos en estado 'pendiente' pueden ser desactivados por el distribuidor
+        if ($prestamo->estado !== 'pendiente' && $prestamo->estado_entrega !== 'pendiente') {
+            return back()->with('error', "No es posible desactivar este vale porque ya fue entregado y se encuentra en estado '{$prestamo->estado}'.");
+        }
+
+        $prestamo->update([
+            'estado' => 'desactivado',
+            'estado_entrega' => 'cancelado',
+            'activo' => false,
+            'desactivado_at' => now(),
+            'desactivado_by_user_id' => Auth::id() ?? $operador?->id,
+        ]);
+
+        return redirect()->route('prestamos.index')
+            ->with('success', "El vale con Referencia {$prestamo->referencia} ha sido desactivado y cancelado exitosamente. La línea de crédito fue liberada.");
     }
 
     /**

@@ -42,9 +42,16 @@ class DistribuidorController extends Controller
         $totalClientes = Cliente::where('created_by_user_id', $distribuidor->id)->count();
         $clientesActivos = Cliente::where('created_by_user_id', $distribuidor->id)->where('activo', true)->count();
 
-        // Préstamos / Vales activos
+        // Préstamos / Vales activos (entregados)
         $prestamosActivos = Prestamo::where('created_by_user_id', $distribuidor->id)
             ->where('estado', 'activo')
+            ->with(['cliente', 'productoVale'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Préstamos / Vales pendientes de entrega en caja
+        $prestamosPendientes = Prestamo::where('created_by_user_id', $distribuidor->id)
+            ->where('estado', 'pendiente')
             ->with(['cliente', 'productoVale'])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -76,6 +83,7 @@ class DistribuidorController extends Controller
             'totalClientes',
             'clientesActivos',
             'prestamosActivos',
+            'prestamosPendientes',
             'totalPrestadoActivo',
             'totalAdeudoPendiente',
             'totalCobrado',

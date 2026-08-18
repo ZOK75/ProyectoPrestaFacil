@@ -106,16 +106,6 @@
                 </div>
             </div>
 
-            <!-- Nota Informativa de Categoría Inicial Cobre -->
-            <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-2.5">
-                <div class="w-6 h-6 rounded-lg bg-amber-500/20 flex items-center justify-center font-bold text-amber-400 shrink-0">
-                    🥉
-                </div>
-                <div>
-                    <strong>Categoría Inicial Automática:</strong> Si el rol asignado es <strong>Distribuidor / Distribuidora</strong>, iniciará siempre en <strong>Categoría Cobre</strong> por regla del sistema. Podrá ascender de categoría en la edición de su perfil.
-                </div>
-            </div>
-
             <!-- Botones -->
             <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
                 <a href="{{ route('usuarios.index') }}" class="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-sm font-semibold transition">

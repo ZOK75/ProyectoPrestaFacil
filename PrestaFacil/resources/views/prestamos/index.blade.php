@@ -154,8 +154,10 @@
 
                 <select name="estado" class="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none">
                     <option value="">Todos estados</option>
-                    <option value="activo" {{ request('estado') === 'activo' ? 'selected' : '' }}>Activos</option>
-                    <option value="finalizado" {{ request('estado') === 'finalizado' ? 'selected' : '' }}>Liquidados</option>
+                    <option value="pendiente" {{ request('estado') === 'pendiente' ? 'selected' : '' }}>• Pendientes (Caja)</option>
+                    <option value="activo" {{ request('estado') === 'activo' ? 'selected' : '' }}>• Activos</option>
+                    <option value="finalizado" {{ request('estado') === 'finalizado' ? 'selected' : '' }}>• Liquidados</option>
+                    <option value="desactivado" {{ request('estado') === 'desactivado' ? 'selected' : '' }}>✕ Desactivados</option>
                 </select>
 
                 <button type="submit" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition">
@@ -168,7 +170,7 @@
     <!-- Lista Móvil de Referencias de Préstamo -->
     <div class="space-y-3">
         @forelse($prestamos as $prestamo)
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg space-y-3 relative overflow-hidden">
+            <div class="bg-slate-900 border @if($prestamo->esPendiente()) border-amber-500/30 @else border-slate-800 @endif rounded-2xl p-4 shadow-lg space-y-3 relative overflow-hidden">
                 
                 <!-- Encabezado con Referencia y Badge Prevale/Vale -->
                 <div class="flex items-start justify-between gap-2 border-b border-slate-800 pb-2.5">
@@ -191,7 +193,15 @@
                     </div>
 
                     <div>
-                        @if($prestamo->estado === 'activo')
+                        @if($prestamo->esPendiente())
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 animate-pulse">
+                                * Pendiente Caja
+                            </span>
+                        @elseif($prestamo->estaCancelado())
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                ✕ Desactivado
+                            </span>
+                        @elseif($prestamo->estado === 'activo')
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                                 • Activo
                             </span>
@@ -243,11 +253,24 @@
 
                 <!-- Botones Móviles Táctiles -->
                 <div class="flex items-center gap-2 pt-1">
-                    <a href="{{ route('prestamos.show', $prestamo) }}" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold text-center transition flex items-center justify-center gap-1">
+                    <a href="{{ route('prestamos.show', $prestamo) }}" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold text-center transition flex items-center justify-center gap-1">
                         Estado de Cuenta
                     </a>
 
-                    @if(!$prestamo->estaPagado() && (!Auth::check() || (!Auth::user()->esDistribuidor() && !Auth::user()->esAdministrador())))
+                    @if($prestamo->puedeDesactivarsePorDistribuidor() && Auth::check() && (Auth::user()->esDistribuidor() || Auth::user()->id === $prestamo->created_by_user_id))
+                        <form action="{{ route('prestamos.destroy', $prestamo) }}" method="POST" class="flex-1" onsubmit="return confirm('¿Estás seguro de desactivar y cancelar este vale pendiente? Se liberará la línea de crédito de inmediato.');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="w-full py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold text-center transition flex items-center justify-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                                Desactivar Vale
+                            </button>
+                        </form>
+                    @endif
+
+                    @if($prestamo->esActivo() && !$prestamo->estaPagado() && (!Auth::check() || (!Auth::user()->esDistribuidor() && !Auth::user()->esAdministrador())))
                         <a href="{{ route('prestamos.pago', $prestamo) }}" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold text-center shadow-lg transition flex items-center justify-center gap-1">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>

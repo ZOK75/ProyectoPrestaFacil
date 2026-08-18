@@ -112,9 +112,12 @@
                                 Canje
                             </a>
                         @elseif(Auth::user()->esCoordinador())
-                            <!-- Opciones para Coordinador Desktop -->
-                            <a href="{{ route('autorizaciones.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('autorizaciones.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
-                                Autorizaciones
+                            <!-- Opciones para Coordinador Desktop y Tablet -->
+                            <a href="{{ route('coordinador.dashboard') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('coordinador.dashboard') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Inicio
+                            </a>
+                            <a href="{{ route('coordinador.prestamos') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('coordinador.prestamos') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                Préstamos
                             </a>
                         @elseif(Auth::user()->esVerificador())
                             <!-- Verificador no tiene enlaces extra en el header -->
@@ -218,20 +221,21 @@
                         </a>
                     @endif
 
-                    <!-- Campana de Notificaciones (Cajeros y Coordinadores) -->
-                    @if(Auth::user()->esCajero() || Auth::user()->esCoordinador())
+                    <!-- Campana de Notificaciones (Cajeros, Coordinadores y Gerentes) -->
+                    @if(Auth::user()->esCajero() || Auth::user()->esCoordinador() || Auth::user()->esGerenteGeneral() || Auth::user()->esGerenteSucursal())
                         @php
-                            $conteoNotifCajero = Auth::user()->conteoNotificacionesSinLeer();
+                            $conteoNotifUsuario = Auth::user()->conteoNotificacionesSinLeer();
+                            $rutaCampana = Auth::user()->esCajero() ? route('cajero.notificaciones') : route('notificaciones.index');
                         @endphp
-                        <a href="{{ route('cajero.notificaciones') }}" 
+                        <a href="{{ $rutaCampana }}" 
                            class="relative p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition border border-transparent hover:border-slate-700" 
                            title="Notificaciones">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                             </svg>
-                            @if($conteoNotifCajero > 0)
+                            @if($conteoNotifUsuario > 0)
                                 <span class="absolute -top-1 -right-1 flex h-4.5 w-4.5 min-w-[18px] min-h-[18px] items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-lg shadow-rose-500/40 animate-bounce">
-                                    {{ $conteoNotifCajero > 9 ? '9+' : $conteoNotifCajero }}
+                                    {{ $conteoNotifUsuario > 9 ? '9+' : $conteoNotifUsuario }}
                                 </span>
                             @endif
                         </a>
@@ -466,13 +470,21 @@
 
                 @elseif(Auth::user()->esCoordinador())
                     <!-- Opciones de Coordinador en Drawer -->
-                    <a href="{{ route('autorizaciones.index') }}" @click="mobileMenuOpen = false" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold {{ request()->routeIs('autorizaciones.*') ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800' }}">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span>Bandeja de Autorizaciones</span>
+                    <a href="{{ route('coordinador.dashboard') }}" @click="mobileMenuOpen = false" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold {{ request()->routeIs('coordinador.dashboard') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-300 hover:bg-slate-800' }}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                        <span>Inicio (Dashboard)</span>
                     </a>
-                    <a href="{{ route('producto-vales.index') }}" @click="mobileMenuOpen = false" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold {{ request()->routeIs('producto-vales.*') ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800' }}">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
-                        <span>Catálogo de Vales</span>
+                    <a href="{{ route('coordinador.prestamos') }}" @click="mobileMenuOpen = false" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold {{ request()->routeIs('coordinador.prestamos') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-300 hover:bg-slate-800' }}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"/></svg>
+                        <span>Préstamos</span>
+                    </a>
+                    <a href="{{ route('coordinador.solicitudes.index') }}" @click="mobileMenuOpen = false" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold {{ request()->routeIs('coordinador.solicitudes.*') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-300 hover:bg-slate-800' }}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span>Solicitudes de Distribuidora</span>
+                    </a>
+                    <a href="{{ route('autorizaciones.index') }}" @click="mobileMenuOpen = false" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold {{ request()->routeIs('autorizaciones.*') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-300 hover:bg-slate-800' }}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                        <span>Bandeja de Autorizaciones</span>
                     </a>
 
                 @elseif(Auth::user()->esVerificador())
@@ -504,6 +516,25 @@
                     <a href="{{ route('usuarios.index') }}" @click="mobileMenuOpen = false" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold {{ request()->routeIs('usuarios.*') ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800' }}">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                         <span>Gestión de Usuarios</span>
+                    </a>
+
+                    @php
+                        $conteoNotifGerente = Auth::user()->conteoNotificacionesSinLeer();
+                    @endphp
+                    <a href="{{ route('notificaciones.index') }}" 
+                       @click="mobileMenuOpen = false" 
+                       class="flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition {{ request()->routeIs('notificaciones.*') ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-300 hover:bg-slate-800' }}">
+                        <div class="flex items-center gap-3">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                            </svg>
+                            <span>Notificaciones</span>
+                        </div>
+                        @if($conteoNotifGerente > 0)
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white">
+                                {{ $conteoNotifGerente > 9 ? '9+' : $conteoNotifGerente }}
+                            </span>
+                        @endif
                     </a>
 
                     @if(Auth::user()->esAdministrador())

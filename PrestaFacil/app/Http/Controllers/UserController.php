@@ -144,10 +144,10 @@ class UserController extends Controller
             return back()->withErrors(['sucursal_id' => 'No tienes permiso para asignar usuarios a esta sucursal.'])->withInput();
         }
 
-        // Validación estricta: Ningún rol puede crear usuarios con el rol Distribuidor
+        // Validación estricta: Ningún gerente puede crear usuarios con el rol Distribuidor manualmente
         $rolSeleccionado = Rol::find($data['rol_id']);
         if ($rolSeleccionado && in_array(strtolower($rolSeleccionado->nombre), ['distribuidor', 'distribuidora'])) {
-            return back()->withErrors(['rol_id' => 'Ningún rol tiene permitido registrar usuarios con el rol de Distribuidor.'])->withInput();
+            return back()->withErrors(['rol_id' => 'Las cuentas con rol de Distribuidora solo pueden darse de alta a través del proceso de solicitud, verificación presencial y aprobación de expediente.'])->withInput();
         }
 
         $data['categoria_distribuidor'] = null;

@@ -134,6 +134,56 @@
         </div>
     </div>
 
+    <!-- Sección: Solicitudes de Traspaso de Distribuidoras (Pendientes de Autorización Corporativa / Gerencial) -->
+    @if(isset($transferenciasPendientesGerente) && $transferenciasPendientesGerente->count() > 0)
+        <div class="bg-slate-900 border border-purple-500/40 rounded-2xl shadow-xl overflow-hidden">
+            <div class="p-6 border-b border-slate-800 bg-purple-950/20 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 font-bold">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Traspasos de Distribuidora Pendientes de Autorización</h2>
+                        <p class="text-slate-400 text-xs mt-0.5">El coordinador receptor aceptó la solicitud. Como Gerente General puedes revisar y autorizar el traspaso a nivel corporativo.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divide-y divide-slate-800">
+                @foreach($transferenciasPendientesGerente as $tpg)
+                    <div class="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-800/30 transition">
+                        <div class="space-y-1.5">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-bold text-white text-sm">{{ $tpg->distribuidor?->name }}</span>
+                                <span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                    Cat. {{ $tpg->distribuidor?->categoria_distribuidor ?? 'Estándar' }}
+                                </span>
+                                <span class="text-xs text-slate-500 font-mono">Ref: {{ $tpg->distribuidor?->referenciaPago() }}</span>
+                            </div>
+                            <p class="text-xs text-slate-300">
+                                De: <strong class="text-slate-200">{{ $tpg->coordinadorEmisor?->name }}</strong> (Sucursal: {{ $tpg->sucursalOrigen?->nombre }}) 
+                                &rarr; Hacia: <strong class="text-indigo-300">{{ $tpg->coordinadorReceptor?->name }}</strong> (Sucursal: {{ $tpg->sucursalDestino?->nombre }})
+                            </p>
+                            <p class="text-xs text-slate-400 italic bg-slate-950/40 p-2 rounded-lg border border-slate-800">
+                                "{{ $tpg->motivo }}"
+                            </p>
+                        </div>
+
+                        <div class="shrink-0">
+                            <a href="{{ route('gerente-sucursal.transferencias.revisar', $tpg) }}" 
+                               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-900/30 transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                Revisar y Dictaminar
+                            </a>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <!-- Sección: Solicitudes de Distribuidor (Decisión Final del Gerente General) -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
         <div class="p-6 border-b border-slate-800">
@@ -151,14 +201,14 @@
                 No hay solicitudes de distribuidores pendientes de tu revisión final.
             </div>
         @else
-            <div class="overflow-x-auto" x-data="{ openDecisionId: null }">
+            <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm text-slate-300">
                     <thead class="bg-slate-950/60 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-800">
                         <tr>
                             <th class="px-6 py-3.5">Candidata</th>
                             <th class="px-6 py-3.5">Sucursal / Coordinador</th>
                             <th class="px-6 py-3.5">Dictamen Verificador</th>
-                            <th class="px-6 py-3.5 text-right">Acciones</th>
+                            <th class="px-6 py-3.5 text-right">Acción</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800/60">
@@ -188,34 +238,11 @@
                                     <div class="text-[10px] text-slate-500 mt-0.5">Por: {{ $sol->verificador?->name ?? 'N/A' }}</div>
                                 </td>
                                 <td class="px-6 py-4 text-right">
-                                    <button @click="openDecisionId = (openDecisionId === {{ $sol->id }} ? null : {{ $sol->id }})" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-300 border border-slate-700 transition">
-                                        Evaluar
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr x-show="openDecisionId === {{ $sol->id }}" class="bg-slate-950/40" style="display: none;">
-                                <td colspan="4" class="px-6 py-4">
-                                    <form method="POST" action="{{ route('gerente-general.solicitudes.decidir', $sol->id) }}" class="space-y-3">
-                                        @csrf
-                                        <input type="hidden" name="accion" id="dec_general_{{ $sol->id }}">
-                                        
-                                        <div>
-                                            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Notas de Gerencia (Opcional)</label>
-                                            <textarea name="observaciones_resolucion" rows="2" placeholder="Comentarios finales sobre esta decisión..."
-                                                      class="w-full bg-slate-900 border border-slate-850 rounded-xl text-white px-4 py-2.5 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none transition"></textarea>
-                                        </div>
-
-                                        <div class="flex justify-end gap-2">
-                                            <button type="submit" onclick="document.getElementById('dec_general_{{ $sol->id }}').value = 'rechazar'; return confirm('¿Rechazar definitivamente a esta candidata?')"
-                                                    class="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
-                                                ✕ Rechazar Definitivamente
-                                            </button>
-                                            <button type="submit" onclick="document.getElementById('dec_general_{{ $sol->id }}').value = 'aprobar'; return confirm('¿Aprobar y pasar a creación de cuenta?')"
-                                                    class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/20 text-xs font-bold transition">
-                                                ✓ Aprobar Prospecto
-                                            </button>
-                                        </div>
-                                    </form>
+                                    <a href="{{ route('gerente-general.solicitudes.comparar', $sol->id) }}" 
+                                       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white shadow-md shadow-indigo-950/20 transition">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                        Comparar y Dictaminar
+                                    </a>
                                 </td>
                             </tr>
                         @endforeach

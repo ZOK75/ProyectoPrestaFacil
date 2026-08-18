@@ -79,16 +79,19 @@ class AutorizacionController extends Controller
 
         DB::transaction(function () use ($request, $solicitud, $user) {
             $solicitud->aprobar($user, $request->observaciones);
-            
-            // Si es conciliación manual, aplicamos el cambio
+
+            // Si es conciliación manual, aplicamos el cambio y registramos auditoría de conciliación
             if ($solicitud->tipo === 'conciliacion_manual') {
                 $conciliacion = Conciliacion::find($solicitud->entidad_id);
                 if ($conciliacion) {
                     $conciliacion->update([
-                        'estado' => 'aprobada',
+                        'estado' => 'conciliado',
                         'autorizador_id' => $user->id,
                         'autorizador_rol' => $user->rol->nombre,
+                        'conciliado_por_user_id' => $user->id,
                         'resolved_at' => now(),
+                        'conciliado_at' => now(),
+                        'observaciones_resolucion' => $request->observaciones,
                     ]);
                 }
             }

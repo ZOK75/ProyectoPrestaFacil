@@ -39,13 +39,21 @@
             </div>
 
             <div>
-                @if($prestamo->estado === 'activo')
+                @if($prestamo->esPendiente())
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 animate-pulse">
+                        ⏳ Pendiente en Caja
+                    </span>
+                @elseif($prestamo->estaCancelado())
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                        ✕ Desactivado
+                    </span>
+                @elseif($prestamo->estado === 'activo')
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        Activo
+                        • Activo
                     </span>
                 @else
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
-                        Liquidado
+                        • Liquidado
                     </span>
                 @endif
             </div>
@@ -83,8 +91,33 @@
             </div>
         </div>
 
+        <!-- Alerta y Desactivación para Distribuidor si está pendiente -->
+        @if($prestamo->puedeDesactivarsePorDistribuidor() && Auth::check() && (Auth::user()->esDistribuidor() || Auth::user()->id === $prestamo->created_by_user_id))
+            <div class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2 text-xs">
+                <div class="flex items-center gap-2 text-amber-300 font-bold">
+                    <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span>Vale en Espera de Entrega en Ventanilla</span>
+                </div>
+                <p class="text-[11px] text-slate-400 leading-tight">
+                    Este vale aún no ha sido entregado por el cajero. Puedes desactivarlo y cancelar la referencia para liberar tu saldo de crédito.
+                </p>
+                <form action="{{ route('prestamos.destroy', $prestamo) }}" method="POST" onsubmit="return confirm('¿Estás seguro de desactivar y cancelar este vale pendiente? Se liberará la línea de crédito de inmediato.');">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="w-full py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition flex items-center justify-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                        Desactivar y Cancelar Vale
+                    </button>
+                </form>
+            </div>
+        @endif
+
         <!-- Botón de Cobro Móvil (Exclusivo para Caja/Cajero, oculto para Distribuidor y Administrador) -->
-        @if(!$prestamo->estaPagado() && (!Auth::check() || (!Auth::user()->esDistribuidor() && !Auth::user()->esAdministrador())))
+        @if($prestamo->esActivo() && !$prestamo->estaPagado() && (!Auth::check() || (!Auth::user()->esDistribuidor() && !Auth::user()->esAdministrador())))
             <div>
                 <a href="{{ route('prestamos.pago', $prestamo) }}" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold text-center shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-1.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

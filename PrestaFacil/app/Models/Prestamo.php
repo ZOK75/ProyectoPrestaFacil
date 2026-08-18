@@ -100,6 +100,21 @@ class Prestamo extends Model
         return $this->tipo === 'prevale';
     }
 
+    public function esPendiente(): bool
+    {
+        return $this->estado === 'pendiente' || ($this->estado_entrega === 'pendiente' && $this->estado !== 'desactivado');
+    }
+
+    public function esActivo(): bool
+    {
+        return $this->estado === 'activo';
+    }
+
+    public function puedeDesactivarsePorDistribuidor(): bool
+    {
+        return $this->esPendiente() && !$this->estaCancelado();
+    }
+
     public function estaPagado(): bool
     {
         return $this->estado === 'finalizado' || $this->adeudo_pendiente <= 0;

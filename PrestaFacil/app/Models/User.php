@@ -35,9 +35,11 @@ class User extends Authenticatable
         'password',
         'rol_id',
         'sucursal_id',
+        'coordinador_id',
         'categoria_distribuidor',
         'limite_credito',
         'limite_credito_anterior',
+        'multas',
         'referencia_pago_distribuidor',
         'puntos',
         'activo',
@@ -69,6 +71,7 @@ class User extends Authenticatable
             'desactivado_at' => 'datetime',
             'limite_credito' => 'decimal:2',
             'limite_credito_anterior' => 'decimal:2',
+            'multas' => 'decimal:2',
             'puntos' => 'integer',
         ];
     }
@@ -253,6 +256,7 @@ class User extends Authenticatable
 
     /**
      * Calcula el monto de crédito de vales en estado 'activo' que tiene ocupados el distribuidor.
+     * El límite de crédito no se ve afectado hasta que el vale es entregado y activado por el cajero.
      */
     public function creditoUtilizado(): float
     {
@@ -285,7 +289,7 @@ class User extends Authenticatable
     }
 
     /**
-     * Calcula los puntos acumulados por el distribuidor según el total de productos otorgados.
+     * Calcula los puntos acumulados por el distribuidor según el total de productos otorgados activos.
      * Fórmula: floor(Total en productos / Monto base) * Puntos base
      */
     public function puntosAcumulados(): int
@@ -295,7 +299,9 @@ class User extends Authenticatable
         }
 
         $config = Configuracion::actual();
-        $totalProductos = floatval(Prestamo::where('created_by_user_id', $this->id)->sum('monto_prestamo'));
+        $totalProductos = floatval(Prestamo::where('created_by_user_id', $this->id)
+            ->where('estado', 'activo')
+            ->sum('monto_prestamo'));
 
         return $config->calcularPuntosPorMonto($totalProductos);
     }
@@ -324,11 +330,48 @@ class User extends Authenticatable
     }
 
     /**
+     * Calcula el adeudo pendiente total acumulado de todos los préstamos activos de la distribuidora.
+     */
+    public function totalAdeudoPrestamos(): float
+    {
+        if (!$this->esDistribuidor()) {
+            return 0.0;
+        }
+
+        return floatval(Prestamo::where('created_by_user_id', $this->id)
+            ->where('estado', 'activo')
+            ->sum('adeudo_pendiente'));
+    }
+
+    /**
+     * Calcula la cuota quincenal total a cobrar en el periodo por todos los préstamos activos.
+     */
+    public function totalCuotaQuincenal(): float
+    {
+        if (!$this->esDistribuidor()) {
+            return 0.0;
+        }
+
+        return floatval(Prestamo::where('created_by_user_id', $this->id)
+            ->where('estado', 'activo')
+            ->sum('cuota_quincenal'));
+    }
+
+    /**
+     * Calcula el saldo total a pagar por la distribuidora (Adeudo de Préstamos + Multas acumuladas).
+     */
+    public function totalAdeudoGlobal(): float
+    {
+        return $this->totalAdeudoPrestamos() + floatval($this->multas ?? 0.0);
+    }
+
+    /**
      * Devuelve los roles que este usuario tiene permiso de asignar.
+     * Los distribuidores NO pueden crearse manualmente por ningún gerente (solo vía solicitud y verificación).
      */
     public function rolesPermitidos()
     {
-        $query = Rol::query();
+        $query = Rol::query()->whereNotIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']);
 
         if ($this->esGerenteGeneral()) {
             $query->where('nombre', '!=', 'Gerente General');
@@ -372,5 +415,55 @@ class User extends Authenticatable
     public function solicitudesDistribuidoresCreadas(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(SolicitudDistribuidor::class, 'coordinador_id')->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Coordinador asignado a esta distribuidora.
+     */
+    public function coordinador(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'coordinador_id');
+    }
+
+    /**
+     * Distribuidoras asignadas a este coordinador.
+     */
+    public function distribuidoresCoordinados(): HasMany
+    {
+        return $this->hasMany(User::class, 'coordinador_id');
+    }
+
+    /**
+     * Solicitudes de transferencia emitidas por este coordinador.
+     */
+    public function solicitudesTransferenciaEmitidas(): HasMany
+    {
+        return $this->hasMany(SolicitudTransferencia::class, 'coordinador_emisor_id')->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Solicitudes de transferencia recibidas por este coordinador.
+     */
+    public function solicitudesTransferenciaRecibidas(): HasMany
+    {
+        return $this->hasMany(SolicitudTransferencia::class, 'coordinador_receptor_id')->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Obtiene las distribuidoras bajo la supervisión de este coordinador.
+     */
+    public function misDistribuidorasQuery()
+    {
+        return User::whereHas('rol', function($q) {
+                $q->whereIn('nombre', ['Distribuidor', 'distribuidor', 'Distribuidora', 'distribuidora']);
+            })
+            ->where('activo', true)
+            ->where(function($q) {
+                $q->where('coordinador_id', $this->id)
+                  ->orWhere(function($sub) {
+                      $sub->whereNull('coordinador_id')
+                          ->where('sucursal_id', $this->sucursal_id);
+                  });
+            });
     }
 }

@@ -63,6 +63,13 @@ class GerenteSucursalController extends Controller
             ->orderBy('resolved_at', 'desc')
             ->get();
 
+        // Solicitudes de transferencias de distribuidora dirigidas a esta sucursal
+        $transferenciasPendientesGerente = \App\Models\SolicitudTransferencia::where('sucursal_destino_id', $sucursalId)
+            ->where('estado', 'pendiente_gerente')
+            ->with(['distribuidor', 'coordinadorEmisor', 'coordinadorReceptor', 'sucursalOrigen'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         return view('gerente-sucursal.dashboard', compact(
             'operador',
             'personalSucursal',
@@ -70,55 +77,323 @@ class GerenteSucursalController extends Controller
             'distribuidores',
             'solicitudesCreditoPendientes',
             'solicitudesEnEspera',
-            'solicitudesAprobadasSinCuenta'
+            'solicitudesAprobadasSinCuenta',
+            'transferenciasPendientesGerente'
         ));
     }
 
     /**
-     * Procesar la decisión final del Gerente (Aprobar o Rechazar)
-     * basándose en la solicitud "en espera" (después del Verificador).
+     * Vista comparativa no editable entre la solicitud del Coordinador y la del Verificador
      */
-    public function decidirSolicitudDistribuidor(Request $request, $id)
+    public function compararSolicitudDistribuidor(\App\Models\SolicitudDistribuidor $solicitud)
     {
-        $request->validate([
-            'accion' => 'required|in:aprobar,rechazar',
-            'observaciones_resolucion' => 'nullable|string|max:1000'
-        ]);
+        $user = Auth::user();
+        $esGeneral = $user->esGerenteGeneral() || $user->esAdministrador();
 
-        $solicitud = \App\Models\SolicitudDistribuidor::findOrFail($id);
+        if (!$esGeneral && $user->sucursal_id !== $solicitud->sucursal_id) {
+            abort(403, 'No tienes permiso para evaluar esta solicitud.');
+        }
 
-        if ($solicitud->sucursal_id !== Auth::user()->sucursal_id) {
-            abort(403, 'No tienes permiso para decidir sobre esta solicitud.');
+        $solicitud->load(['coordinador', 'verificador', 'sucursal']);
+
+        return view('gerente.solicitudes.comparar', compact('solicitud', 'esGeneral'));
+    }
+
+    /**
+     * Decisión gerencial comparativa y creación directa de la cuenta de distribuidora
+     */
+    public function decidirSolicitudConCuenta(Request $request, \App\Models\SolicitudDistribuidor $solicitud)
+    {
+        $user = Auth::user();
+        $esGeneral = $user->esGerenteGeneral() || $user->esAdministrador();
+
+        if (!$esGeneral && $user->sucursal_id !== $solicitud->sucursal_id) {
+            abort(403, 'No tienes permiso para evaluar esta solicitud.');
         }
 
         if ($solicitud->estado !== 'en espera') {
-            return back()->with('error', 'Esta solicitud ya no está en espera de decisión.');
+            return back()->with('error', 'Esta solicitud ya no se encuentra en espera de decisión.');
         }
 
-        if ($request->accion === 'aprobar') {
-            $solicitud->estado = 'aprobado';
-            $solicitud->observaciones_resolucion = $request->observaciones_resolucion;
-            $solicitud->resolved_at = now();
-            $solicitud->save();
+        $request->validate([
+            'accion' => 'required|in:aprobar,rechazar',
+            'observaciones_resolucion' => 'nullable|string|max:1000',
+            'email' => $request->accion === 'aprobar' ? 'required|email|max:255|unique:users,email' : 'nullable',
+            'limite_credito' => $request->accion === 'aprobar' ? 'required|numeric|min:1000' : 'nullable',
+        ], [
+            'email.required' => 'El correo electrónico institucional es obligatorio para dar de alta a la distribuidora.',
+            'email.unique' => 'Este correo electrónico ya está registrado en el sistema.',
+            'limite_credito.required' => 'Debes asignar un límite de crédito inicial.',
+            'limite_credito.min' => 'El límite de crédito inicial mínimo es de $1,000.',
+        ]);
 
-            return redirect()->route('gerente-sucursal.dashboard')
-                ->with('success', "La solicitud de {$solicitud->nombre_completo} ha sido APROBADA. Ahora debes crear su cuenta para activar su acceso.");
-        } else {
-            $solicitud->estado = 'rechazado';
-            $solicitud->observaciones_resolucion = $request->observaciones_resolucion;
-            $solicitud->resolved_at = now();
-            $solicitud->save();
+        if ($request->accion === 'rechazar') {
+            $solicitud->update([
+                'estado' => 'rechazado',
+                'observaciones_resolucion' => $request->observaciones_resolucion,
+                'resolved_at' => now(),
+            ]);
 
-            // Notificar al coordinador que fue rechazada (Paso 7/11)
+            // Notificar al coordinador
             \App\Models\NotificacionCajero::enviar(
                 $solicitud->coordinador_id,
-                'alerta',
-                'Solicitud Rechazada por Gerencia',
-                "La solicitud de {$solicitud->nombre_completo} fue rechazada por el Gerente. Verificador dictaminó: {$solicitud->dictamen_verificador}. Comentarios finales: " . ($request->observaciones_resolucion ?? 'Sin comentarios.')
+                'solicitud_rechazada',
+                'Solicitud de Distribuidora Rechazada',
+                "La solicitud de {$solicitud->nombre_completo} ha sido rechazada por " . ($esGeneral ? "Gerencia General" : "Gerencia de Sucursal") . "." . ($request->observaciones_resolucion ? " Motivo: \"{$request->observaciones_resolucion}\"" : "")
             );
 
-            return redirect()->route('gerente-sucursal.dashboard')
-                ->with('info', "La solicitud de {$solicitud->nombre_completo} ha sido RECHAZADA de forma definitiva.");
+            // Si lo rechazó el Gerente General, notificar a Gerencia de Sucursal
+            if ($esGeneral) {
+                $gerentesSucursal = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente Sucursal']))
+                    ->where('sucursal_id', $solicitud->sucursal_id)
+                    ->where('activo', true)
+                    ->get();
+
+                foreach ($gerentesSucursal as $gs) {
+                    \App\Models\NotificacionCajero::enviar(
+                        $gs->id,
+                        'solicitud_rechazada',
+                        'Solicitud Rechazada por Dirección General',
+                        "La Dirección General ha rechazado la postulación de {$solicitud->nombre_completo} en tu sucursal."
+                    );
+                }
+            }
+
+            $rutaVolver = $esGeneral ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
+            return redirect()->route($rutaVolver)
+                ->with('info', "La solicitud de {$solicitud->nombre_completo} ha sido rechazada definitivamente.");
         }
+
+        // APROBAR: Crear cuenta de usuario con la CURP como contraseña
+        $rolDistribuidor = \App\Models\Rol::where('nombre', 'Distribuidor')
+            ->orWhere('nombre', 'Distribuidora')
+            ->first();
+
+        if (!$rolDistribuidor) {
+            return back()->with('error', 'No se encontró el rol de Distribuidor en el sistema.');
+        }
+
+        // Usar datos verificados
+        $nombresFinal = $solicitud->getDatoVerificado('nombres');
+        $apellidosFinal = $solicitud->getDatoVerificado('apellidos');
+        $curpFinal = strtoupper(trim($solicitud->getDatoVerificado('curp')));
+        $nombreCompletoFinal = "{$nombresFinal} {$apellidosFinal}";
+
+        // Crear usuario con CURP como contraseña, sucursal del coordinador y límite de crédito
+        $newUser = User::create([
+            'name' => $nombreCompletoFinal,
+            'email' => $request->email,
+            'password' => \Illuminate\Support\Facades\Hash::make($curpFinal),
+            'rol_id' => $rolDistribuidor->id,
+            'sucursal_id' => $solicitud->sucursal_id,
+            'coordinador_id' => $solicitud->coordinador_id,
+            'limite_credito' => $request->limite_credito,
+            'categoria_distribuidor' => 'cobre',
+            'activo' => true,
+        ]);
+
+        $solicitud->update([
+            'estado' => 'aprobado',
+            'user_id' => $newUser->id,
+            'observaciones_resolucion' => $request->observaciones_resolucion,
+            'resolved_at' => now(),
+        ]);
+
+        // Notificar al coordinador
+        \App\Models\NotificacionCajero::enviar(
+            $solicitud->coordinador_id,
+            'solicitud_aprobada',
+            '¡Distribuidora Aprobada y Cuenta Activada!',
+            "La solicitud de {$nombreCompletoFinal} ha sido APROBADA. Su cuenta fue activada con correo: {$request->email}, contraseña inicial (su CURP): {$curpFinal} y línea de crédito: $" . number_format($request->limite_credito, 2) . "."
+        );
+
+        // Si lo aprobó Gerencia General, notificar al Gerente de Sucursal
+        if ($esGeneral) {
+            $gerentesSucursal = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente Sucursal']))
+                ->where('sucursal_id', $solicitud->sucursal_id)
+                ->where('activo', true)
+                ->get();
+
+            foreach ($gerentesSucursal as $gs) {
+                \App\Models\NotificacionCajero::enviar(
+                    $gs->id,
+                    'solicitud_aprobada',
+                    'Distribuidora Aprobada por Gerencia General',
+                    "La Gerencia General ha aprobado e incorporado a la distribuidora {$nombreCompletoFinal} a tu sucursal ({$solicitud->sucursal?->nombre})."
+                );
+            }
+        }
+
+        $rutaVolver = $esGeneral ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
+        return redirect()->route($rutaVolver)
+            ->with('success', "La distribuidora {$nombreCompletoFinal} ha sido APROBADA y dada de alta exitosamente en el sistema con su CURP como contraseña.");
+    }
+
+    /**
+     * Revisión de transferencia de distribuidora para Gerente de Sucursal o Gerente General
+     */
+    public function revisarTransferencia(\App\Models\SolicitudTransferencia $transferencia)
+    {
+        $gerente = Auth::user();
+        $esGeneral = $gerente->esGerenteGeneral() || $gerente->esAdministrador();
+
+        if (!$esGeneral && $gerente->sucursal_id !== $transferencia->sucursal_destino_id) {
+            abort(403, 'No tienes autorización para dictaminar sobre esta transferencia.');
+        }
+
+        $transferencia->load([
+            'distribuidor.sucursal',
+            'coordinadorEmisor.sucursal',
+            'coordinadorReceptor.sucursal',
+            'sucursalOrigen',
+            'sucursalDestino'
+        ]);
+
+        $distribuidora = $transferencia->distribuidor;
+        $prestamosActivos = \App\Models\Prestamo::with(['cliente', 'productoVale'])
+            ->where('created_by_user_id', $distribuidora->id)
+            ->where('estado', 'activo')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('gerente-sucursal.transferencias.show', compact('transferencia', 'distribuidora', 'prestamosActivos', 'esGeneral'));
+    }
+
+    /**
+     * Decisión final del Gerente (de Sucursal o General) sobre el traspaso de distribuidora
+     */
+    public function decidirTransferencia(Request $request, \App\Models\SolicitudTransferencia $transferencia)
+    {
+        $gerente = Auth::user();
+        $esGeneral = $gerente->esGerenteGeneral() || $gerente->esAdministrador();
+
+        if (!$esGeneral && $gerente->sucursal_id !== $transferencia->sucursal_destino_id) {
+            abort(403, 'No tienes autorización para dictaminar sobre esta transferencia.');
+        }
+
+        if ($transferencia->estado !== 'pendiente_gerente') {
+            return back()->with('error', 'Esta transferencia no está pendiente de autorización gerencial.');
+        }
+
+        $request->validate([
+            'accion' => 'required|in:aprobar,rechazar',
+            'observaciones_gerente' => 'nullable|string|max:600'
+        ]);
+
+        $distribuidora = $transferencia->distribuidor;
+        $emisor = $transferencia->coordinadorEmisor;
+        $receptor = $transferencia->coordinadorReceptor;
+
+        if ($request->accion === 'rechazar') {
+            $transferencia->update([
+                'estado' => 'rechazada_gerente',
+                'observaciones_gerente' => $request->observaciones_gerente,
+                'gerente_id' => $gerente->id,
+                'resolved_at' => now(),
+            ]);
+
+            // Si lo rechazó el Gerente General, se le notifica al Gerente de la Sucursal receptora
+            if ($esGeneral) {
+                $gerentesSucursal = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente Sucursal']))
+                    ->where('sucursal_id', $transferencia->sucursal_destino_id)
+                    ->where('activo', true)
+                    ->get();
+
+                foreach ($gerentesSucursal as $gs) {
+                    \App\Models\NotificacionCajero::enviar(
+                        $gs->id,
+                        'transferencia_rechazada_gerente',
+                        'Traspaso Rechazado por Dirección General',
+                        "La Dirección General ha rechazado el traspaso de {$distribuidora->name} a tu sucursal. " . ($request->observaciones_gerente ? "Observaciones: \"{$request->observaciones_gerente}\"" : ""),
+                        ['transferencia_id' => $transferencia->id]
+                    );
+                }
+            }
+
+            // Notificar a ambos coordinadores
+            \App\Models\NotificacionCajero::enviar(
+                $emisor->id,
+                'transferencia_rechazada_gerente',
+                'Traspaso de Distribuidora No Aprobado por Gerencia',
+                "La Gerencia " . ($esGeneral ? "General" : "de Sucursal") . " rechazó el traspaso de {$distribuidora->name}. " . ($request->observaciones_gerente ? "Observaciones: \"{$request->observaciones_gerente}\"" : ""),
+                ['transferencia_id' => $transferencia->id]
+            );
+
+            \App\Models\NotificacionCajero::enviar(
+                $receptor->id,
+                'transferencia_rechazada_gerente',
+                'Traspaso de Distribuidora No Aprobado por Gerencia',
+                "La Gerencia " . ($esGeneral ? "General" : "de Sucursal") . " rechazó la incorporación de {$distribuidora->name} a tu equipo. " . ($request->observaciones_gerente ? "Observaciones: \"{$request->observaciones_gerente}\"" : ""),
+                ['transferencia_id' => $transferencia->id]
+            );
+
+            $rutaRedireccion = $esGeneral ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
+            return redirect()->route($rutaRedireccion)
+                ->with('info', "Has rechazado el traspaso de la distribuidora {$distribuidora->name}.");
+        }
+
+        // APROBADA: Actualizar estado y formalizar el traspaso en la base de datos
+        $transferencia->update([
+            'estado' => 'aprobada',
+            'observaciones_gerente' => $request->observaciones_gerente,
+            'gerente_id' => $gerente->id,
+            'resolved_at' => now(),
+        ]);
+
+        // Reasignar distribuidora a su nuevo coordinador y nueva sucursal
+        $distribuidora->update([
+            'coordinador_id' => $transferencia->coordinador_receptor_id,
+            'sucursal_id' => $transferencia->sucursal_destino_id,
+        ]);
+
+        // Si la acepta el Gerente General, se le notifica al Gerente de la sucursal receptora
+        if ($esGeneral) {
+            $gerentesSucursal = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente Sucursal']))
+                ->where('sucursal_id', $transferencia->sucursal_destino_id)
+                ->where('activo', true)
+                ->get();
+
+            foreach ($gerentesSucursal as $gs) {
+                \App\Models\NotificacionCajero::enviar(
+                    $gs->id,
+                    'transferencia_completada',
+                    'Traspaso de Distribuidora Aprobado por Gerencia General',
+                    "El Gerente General {$gerente->name} ha autorizado el traspaso de la distribuidora {$distribuidora->name} a tu sucursal ({$transferencia->sucursalDestino?->nombre}), asignada al coordinador {$receptor->name}.",
+                    [
+                        'transferencia_id' => $transferencia->id,
+                        'url' => route('gerente-sucursal.dashboard')
+                    ]
+                );
+            }
+        }
+
+        // Notificar a todos los involucrados (Emisor, Receptor, Distribuidora)
+        \App\Models\NotificacionCajero::enviar(
+            $emisor->id,
+            'transferencia_completada',
+            'Traspaso de Distribuidora Formalizado',
+            "Se ha completado el traspaso de {$distribuidora->name} al coordinador {$receptor->name} (Sucursal: {$transferencia->sucursalDestino?->nombre}) con el visto bueno de " . ($esGeneral ? "Gerencia General" : "Gerencia de Sucursal") . ".",
+            ['transferencia_id' => $transferencia->id]
+        );
+
+        \App\Models\NotificacionCajero::enviar(
+            $receptor->id,
+            'transferencia_completada',
+            'Nueva Distribuidora Incorporada a tu Equipo',
+            "¡Traspaso formalizado! La distribuidora {$distribuidora->name} ha sido asignada formalmente a tu coordinación tras la autorización de " . ($esGeneral ? "Gerencia General" : "Gerencia de Sucursal") . ".",
+            ['transferencia_id' => $transferencia->id]
+        );
+
+        \App\Models\NotificacionCajero::enviar(
+            $distribuidora->id,
+            'cambio_coordinador_asignado',
+            'Actualización de tu Coordinador y Sucursal',
+            "Se ha formalizado tu cambio de coordinación. Tu nuevo coordinador es {$receptor->name} (Sucursal: {$transferencia->sucursalDestino?->nombre}).",
+            ['transferencia_id' => $transferencia->id]
+        );
+
+        $rutaRedireccion = $esGeneral ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
+        return redirect()->route($rutaRedireccion)
+            ->with('success', "Traspaso de {$distribuidora->name} APROBADO y formalizado exitosamente con el coordinador {$receptor->name}.");
     }
 }

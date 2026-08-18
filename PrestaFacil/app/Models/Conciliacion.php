@@ -17,6 +17,11 @@ class Conciliacion extends Model
     protected $fillable = [
         'prestamo_id',
         'pago_prestamo_id',
+        'distribuidora_id',
+        'referencia_original',
+        'referencia_conciliacion',
+        'fecha_pago',
+        'metodo_pago',
         'monto_original',
         'monto_corregido',
         'motivo',
@@ -24,20 +29,29 @@ class Conciliacion extends Model
         'solicitante_id',
         'autorizador_id',
         'autorizador_rol',
+        'conciliado_por_user_id',
         'estado',
         'observaciones_resolucion',
         'resolved_at',
+        'conciliado_at',
     ];
 
     protected $casts = [
+        'fecha_pago' => 'date',
         'monto_original' => 'decimal:2',
         'monto_corregido' => 'decimal:2',
         'resolved_at' => 'datetime',
+        'conciliado_at' => 'datetime',
     ];
 
     public function prestamo(): BelongsTo
     {
         return $this->belongsTo(Prestamo::class, 'prestamo_id');
+    }
+
+    public function distribuidora(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'distribuidora_id');
     }
 
     public function pago(): BelongsTo
@@ -55,6 +69,11 @@ class Conciliacion extends Model
         return $this->belongsTo(User::class, 'autorizador_id');
     }
 
+    public function conciliadoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'conciliado_por_user_id');
+    }
+
     public function esPendiente(): bool
     {
         return $this->estado === 'pendiente';
@@ -62,6 +81,6 @@ class Conciliacion extends Model
 
     public function estaAprobada(): bool
     {
-        return $this->estado === 'aprobada';
+        return in_array($this->estado, ['aprobada', 'conciliado']);
     }
 }

@@ -143,6 +143,7 @@
                         <th class="px-6 py-4">Plazo</th>
                         <th class="px-6 py-4">Total a Pagar</th>
                         <th class="px-6 py-4">Cuota 15na</th>
+                        <th class="px-6 py-4">Multa Retraso</th>
                         <th class="px-6 py-4">Estado / Desactivación</th>
                         <th class="px-6 py-4 text-right">Acciones</th>
                     </tr>
@@ -173,6 +174,9 @@
                             </td>
                             <td class="px-6 py-4 font-bold text-white">
                                 ${{ number_format($producto->cuota_quincenal, 2) }}
+                            </td>
+                            <td class="px-6 py-4 font-semibold text-rose-400">
+                                ${{ number_format($producto->multa ?? 0, 2) }}
                             </td>
                             <td class="px-6 py-4">
                                 @if($producto->activo)

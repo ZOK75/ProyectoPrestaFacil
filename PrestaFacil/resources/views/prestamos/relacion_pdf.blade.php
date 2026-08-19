@@ -112,64 +112,118 @@
             </div>
 
             @php
-                $totalQuincenalPeriodo = $prestamos->sum('cuota_quincenal');
-                $multasDistribuidora = floatval($operador->multas ?? 0.0);
-                $totalPagarGeneral = $totalQuincenalPeriodo + $multasDistribuidora;
                 $porcentajeComision = $operador->obtenerPorcentajeGanancia();
-                $totalComisiones = $totalQuincenalPeriodo * ($porcentajeComision / 100);
+                $totalComisionesSum = 0;
+                $totalPagosSum = 0;
+                $totalRecargosSum = 0;
+                $totalGeneralSum = 0;
+
+                foreach($prestamos as $p) {
+                    $totalPagos = max(1, intval($p->pagos_totales));
+                    $comisionRow = (($porcentajeComision / 100) * floatval($p->monto_prestamo)) / $totalPagos;
+                    $pagoRow = floatval($p->cuota_quincenal) - $comisionRow;
+                    
+                    // Multas acumuladas y cálculo de cortes vencidos
+                    $multaRow = floatval($p->multas ?? 0.0);
+                    $tieneRetraso = ($multaRow > 0);
+                    $multaValeRow = $p->multaConfigurada() > 0 ? $p->multaConfigurada() : 300.00;
+                    $cortesVencidosRow = ($tieneRetraso && $multaValeRow > 0) ? max(1, intval(round($multaRow / $multaValeRow))) : ($tieneRetraso ? 1 : 0);
+                    
+                    $pagoTotalFilaAnterior = $cortesVencidosRow * $pagoRow;
+                    $comisionAnteriorRow = $cortesVencidosRow * $comisionRow;
+                    // Recargos: si se retrasa un pago: multas acumuladas + pagos anteriores adeudados + comisiones anteriores
+                    $recargosRow = $tieneRetraso ? ($multaRow + $pagoTotalFilaAnterior + $comisionAnteriorRow) : 0.00;
+                    
+                    // Total fila redondeado al piso
+                    $totalFila = floor($pagoRow + $recargosRow);
+
+                    $totalComisionesSum += $comisionRow;
+                    $totalPagosSum += $pagoRow;
+                    $totalRecargosSum += $recargosRow;
+                    $totalGeneralSum += $totalFila;
+                }
+                $totalGeneralSum = floor($totalGeneralSum);
             @endphp
 
             <div class="text-left sm:text-right border-t sm:border-t-0 sm:border-l border-slate-300 pt-2 sm:pt-0 sm:pl-4 space-y-0.5">
-                <span class="text-[11px] uppercase font-bold text-slate-500 block">Total Quincenal: ${{ number_format($totalQuincenalPeriodo, 2) }}</span>
-                @if($multasDistribuidora > 0)
-                    <span class="text-[11px] uppercase font-bold text-rose-600 block">Multas Acumuladas: +${{ number_format($multasDistribuidora, 2) }}</span>
+                <span class="text-[11px] uppercase font-bold text-slate-500 block">Subtotal Pagos (Cuotas - Comisiones): ${{ number_format($totalPagosSum, 2) }}</span>
+                <span class="text-[11px] uppercase font-bold text-indigo-600 block">Total Comisiones (Cat. {{ ucfirst($operador->categoria_distribuidor ?? 'Cobre') }} {{ $porcentajeComision }}%): ${{ number_format($totalComisionesSum, 2) }}</span>
+                @if($totalRecargosSum > 0)
+                    <span class="text-[11px] uppercase font-bold text-rose-600 block">Recargos por Retraso (Multa + Pagos Anteriores + Comisiones): +${{ number_format($totalRecargosSum, 2) }}</span>
                 @endif
-                <span class="text-xl font-black text-slate-900 block">Total a PAGAR: ${{ number_format($totalPagarGeneral, 2) }}</span>
+                <span class="text-xl font-black text-slate-900 block">Total a PAGAR: ${{ number_format($totalGeneralSum, 2) }}</span>
             </div>
         </div>
 
-        <!-- Tabla de Estado de Cuenta / Relación de Clientes con Préstamos -->
+        <!-- Tabla de Conciliación / Relación de Cobranza -->
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs border border-slate-900">
-                <thead class="bg-slate-100 text-slate-900 font-extrabold uppercase border-b border-slate-900">
+                <thead class="bg-slate-100 text-slate-900 font-extrabold uppercase border-b border-slate-900 text-[11px]">
                     <tr>
                         <th class="border-r border-slate-900 px-2 py-2 text-center w-8">#</th>
                         <th class="border-r border-slate-900 px-3 py-2">Producto</th>
                         <th class="border-r border-slate-900 px-3 py-2">Cliente</th>
                         <th class="border-r border-slate-900 px-3 py-2 text-center">Pagos Realizados</th>
                         <th class="border-r border-slate-900 px-3 py-2 text-right">Comisión</th>
-                        <th class="border-r border-slate-900 px-3 py-2 text-right">Cuota Qna</th>
-                        <th class="border-r border-slate-900 px-3 py-2 text-right">Adeudo Pendiente</th>
-                        <th class="px-3 py-2 text-right">Total Periodo</th>
+                        <th class="border-r border-slate-900 px-3 py-2 text-right">Pago</th>
+                        <th class="border-r border-slate-900 px-3 py-2 text-right">Recargos</th>
+                        <th class="px-3 py-2 text-right">Total</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-900">
                     @forelse($prestamos as $index => $p)
                         @php
-                            $comisionRow = $p->cuota_quincenal * ($porcentajeComision / 100);
+                            $totalPagos = max(1, intval($p->pagos_totales));
+                            // Comisión = Categoría de distribuidora (%) * monto préstamo / total de pagos
+                            $comision = (($porcentajeComision / 100) * floatval($p->monto_prestamo)) / $totalPagos;
+                            // Pago = Cuota 15nal - comisión
+                            $pago = floatval($p->cuota_quincenal) - $comision;
+                            
+                            // Multas acumuladas y cálculo de cortes vencidos
+                            $multa = floatval($p->multas ?? 0.0);
+                            $tieneRetraso = ($multa > 0);
+                            $multaVale = $p->multaConfigurada() > 0 ? $p->multaConfigurada() : 300.00;
+                            $cortesVencidos = ($tieneRetraso && $multaVale > 0) ? max(1, intval(round($multa / $multaVale))) : ($tieneRetraso ? 1 : 0);
+                            
+                            $pagoTotalFilaAnterior = $cortesVencidos * $pago;
+                            $comisionAnterior = $cortesVencidos * $comision;
+                            
+                            // Recargos: si se retrasa un pago: multas acumuladas + pagos anteriores adeudados + comisiones anteriores
+                            $recargos = $tieneRetraso ? ($multa + $pagoTotalFilaAnterior + $comisionAnterior) : 0.00;
+                            
+                            // Total = suma de pago actual + recargos acumulados (redondeado al piso)
+                            $totalFila = floor($pago + $recargos);
                         @endphp
                         <tr>
+                            <!-- #: número de préstamo a partir de 1 -->
                             <td class="border-r border-slate-900 px-2 py-2.5 text-center font-bold">{{ $index + 1 }}</td>
+                            <!-- Producto: Nombre de producto -->
                             <td class="border-r border-slate-900 px-3 py-2.5 font-semibold">
-                                {{ $p->productoVale->clave }} ({{ $p->pagos_totales }} 15nas)
+                                {{ $p->productoVale->nombre ?? $p->productoVale->clave }}
                             </td>
+                            <!-- Cliente: Nombre de cliente -->
                             <td class="border-r border-slate-900 px-3 py-2.5 font-medium">
-                                {{ $p->cliente->nombre }}
+                                {{ $p->cliente->nombre_completo ?? $p->cliente->nombre }}
                             </td>
+                            <!-- Pagos Realizados: ejemplo 1/10 -->
                             <td class="border-r border-slate-900 px-3 py-2.5 text-center font-bold">
                                 {{ $p->pagos_realizados }}/{{ $p->pagos_totales }}
                             </td>
-                            <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono">
-                                ${{ number_format($comisionRow, 2) }}
+                            <!-- Comisión -->
+                            <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-indigo-900 font-semibold">
+                                ${{ number_format($comision, 2) }}
                             </td>
+                            <!-- Pago -->
                             <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono font-bold">
-                                ${{ number_format($p->cuota_quincenal, 2) }}
+                                ${{ number_format($pago, 2) }}
                             </td>
-                            <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-slate-700">
-                                ${{ number_format($p->adeudo_pendiente, 2) }}
+                            <!-- Recargos -->
+                            <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono font-bold {{ $recargos > 0 ? 'text-rose-700' : 'text-slate-500' }}">
+                                ${{ number_format($recargos, 2) }}
                             </td>
-                            <td class="px-3 py-2.5 text-right font-mono font-bold">
-                                ${{ number_format($p->cuota_quincenal, 2) }}
+                            <!-- Total (redondeado al piso) -->
+                            <td class="px-3 py-2.5 text-right font-mono font-black text-slate-950">
+                                ${{ number_format($totalFila, 2) }}
                             </td>
                         </tr>
                     @empty
@@ -182,22 +236,12 @@
                 </tbody>
                 <tfoot class="bg-slate-100 font-extrabold border-t-2 border-slate-900">
                     <tr>
-                        <td colspan="4" class="border-r border-slate-900 px-3 py-2.5 text-right uppercase">Subtotales</td>
-                        <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono">${{ number_format($totalComisiones, 2) }}</td>
-                        <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono">${{ number_format($totalQuincenalPeriodo, 2) }}</td>
-                        <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono">${{ number_format($prestamos->sum('adeudo_pendiente'), 2) }}</td>
-                        <td class="px-3 py-2.5 text-right font-mono text-slate-900 text-sm">${{ number_format($totalQuincenalPeriodo, 2) }}</td>
+                        <td colspan="4" class="border-r border-slate-900 px-3 py-2.5 text-right uppercase">Totales</td>
+                        <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-indigo-900">${{ number_format($totalComisionesSum, 2) }}</td>
+                        <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-slate-900">${{ number_format($totalPagosSum, 2) }}</td>
+                        <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-rose-700">${{ number_format($totalRecargosSum, 2) }}</td>
+                        <td class="px-3 py-2.5 text-right font-mono text-slate-950 text-sm">${{ number_format($totalGeneralSum, 2) }}</td>
                     </tr>
-                    @if($multasDistribuidora > 0)
-                        <tr class="bg-rose-50 text-rose-900 border-t border-slate-900">
-                            <td colspan="7" class="border-r border-slate-900 px-3 py-2 text-right uppercase font-black">Multas Acumuladas de la Distribuidora</td>
-                            <td class="px-3 py-2 text-right font-mono font-black text-rose-700">${{ number_format($multasDistribuidora, 2) }}</td>
-                        </tr>
-                        <tr class="bg-slate-200 text-slate-950 border-t-2 border-slate-900">
-                            <td colspan="7" class="border-r border-slate-900 px-3 py-2 text-right uppercase font-black">Total General a Pagar (Cuotas + Multas)</td>
-                            <td class="px-3 py-2 text-right font-mono font-black text-base">${{ number_format($totalPagarGeneral, 2) }}</td>
-                        </tr>
-                    @endif
                 </tfoot>
             </table>
         </div>

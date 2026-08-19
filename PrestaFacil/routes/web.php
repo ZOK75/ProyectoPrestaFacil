@@ -78,6 +78,7 @@ Route::middleware(['auth'])->group(function () {
         // Configuración General del Sistema (Lectura para Administrador, Edición solo Gerente General)
         Route::get('configuracion-general', [ConfiguracionController::class, 'edit'])->name('configuracion-general.edit');
         Route::put('configuracion-general', [ConfiguracionController::class, 'update'])->name('configuracion-general.update');
+        Route::post('configuracion-general/simular-corte', [ConfiguracionController::class, 'simularCorte'])->name('configuracion-general.simular-corte');
     });
 
     // ──────────────────────────────────────────

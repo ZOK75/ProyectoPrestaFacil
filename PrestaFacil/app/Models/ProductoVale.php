@@ -25,6 +25,7 @@ class ProductoVale extends Model
         'plazo_quincenas',
         'comision_apertura',
         'tasa_interes_quincenal',
+        'multa',
         'activo',
         'desactivado_at',
         'created_by_user_id',
@@ -38,6 +39,7 @@ class ProductoVale extends Model
         'plazo_quincenas' => 'integer',
         'comision_apertura' => 'decimal:2',
         'tasa_interes_quincenal' => 'decimal:2',
+        'multa' => 'decimal:2',
         'activo' => 'boolean',
         'desactivado_at' => 'datetime',
     ];

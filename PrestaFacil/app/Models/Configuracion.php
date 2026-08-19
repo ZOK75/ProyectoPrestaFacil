@@ -237,6 +237,27 @@ class Configuracion extends Model
     }
  
     /**
+     * Avanza automáticamente la fecha de corte y la fecha límite de pago 15 días.
+     */
+    public function avanzarCicloQuincenal(): void
+    {
+        $corteActual = $this->fecha_corte;
+        $limiteActual = $this->fecha_limite_pago;
+
+        $nuevoCorte = $corteActual->copy()->addDays(15);
+        $nuevoLimite = $limiteActual->copy()->addDays(15);
+
+        $this->update([
+            'dia_corte' => $nuevoCorte->day,
+            'hora_corte' => $nuevoCorte->format('H:i:s'),
+            'dia_limite_pago' => $nuevoLimite->day,
+            'hora_limite_pago' => $nuevoLimite->format('H:i:s'),
+            'fecha_corte' => $nuevoCorte,
+            'fecha_limite_pago' => $nuevoLimite,
+        ]);
+    }
+
+    /**
      * La configuración general es un singleton: siempre debe existir
      * una sola fila.
      */

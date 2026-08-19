@@ -24,7 +24,7 @@ class UpdateConfiguracionRequest extends FormRequest
             'hora_corte' => ['required', 'string'],
             'dia_limite_pago' => ['required', 'integer', 'min:1', 'max:31'],
             'hora_limite_pago' => ['required', 'string'],
-            'multa_adeudo' => ['required', 'numeric', 'min:0'],
+            'multa_adeudo' => ['nullable', 'numeric', 'min:0'],
             'comision_cobre' => ['required', 'numeric', 'min:0', 'max:100'],
             'comision_plata' => ['required', 'numeric', 'min:0', 'max:100'],
             'comision_oro' => ['required', 'numeric', 'min:0', 'max:100'],

@@ -241,36 +241,54 @@ class CorteCobranzaService
                         continue;
                     }
 
-                    // REGLA 3: Las multas son por distribuidora y actualizan la relación
+                    // REGLA: Las multas se calculan y aplican por cada vale individual
                     if ($relacion && !$relacion->multa_aplicada_at && $relacion->estado_pago === 'pendiente') {
-                        $montoMulta = floatval($config->multa_adeudo ?? 300.00);
+                        $prestamosActivos = Prestamo::where('created_by_user_id', $dist->id)
+                            ->where('estado', 'activo')
+                            ->where('adeudo_pendiente', '>', 0)
+                            ->with('productoVale')
+                            ->get();
 
-                        // Multa por distribuidora
-                        $dist->increment('multas', $montoMulta);
+                        $multaTotalPeriodo = 0.0;
+                        foreach ($prestamosActivos as $prestamo) {
+                            $multaVale = $prestamo->multaConfigurada();
+                            if ($multaVale > 0) {
+                                $prestamo->increment('multas', $multaVale);
+                                $multaTotalPeriodo += $multaVale;
+                            }
+                        }
 
-                        $relacion->update([
-                            'monto_total_periodo' => $total15nalExigible,
-                            'monto_pagado' => $montoPagado,
-                            'multa_aplicada' => $montoMulta,
-                            'multa_aplicada_at' => $ahora,
-                            'adeudo_pendiente' => $adeudo15nalPendiente + $montoMulta,
-                        ]);
+                        if ($multaTotalPeriodo > 0) {
+                            $dist->increment('multas', $multaTotalPeriodo);
 
-                        NotificacionCajero::create([
-                            'user_id' => $dist->id,
-                            'tipo' => 'multa_adeudo_aplicada',
-                            'titulo' => '⚠️ Multa por Adeudo Vencido',
-                            'mensaje' => 'La fecha límite de pago (' . $config->fecha_limite_pago->format('d/m/Y H:i') . ') ha vencido con saldo pendiente. Se ha aplicado una multa por adeudo de $' . number_format($montoMulta, 2) . ' a tu cuenta.',
-                            'data' => [
-                                'multa' => $montoMulta,
-                                'fecha_limite' => $config->fecha_limite_pago->toIso8601String(),
-                            ],
-                            'leida' => false,
-                        ]);
+                            $relacion->update([
+                                'monto_total_periodo' => $total15nalExigible,
+                                'monto_pagado' => $montoPagado,
+                                'multa_aplicada' => $multaTotalPeriodo,
+                                'multa_aplicada_at' => $ahora,
+                                'adeudo_pendiente' => $adeudo15nalPendiente + $multaTotalPeriodo,
+                            ]);
 
-                        $resultados['multas_aplicadas']++;
+                            NotificacionCajero::create([
+                                'user_id' => $dist->id,
+                                'tipo' => 'multa_adeudo_aplicada',
+                                'titulo' => '⚠️ Multas Aplicadas por Vales Vencidos',
+                                'mensaje' => 'La fecha límite de pago (' . $config->fecha_limite_pago->format('d/m/Y H:i') . ') ha vencido con saldo pendiente. Se han aplicado los cargos moratorios correspondientes por cada vale con adeudo (Total multas: $' . number_format($multaTotalPeriodo, 2) . ').',
+                                'data' => [
+                                    'multa_total' => $multaTotalPeriodo,
+                                    'fecha_limite' => $config->fecha_limite_pago->toIso8601String(),
+                                ],
+                                'leida' => false,
+                            ]);
+
+                            $resultados['multas_aplicadas']++;
+                        }
                     }
                 }
+
+                // AVANCE AUTOMÁTICO DEL CICLO QUINCENAL (+15 días)
+                // Una vez superada la fecha límite de pago del periodo, se programa el siguiente corte 15 días después
+                $config->avanzarCicloQuincenal();
             }
         });
 
@@ -331,5 +349,103 @@ class CorteCobranzaService
         }
 
         return $relacion;
+    }
+
+    /**
+     * Simula el avance forzado de un ciclo quincenal completo:
+     * - Aplica y ACUMULA multas moratorias individuales a cada vale activo con adeudo pendiente.
+     * - Incrementa las multas acumuladas de la distribuidora en cada ejecución sucesiva.
+     * - Genera o actualiza la relación de cobranza con los nuevos saldos acumulados.
+     * - Avanza automáticamente la fecha de corte y la fecha límite 15 días (+15d) por cada vez que se invoque.
+     */
+    public function simularSiguienteCorte(): array
+    {
+        $config = Configuracion::actual();
+        $ahora = now();
+
+        $resultados = [
+            'multas_aplicadas' => 0,
+            'cortes_procesados' => 0,
+        ];
+
+        DB::transaction(function () use ($config, $ahora, &$resultados) {
+            $distribuidoras = User::whereHas('rol', fn ($q) => $q->where('nombre', 'Distribuidor'))
+                ->where('activo', true)
+                ->get();
+
+            foreach ($distribuidoras as $dist) {
+                // Préstamos activos de la distribuidora con saldo pendiente
+                $prestamosActivos = Prestamo::where('created_by_user_id', $dist->id)
+                    ->where('estado', 'activo')
+                    ->where('adeudo_pendiente', '>', 0)
+                    ->with('productoVale')
+                    ->get();
+
+                $totalQuincenal = floatval(Prestamo::where('created_by_user_id', $dist->id)
+                    ->where('estado', 'activo')
+                    ->sum('cuota_quincenal'));
+
+                // 1. Aplicar y acumular multas por cada vale individual que tenga adeudo pendiente
+                $multaTotalEsteCiclo = 0.0;
+                foreach ($prestamosActivos as $prestamo) {
+                    $multaVale = $prestamo->multaConfigurada();
+                    if ($multaVale > 0) {
+                        $prestamo->increment('multas', $multaVale);
+                        $multaTotalEsteCiclo += $multaVale;
+                        $resultados['multas_aplicadas']++;
+                    }
+                }
+
+                if ($multaTotalEsteCiclo > 0) {
+                    $dist->increment('multas', $multaTotalEsteCiclo);
+                }
+
+                $dist->refresh();
+                $multasAcumuladasDistribuidora = floatval($dist->multas ?? 0.0);
+                $total15nalExigible = $totalQuincenal + $multasAcumuladasDistribuidora;
+
+                // 2. Registrar o actualizar la relación de cobranza para este corte simulado
+                RelacionCobranza::updateOrCreate(
+                    [
+                        'distribuidora_id' => $dist->id,
+                        'fecha_corte' => $config->fecha_corte,
+                    ],
+                    [
+                        'fecha_limite_pago' => $config->fecha_limite_pago,
+                        'monto_total_periodo' => $total15nalExigible,
+                        'monto_pagado' => 0.00,
+                        'adeudo_pendiente' => $total15nalExigible,
+                        'multa_aplicada' => $multaTotalEsteCiclo,
+                        'multa_aplicada_at' => $ahora,
+                        'estado_pago' => 'pendiente',
+                        'puntos_ganados' => 0,
+                        'puntos_descontados' => 0,
+                        'corte_notificado_at' => $ahora,
+                    ]
+                );
+
+                if ($multaTotalEsteCiclo > 0) {
+                    NotificacionCajero::create([
+                        'user_id' => $dist->id,
+                        'tipo' => 'multa_adeudo_aplicada',
+                        'titulo' => '⚠️ Multas Quincenales Acumuladas (' . $config->fecha_corte->format('d/m/Y') . ')',
+                        'mensaje' => 'Se ha procesado el corte quincenal. Se aplicaron cargos moratorios de $' . number_format($multaTotalEsteCiclo, 2) . ' a los vales con adeudo pendiente. Total multas acumuladas: $' . number_format($multasAcumuladasDistribuidora, 2) . '.',
+                        'data' => [
+                            'multa_ciclo' => $multaTotalEsteCiclo,
+                            'multas_acumuladas' => $multasAcumuladasDistribuidora,
+                            'total_adeudo_global' => $dist->totalAdeudoGlobal(),
+                        ],
+                        'leida' => false,
+                    ]);
+                }
+
+                $resultados['cortes_procesados']++;
+            }
+
+            // 3. AVANZAR EL CICLO QUINCENAL +15 DÍAS
+            $config->avanzarCicloQuincenal();
+        });
+
+        return $resultados;
     }
 }

@@ -68,14 +68,16 @@ class ConfiguracionController extends Controller
             $fechaCorteCalculada = $configuracion->fechaCorteCalculada();
             $fechaLimiteCalculada = $configuracion->fechaLimitePagoCalculada();
 
+            $multaAdeudo = floatval($validated['multa_adeudo'] ?? $configuracion->multa_adeudo ?? 0.00);
+
             // 1. Registrar el cambio en el historial ANTES de actualizar
             ConfiguracionLog::create([
                 'configuracion_id' => $configuracion->id,
                 'fecha_corte' => $fechaCorteCalculada,
                 'fecha_limite_pago' => $fechaLimiteCalculada,
-                'multa_adeudo' => $validated['multa_adeudo'],
+                'multa_adeudo' => $multaAdeudo,
                 'changed_by_user_id' => $userId,
-                'motivo' => $validated['motivo'] ?? "Ajuste de ciclo periódico (Corte: Día {$validated['dia_corte']} a las {$validated['hora_corte']}, Límite: Día {$validated['dia_limite_pago']} a las {$validated['hora_limite_pago']}, Multa: \${$validated['multa_adeudo']}).",
+                'motivo' => $validated['motivo'] ?? "Ajuste de ciclo periódico (Corte: Día {$validated['dia_corte']} a las {$validated['hora_corte']}, Límite: Día {$validated['dia_limite_pago']} a las {$validated['hora_limite_pago']}).",
                 'changed_at' => now(),
             ]);
 
@@ -87,7 +89,7 @@ class ConfiguracionController extends Controller
                 'hora_limite_pago' => $validated['hora_limite_pago'],
                 'fecha_corte' => $fechaCorteCalculada,
                 'fecha_limite_pago' => $fechaLimiteCalculada,
-                'multa_adeudo' => $validated['multa_adeudo'],
+                'multa_adeudo' => $multaAdeudo,
                 'comision_cobre' => $validated['comision_cobre'],
                 'comision_plata' => $validated['comision_plata'],
                 'comision_oro' => $validated['comision_oro'],
@@ -110,5 +112,25 @@ class ConfiguracionController extends Controller
 
         return redirect()->route('configuracion-general.edit')
             ->with('success', 'La configuración periódica de corte (Día ' . $validated['dia_corte'] . ' ' . $validated['hora_corte'] . ') y fecha límite (Día ' . $validated['dia_limite_pago'] . ' ' . $validated['hora_limite_pago'] . ') fueron actualizadas con éxito.');
+    }
+
+    /**
+     * Simula la ejecución de un corte quincenal completo:
+     * - Aplica y ACUMULA las multas moratorias individuales a cada vale activo con adeudo pendiente.
+     * - Cada vez que se presione el botón, se suman nuevos cargos moratorios a los vales no liquidados.
+     * - Avanza automáticamente 15 días (+15d) el ciclo periódico.
+     */
+    public function simularCorte(CorteCobranzaService $corteService)
+    {
+        $operador = $this->operador();
+        if (!$operador || !$operador->esGerenteGeneral()) {
+            return redirect()->route('configuracion-general.edit')
+                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para simular cortes.');
+        }
+
+        $resultados = $corteService->simularSiguienteCorte();
+        $config = Configuracion::actual();
+
+        return back()->with('success', "⚡ Corte quincenal simulado con éxito: Se acumularon las multas de los vales vencidos ({$resultados['multas_aplicadas']} multas aplicadas) y se avanzó el ciclo quincenal +15 días (Próximo corte: Día {$config->dia_corte} a las " . substr($config->hora_corte, 0, 5) . " hrs).");
     }
 }

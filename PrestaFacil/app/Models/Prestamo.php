@@ -134,4 +134,19 @@ class Prestamo extends Model
     {
         return $this->estado_entrega === 'pendiente';
     }
+
+    public function multaConfigurada(): float
+    {
+        return floatval($this->productoVale?->multa ?? 0.0);
+    }
+
+    public function totalAdeudoConMultas(): float
+    {
+        return floatval($this->adeudo_pendiente) + floatval($this->multas ?? 0.0);
+    }
+
+    public function cuotaExigibleQuincenal(): float
+    {
+        return floatval($this->cuota_quincenal) + floatval($this->multas ?? 0.0);
+    }
 }

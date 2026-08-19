@@ -120,6 +120,10 @@
                     <dt class="text-slate-400">Tasa Interés 15nal:</dt>
                     <dd class="font-semibold text-indigo-400">{{ number_format($productoVale->tasa_interes_quincenal, 2) }}%</dd>
                 </div>
+                <div class="flex justify-between">
+                    <dt class="text-slate-400">Multa por Retraso:</dt>
+                    <dd class="font-semibold text-rose-400">${{ number_format($productoVale->multa ?? 0, 2) }}</dd>
+                </div>
                 <div class="flex justify-between pt-2 border-t border-slate-800 font-bold">
                     <dt class="text-slate-300">Interés Total Plazo:</dt>
                     <dd class="text-indigo-300">${{ number_format($productoVale->interes_total, 2) }}</dd>

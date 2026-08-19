@@ -140,8 +140,8 @@
                     </div>
                 </div>
 
-                <!-- Plazo Quincenas y Tasa de Interés -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Plazo Quincenas, Tasa de Interés y Multa por Retraso -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                             Plazo en Quincenas <span class="text-rose-400">*</span>
@@ -157,7 +157,7 @@
                                onkeydown="if(['e','E','+','-','.'].includes(event.key)) event.preventDefault();"
                                oninput="this.value = this.value.replace(/[^0-9]/g, ''); if(parseInt(this.value) > 120) this.value = 120;"
                                class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white font-semibold focus:outline-none focus:border-indigo-500 @error('plazo_quincenas') border-rose-500 @enderror">
-                        <span class="text-[11px] text-slate-500 mt-1 block">Solo números enteros (1 a 120 quincenas).</span>
+                        <span class="text-[11px] text-slate-500 mt-1 block">1 a 120 quincenas.</span>
                         @error('plazo_quincenas')
                             <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
                         @enderror
@@ -165,7 +165,7 @@
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                            Tasa Interés Quincenal (%) <span class="text-rose-400">*</span>
+                            Tasa Interés 15nal (%) <span class="text-rose-400">*</span>
                         </label>
                         <div class="relative">
                             <input type="number" 
@@ -181,8 +181,32 @@
                                    class="w-full pl-4 pr-8 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white font-semibold focus:outline-none focus:border-indigo-500 @error('tasa_interes_quincenal') border-rose-500 @enderror">
                             <span class="absolute right-3.5 top-2.5 text-slate-500 text-sm font-semibold">%</span>
                         </div>
-                        <span class="text-[11px] text-slate-500 mt-1 block">Tasa aplicada cada 15 días (0 - 100%).</span>
+                        <span class="text-[11px] text-slate-500 mt-1 block">Tasa cada 15 días.</span>
                         @error('tasa_interes_quincenal')
+                            <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                            Multa por Retraso ($) <span class="text-rose-400">*</span>
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3.5 top-2.5 text-slate-500 text-sm font-semibold">$</span>
+                            <input type="number" 
+                                   step="0.01" 
+                                   min="0" 
+                                   max="100000" 
+                                   id="multa" 
+                                   name="multa" 
+                                   value="{{ old('multa', 150.00) }}" 
+                                   required
+                                   onkeydown="if(['e','E','+','-'].includes(event.key)) event.preventDefault();"
+                                   oninput="if(parseFloat(this.value) > 100000) this.value = 100000; if(parseFloat(this.value) < 0) this.value = 0;"
+                                   class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-rose-400 font-semibold focus:outline-none focus:border-indigo-500 @error('multa') border-rose-500 @enderror">
+                        </div>
+                        <span class="text-[11px] text-slate-500 mt-1 block">Cargo moratorio por este vale.</span>
+                        @error('multa')
                             <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
                         @enderror
                     </div>

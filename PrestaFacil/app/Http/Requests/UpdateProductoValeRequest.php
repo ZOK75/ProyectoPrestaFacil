@@ -31,6 +31,7 @@ class UpdateProductoValeRequest extends FormRequest
             'comision_apertura' => ['sometimes', 'required', 'numeric', 'min:0', 'max:100'],
             'plazo_quincenas' => ['sometimes', 'required', 'integer', 'min:1', 'max:120'],
             'tasa_interes_quincenal' => ['sometimes', 'required', 'numeric', 'min:0', 'max:100'],
+            'multa' => ['sometimes', 'required', 'numeric', 'min:0', 'max:100000'],
             'activo' => ['nullable', 'boolean'],
             'descripcion' => ['nullable', 'string', 'max:1000'],
         ];
@@ -74,6 +75,10 @@ class UpdateProductoValeRequest extends FormRequest
             'tasa_interes_quincenal.numeric' => 'La tasa de interés debe ser un número válido.',
             'tasa_interes_quincenal.min' => 'La tasa de interés no puede ser menor a 0%.',
             'tasa_interes_quincenal.max' => 'La tasa de interés no puede superar el 100%.',
+
+            'multa.required' => 'El monto de multa por retraso es obligatorio (ingresa 0 si no aplica).',
+            'multa.numeric' => 'La multa debe ser un número válido.',
+            'multa.min' => 'La multa no puede ser negativa.',
 
             'descripcion.string' => 'La descripción debe ser un texto.',
             'descripcion.max' => 'La descripción no puede exceder los 1,000 caracteres.',

@@ -100,14 +100,25 @@
                     <p class="text-xs text-slate-400">Parámetros de corte, vencimientos, multas y comisiones automáticas</p>
                 </div>
             </div>
-            @if(!Auth::user()->esAdministrador())
-                <a href="{{ route('configuracion-general.edit') }}" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition">
-                    Modificar Configuración &rarr;
-                </a>
-            @endif
+            <div class="flex items-center gap-3">
+                <form action="{{ route('configuracion-general.simular-corte') }}" method="POST" onsubmit="return confirm('¿Deseas simular y ejecutar el siguiente corte quincenal? Se procesarán los vales y abonos, se aplicarán las multas moratorias por vale y se avanzará el ciclo 15 días (+15d).');">
+                    @csrf
+                    <button type="submit" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-xs font-black shadow-md shadow-orange-950/30 transition flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        ⚡ Simular Corte (+15d)
+                    </button>
+                </form>
+                @if(!Auth::user()->esAdministrador())
+                    <a href="{{ route('configuracion-general.edit') }}" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition">
+                        Modificar Configuración &rarr;
+                    </a>
+                @endif
+            </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 space-y-1">
                 <span class="text-slate-400 block font-medium">Día y Hora de Corte</span>
                 <span class="text-sm font-extrabold text-white">Día {{ $configuracion->dia_corte }} @ {{ $configuracion->hora_corte ?? '20:00' }}</span>
@@ -117,13 +128,7 @@
             <div class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 space-y-1">
                 <span class="text-slate-400 block font-medium">Fecha Límite de Pago</span>
                 <span class="text-sm font-extrabold text-amber-400">Día {{ $configuracion->dia_limite_pago }} @ {{ $configuracion->hora_limite_pago ?? '20:00' }}</span>
-                <span class="text-[10px] text-slate-500 block">Límite para liquidar sin multa</span>
-            </div>
-
-            <div class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 space-y-1">
-                <span class="text-slate-400 block font-medium">Multa por Adeudo Vencido</span>
-                <span class="text-sm font-extrabold text-rose-400">${{ number_format($configuracion->multa_adeudo, 2) }}</span>
-                <span class="text-[10px] text-slate-500 block">Por distribuidora incumplida</span>
+                <span class="text-[10px] text-slate-500 block">Límite para liquidar quincena</span>
             </div>
 
             <div class="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 space-y-1">

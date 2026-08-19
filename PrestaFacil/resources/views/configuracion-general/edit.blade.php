@@ -119,8 +119,25 @@
                             </div>
                         </div>
 
-                        <div class="text-[11px] text-slate-400">
-                            Próximo corte: <strong class="text-indigo-300 font-mono">{{ $configuracion->fechaCorteCalculada()->format('d/m/Y H:i') }}</strong>
+                        <div class="space-y-1.5 pt-1">
+                            <div class="text-[11px] text-slate-400 flex items-center justify-between">
+                                <span>Corte del periodo actual:</span>
+                                <strong id="js-tag-corte-actual" class="text-indigo-300 font-mono font-bold">{{ $configuracion->fechaCorteCalculada()->format('d/m/Y H:i') }} hrs</strong>
+                            </div>
+
+                            <!-- Etiqueta Siguiente Corte en 15 Días en Tiempo Real -->
+                            <div class="p-2.5 rounded-xl bg-indigo-950/70 border border-indigo-500/30 flex items-center justify-between gap-2 shadow-inner">
+                                <div class="flex items-center gap-2">
+                                    <span class="flex h-2 w-2 relative">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    </span>
+                                    <span class="text-[11px] text-indigo-200 font-bold">Siguiente Corte (+15 días):</span>
+                                </div>
+                                <span id="js-tag-corte-15d" class="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 font-mono font-black text-xs border border-indigo-500/40">
+                                    {{ $configuracion->fechaCorteCalculada()->addDays(15)->format('d/m/Y H:i') }} hrs
+                                </span>
+                            </div>
                         </div>
                     </div>
 
@@ -162,17 +179,25 @@
                             </div>
                         </div>
 
-                        <div class="text-[11px] text-slate-400">
-                            Próximo vencimiento: <strong class="text-amber-300 font-mono">{{ $configuracion->fechaLimitePagoCalculada()->format('d/m/Y H:i') }}</strong>
-                            @if($configuracion->esLimiteSiguienteMes())
-                                <span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 inline-block ml-1">
-                                    Siguiente Mes (Antepuesto)
+                        <div class="space-y-1.5 pt-1">
+                            <div class="text-[11px] text-slate-400 flex items-center justify-between">
+                                <span>Límite del periodo actual:</span>
+                                <strong id="js-tag-limite-actual" class="text-amber-300 font-mono font-bold">{{ $configuracion->fechaLimitePagoCalculada()->format('d/m/Y H:i') }} hrs</strong>
+                            </div>
+
+                            <!-- Etiqueta Siguiente Límite en 15 Días en Tiempo Real -->
+                            <div class="p-2.5 rounded-xl bg-amber-950/70 border border-amber-500/30 flex items-center justify-between gap-2 shadow-inner">
+                                <div class="flex items-center gap-2">
+                                    <span class="flex h-2 w-2 relative">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                    </span>
+                                    <span class="text-[11px] text-amber-200 font-bold">Siguiente Límite (+15 días):</span>
+                                </div>
+                                <span id="js-tag-limite-15d" class="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 font-mono font-black text-xs border border-amber-500/40">
+                                    {{ $configuracion->fechaLimitePagoCalculada()->addDays(15)->format('d/m/Y H:i') }} hrs
                                 </span>
-                            @else
-                                <span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 inline-block ml-1">
-                                    Mismo Mes
-                                </span>
-                            @endif
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -180,22 +205,7 @@
                 <!-- Nota informativa de la regla de anteposición -->
                 <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 text-xs flex items-center gap-2">
                     <span class="text-indigo-400 font-bold">💡 Regla de Anteposición:</span>
-                    <span>Si el día y la hora límite son posteriores al corte dentro del mes (ej. día 10 a las 10:00 PM y día 10 a las 10:01 PM), se mantienen en el <strong>mismo mes</strong>. Si el día u hora límite son anteriores o iguales (ej. día 10 a las 10:00 PM o día 01), se calculan para el <strong>siguiente mes</strong>.</span>
-                </div>
-
-                <!-- Multa por Adeudo -->
-                <div class="pt-1">
-                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                        Multa por Adeudo Vencido ($) <span class="text-rose-400">*</span>
-                    </label>
-                    <div class="relative max-w-xs">
-                        <span class="absolute left-3.5 top-2.5 text-slate-500 text-sm">$</span>
-                        <input type="number" step="0.01" name="multa_adeudo"
-                            value="{{ old('multa_adeudo', $configuracion->multa_adeudo) }}" required
-                            {{ !$puedeEditar ? 'disabled' : '' }}
-                            class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-rose-400 font-semibold focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed @error('multa_adeudo') border-rose-500 @enderror">
-                    </div>
-                    <span class="text-[10px] text-slate-500 mt-1 block">Monto que se cargará de forma automática al superar el día y hora límite si hay adeudo pendiente.</span>
+                    <span>Si el día y la hora límite son posteriores al corte dentro del mes, se mantienen en el <strong>mismo mes</strong>. Si son anteriores o iguales, se calculan para el <strong>siguiente mes</strong>.</span>
                 </div>
             </div>
 
@@ -332,41 +342,72 @@
         </form>
     </div>
 
-    <!-- Resumen de Configuración Vigente -->
+    <!-- Resumen de Configuración Vigente y Simulación -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
-        <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">
-            Resumen de Ciclo Periódico Vigente
-        </h3>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-3 mb-4">
+            <div>
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider">
+                    Resumen de Ciclo Periódico Vigente
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">Control y calendario de cortes automáticos quincenales.</p>
+            </div>
+
+            @if($puedeEditar)
+                <form action="{{ route('configuracion-general.simular-corte') }}" method="POST" onsubmit="return confirm('¿Deseas simular y ejecutar el siguiente corte quincenal? Se procesarán los vales y abonos, se aplicarán las multas moratorias por vale y se avanzará el ciclo 15 días (+15d).');">
+                    @csrf
+                    <button type="submit" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-xs font-black shadow-lg shadow-orange-950/30 transition flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        ⚡ Simular Siguiente Corte (+15 Días)
+                    </button>
+                </form>
+            @endif
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- 1. Corte Periódico Actual -->
             <div class="bg-slate-950 rounded-xl p-4 border border-indigo-500/20">
-                <span class="text-xs text-indigo-400 block font-bold">Corte Periódico</span>
+                <span class="text-xs text-indigo-400 block font-bold">Corte Actual</span>
                 <span class="text-base font-black text-white mt-1 block">
-                    Día {{ $configuracion->dia_corte ?? 10 }} a las {{ substr($configuracion->hora_corte ?? '22:20', 0, 5) }} hrs
+                    Día {{ $configuracion->dia_corte ?? 10 }} @ {{ substr($configuracion->hora_corte ?? '22:20', 0, 5) }}
                 </span>
                 <span class="text-[10px] text-slate-400">Próximo: {{ $configuracion->fechaCorteCalculada()->format('d/m/Y H:i') }}</span>
             </div>
 
+            <!-- 2. Siguiente Corte (+15 Días) -->
+            <div class="bg-slate-950 rounded-xl p-4 border border-indigo-500/40 bg-gradient-to-b from-indigo-950/20 to-transparent">
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="text-xs text-emerald-400 font-black uppercase tracking-wider">Corte en +15 Días</span>
+                </div>
+                <span id="js-tag-resumen-corte-15d" class="text-base font-black text-indigo-300 mt-1 block font-mono">
+                    {{ $configuracion->fechaCorteCalculada()->addDays(15)->format('d/m/Y H:i') }} hrs
+                </span>
+                <span class="text-[10px] text-slate-400">Siguiente ciclo quincenal</span>
+            </div>
+
+            <!-- 3. Fecha Límite de Pago Actual -->
             <div class="bg-slate-950 rounded-xl p-4 border border-amber-500/20">
-                <span class="text-xs text-amber-400 block font-bold">Fecha Límite de Pago</span>
+                <span class="text-xs text-amber-400 block font-bold">Límite Actual</span>
                 <span class="text-base font-black text-amber-400 mt-1 block">
-                    Día {{ $configuracion->dia_limite_pago ?? 15 }} a las {{ substr($configuracion->hora_limite_pago ?? '23:59', 0, 5) }} hrs
+                    Día {{ $configuracion->dia_limite_pago ?? 15 }} @ {{ substr($configuracion->hora_limite_pago ?? '23:59', 0, 5) }}
                 </span>
                 <span class="text-[10px] text-slate-400">
                     Próximo: {{ $configuracion->fechaLimitePagoCalculada()->format('d/m/Y H:i') }}
-                    @if($configuracion->esLimiteSiguienteMes())
-                        (Siguiente Mes)
-                    @else
-                        (Mismo Mes)
-                    @endif
                 </span>
             </div>
 
-            <div class="bg-slate-950 rounded-xl p-4 border border-slate-800">
-                <span class="text-xs text-slate-400 block font-bold">Multa por Adeudo</span>
-                <span class="text-lg font-black text-rose-400 mt-1 block">
-                    ${{ number_format($configuracion->multa_adeudo, 2) }}
+            <!-- 4. Siguiente Fecha Límite (+15 Días) -->
+            <div class="bg-slate-950 rounded-xl p-4 border border-amber-500/40 bg-gradient-to-b from-amber-950/20 to-transparent">
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span class="text-xs text-amber-400 font-black uppercase tracking-wider">Límite en +15 Días</span>
+                </div>
+                <span id="js-tag-resumen-limite-15d" class="text-base font-black text-amber-300 mt-1 block font-mono">
+                    {{ $configuracion->fechaLimitePagoCalculada()->addDays(15)->format('d/m/Y H:i') }} hrs
                 </span>
-                <span class="text-[10px] text-slate-500">Sanción por atraso</span>
+                <span class="text-[10px] text-slate-400">Siguiente vencimiento quincenal</span>
             </div>
         </div>
     </div>
@@ -444,4 +485,81 @@
     </div>
 
 </div>
+
+<!-- JavaScript para Cálculo y Visualización de Corte en 15 Días en Tiempo Real -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const inputDiaCorte = document.querySelector('input[name="dia_corte"]');
+    const inputHoraCorte = document.querySelector('input[name="hora_corte"]');
+    const inputDiaLimite = document.querySelector('input[name="dia_limite_pago"]');
+    const inputHoraLimite = document.querySelector('input[name="hora_limite_pago"]');
+
+    function pad(n) {
+        return String(n).padStart(2, '0');
+    }
+
+    function formatFechaHora(date) {
+        if (!date || isNaN(date.getTime())) return '—';
+        const dia = pad(date.getDate());
+        const mes = pad(date.getMonth() + 1);
+        const anio = date.getFullYear();
+        const hora = pad(date.getHours());
+        const min = pad(date.getMinutes());
+        return `${dia}/${mes}/${anio} ${hora}:${min} hrs`;
+    }
+
+    function actualizarCalculosEnTiempoReal() {
+        if (!inputDiaCorte || !inputHoraCorte) return;
+
+        const diaCorte = parseInt(inputDiaCorte.value, 10) || 1;
+        const [horaC, minC] = (inputHoraCorte.value || '22:20').split(':').map(Number);
+
+        const diaLimite = inputDiaLimite ? (parseInt(inputDiaLimite.value, 10) || 1) : diaCorte;
+        const [horaL, minL] = (inputHoraLimite ? inputHoraLimite.value || '23:59' : '23:59').split(':').map(Number);
+
+        const hoy = new Date();
+        
+        // 1. Fecha de Corte Base
+        let fechaCorte = new Date(hoy.getFullYear(), hoy.getMonth(), diaCorte, horaC || 0, minC || 0, 0);
+        
+        // 2. Fecha Límite de Pago
+        let fechaLimite = new Date(hoy.getFullYear(), hoy.getMonth(), diaLimite, horaL || 0, minL || 0, 0);
+        
+        // Regla de anteposición: Si el límite es menor o igual al corte en el mes, se calcula para el siguiente mes
+        if (fechaLimite <= fechaCorte) {
+            fechaLimite = new Date(hoy.getFullYear(), hoy.getMonth() + 1, diaLimite, horaL || 0, minL || 0, 0);
+        }
+
+        // 3. Siguiente Corte en +15 Días
+        let fechaSiguienteCorte15d = new Date(fechaCorte.getTime() + (15 * 24 * 60 * 60 * 1000));
+        
+        // 4. Siguiente Fecha Límite en +15 Días
+        let fechaSiguienteLimite15d = new Date(fechaLimite.getTime() + (15 * 24 * 60 * 60 * 1000));
+
+        // Actualizar elementos en el DOM
+        const tagCorteActual = document.getElementById('js-tag-corte-actual');
+        const tagCorte15d = document.getElementById('js-tag-corte-15d');
+        const tagResumenCorte15d = document.getElementById('js-tag-resumen-corte-15d');
+        const tagLimiteActual = document.getElementById('js-tag-limite-actual');
+        const tagLimite15d = document.getElementById('js-tag-limite-15d');
+        const tagResumenLimite15d = document.getElementById('js-tag-resumen-limite-15d');
+
+        if (tagCorteActual) tagCorteActual.textContent = formatFechaHora(fechaCorte);
+        if (tagCorte15d) tagCorte15d.textContent = formatFechaHora(fechaSiguienteCorte15d);
+        if (tagResumenCorte15d) tagResumenCorte15d.textContent = formatFechaHora(fechaSiguienteCorte15d);
+        if (tagLimiteActual) tagLimiteActual.textContent = formatFechaHora(fechaLimite);
+        if (tagLimite15d) tagLimite15d.textContent = formatFechaHora(fechaSiguienteLimite15d);
+        if (tagResumenLimite15d) tagResumenLimite15d.textContent = formatFechaHora(fechaSiguienteLimite15d);
+    }
+
+    [inputDiaCorte, inputHoraCorte, inputDiaLimite, inputHoraLimite].forEach(input => {
+        if (input) {
+            input.addEventListener('input', actualizarCalculosEnTiempoReal);
+            input.addEventListener('change', actualizarCalculosEnTiempoReal);
+        }
+    });
+
+    actualizarCalculosEnTiempoReal();
+});
+</script>
 @endsection

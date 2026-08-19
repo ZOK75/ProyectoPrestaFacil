@@ -73,6 +73,8 @@ class User extends Authenticatable
             'limite_credito_anterior' => 'decimal:2',
             'multas' => 'decimal:2',
             'puntos' => 'integer',
+            'google2fa_enabled' => 'boolean',
+            'google2fa_secret' => 'encrypted',
         ];
     }
 

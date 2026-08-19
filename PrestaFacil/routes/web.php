@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\DistribuidorController;
 use App\Http\Controllers\ProductoValeController;
@@ -31,6 +32,21 @@ Route::get('/', function () {
     if ($user->esCajero()) return redirect()->route('cajero.dashboard');
     return redirect()->route('producto-vales.index');
 });
+
+// Autenticación de dos factores (2FA)
+Route::middleware(['web'])->group(function () {
+    // Vista para pedir el código de 6 dígitos
+    Route::get('/2fa-challenge', [AuthenticatedSessionController::class, 'show2faChallenge'])
+        ->name('2fa.challenge');
+
+    // Procesamiento del código enviado por el formulario
+    Route::post('/2fa-verify', [AuthenticatedSessionController::class, 'verify2fa'])
+        ->name('2fa.verify');
+});
+
+// Postulación pública para Distribuidora
+Route::get('solicitar-registro-distribuidor/{coordinador}', [\App\Http\Controllers\PublicPostulacionController::class, 'create'])->name('postulacion.create');
+Route::post('solicitar-registro-distribuidor/{coordinador}', [\App\Http\Controllers\PublicPostulacionController::class, 'store'])->name('postulacion.store');
 
 // Todas las rutas del sistema requieren sesión activa (middleware 'auth')
 Route::middleware(['auth'])->group(function () {
@@ -146,6 +162,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('solicitudes-clientes/{solicitud}', [SolicitudClienteController::class, 'show'])->name('solicitudes-clientes.show');
     Route::post('solicitudes-clientes/{solicitud}/aprobar', [SolicitudClienteController::class, 'aprobar'])->name('solicitudes-clientes.aprobar');
     Route::post('solicitudes-clientes/{solicitud}/rechazar', [SolicitudClienteController::class, 'rechazar'])->name('solicitudes-clientes.rechazar');
+
     // ──────────────────────────────────────────
     // 4. MÓDULO CAJERO
     // ──────────────────────────────────────────
@@ -232,6 +249,10 @@ Route::middleware(['auth'])->group(function () {
     // 10. CATÁLOGO DE PRODUCTO VALES (Lectura para todos los logueados)
     // ──────────────────────────────────────────
     Route::resource('producto-vales', ProductoValeController::class);
+
+    // Rutas para activar y desactivar 2FA desde el perfil
+    Route::post('/profile/2fa/activar', [ProfileController::class, 'activar2FA'])->name('profile.2fa.activar');
+    Route::delete('/profile/2fa/desactivar', [ProfileController::class, 'desactivar2FA'])->name('profile.2fa.desactivar');
 });
 
 require __DIR__.'/auth.php';

@@ -7,7 +7,11 @@ use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\App;
 use Illuminate\View\View;
+use App\Models\User;
+use PragmaRX\Google2FA\Google2FA;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -24,6 +28,27 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse
     {
+
+        $client = Http::asForm();
+
+        if(App::environment('local')) {
+            $client->withoutVerifying();
+        }
+
+        $response = $client->post('https://www.google.com/recaptcha/api/siteverify', [
+            'secret'   => config('services.recaptcha.secret'),
+            'response' => $request->input('g-recaptcha-response'),
+            'remoteip' => $request->ip(),
+        ]);
+
+
+        if (! $response->json('success')) {
+            return back()->withErrors([
+                'g-recaptcha-response' => 'Por favor, confirma que no eres un robot completando el reCAPTCHA.',
+            ])->withInput();
+        }
+
+
         $request->authenticate();
 
         $request->session()->regenerate();
@@ -58,6 +83,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         return redirect()->route('producto-vales.index');
+
     }
 
     /**

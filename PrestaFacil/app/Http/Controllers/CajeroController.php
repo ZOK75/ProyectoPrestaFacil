@@ -298,7 +298,7 @@ class CajeroController extends Controller
             })
             ->where('activo', true)
             ->with(['sucursal', 'prestamos' => function($qp) {
-                $qp->where('estado', 'activo');
+                $qp->where('estado', 'activo')->with(['cliente', 'productoVale']);
             }]);
             
         if ($request->filled('buscar')) {
@@ -307,7 +307,11 @@ class CajeroController extends Controller
                 $q->where('name', 'like', "%{$busqueda}%")
                   ->orWhere('email', 'like', "%{$busqueda}%")
                   ->orWhere('referencia_pago_distribuidor', 'like', "%{$busqueda}%")
-                  ->orWhere('id', 'like', "%{$busqueda}%");
+                  ->orWhere('id', 'like', "%{$busqueda}%")
+                  ->orWhereHas('prestamos', function($qp) use ($busqueda) {
+                      $qp->where('referencia', 'like', "%{$busqueda}%")
+                        ->orWhereHas('cliente', fn($qc) => $qc->where('nombre', 'like', "%{$busqueda}%")->orWhere('apellido_paterno', 'like', "%{$busqueda}%"));
+                  });
             });
         }
         
@@ -343,12 +347,25 @@ class CajeroController extends Controller
         DB::transaction(function () use ($distribuidora, $request, $cajera, $ahora) {
             $montoRestante = floatval($request->monto_abonado);
 
-            // 1. Amortizar multas de la distribuidora si las tiene
-            if ($distribuidora->multas > 0) {
-                $abonoMultas = min($montoRestante, floatval($distribuidora->multas));
-                $distribuidora->decrement('multas', $abonoMultas);
-                $montoRestante -= $abonoMultas;
+            // 1. Amortizar multas de los vales individuales
+            $prestamosConMultas = Prestamo::where('created_by_user_id', $distribuidora->id)
+                ->where('estado', 'activo')
+                ->where('multas', '>', 0)
+                ->orderBy('created_at', 'asc')
+                ->get();
+
+            foreach ($prestamosConMultas as $pm) {
+                if ($montoRestante <= 0) break;
+                $abonoM = min($montoRestante, floatval($pm->multas));
+                $pm->decrement('multas', $abonoM);
+                $montoRestante -= $abonoM;
             }
+
+            // Recalcular multas en distribuidora
+            $multasRestantesTotal = Prestamo::where('created_by_user_id', $distribuidora->id)
+                ->where('estado', 'activo')
+                ->sum('multas');
+            $distribuidora->update(['multas' => $multasRestantesTotal]);
 
             // 2. Distribuir a los préstamos activos con adeudo pendiente
             $prestamos = Prestamo::where('created_by_user_id', $distribuidora->id)
@@ -378,7 +395,7 @@ class CajeroController extends Controller
                 $prestamo->decrement('adeudo_pendiente', $pagoPrestamo);
                 $prestamo->increment('pagos_realizados');
 
-                if ($prestamo->adeudo_pendiente <= 0) {
+                if ($prestamo->adeudo_pendiente <= 0 && ($prestamo->multas ?? 0) <= 0) {
                     $prestamo->update(['estado' => 'finalizado']);
                 }
 
@@ -411,7 +428,7 @@ class CajeroController extends Controller
     }
 
     /**
-     * MÓDULO 3: ABONOS POR PRÉSTAMO INDIVIDUAL (FALLBACK)
+     * MÓDULO 3: ABONOS POR VALE INDIVIDUAL
      */
     public function registrarAbono(RegistrarAbonoRequest $request, Prestamo $prestamo)
     {
@@ -420,6 +437,29 @@ class CajeroController extends Controller
         $distribuidora = $prestamo->createdBy;
 
         DB::transaction(function () use ($prestamo, $request, $cajera, $ahora, $distribuidora) {
+            $montoRestante = floatval($request->monto_abonado);
+            $abonoMultas = 0.0;
+
+            // 1. Amortizar multas del vale individual primero
+            if ($prestamo->multas > 0) {
+                $abonoMultas = min($montoRestante, floatval($prestamo->multas));
+                $prestamo->decrement('multas', $abonoMultas);
+                $montoRestante -= $abonoMultas;
+
+                // Actualizar multas en distribuidora
+                if ($distribuidora && $distribuidora->multas > 0) {
+                    $distribuidora->decrement('multas', min($abonoMultas, floatval($distribuidora->multas)));
+                }
+            }
+
+            // 2. Amortizar capital / adeudo pendiente del préstamo
+            if ($montoRestante > 0) {
+                $pagoCapital = min($montoRestante, floatval($prestamo->adeudo_pendiente));
+                $prestamo->increment('pagos_recibidos', $pagoCapital);
+                $prestamo->decrement('adeudo_pendiente', $pagoCapital);
+                $montoRestante -= $pagoCapital;
+            }
+
             $pago = PagoPrestamo::create([
                 'prestamo_id' => $prestamo->id,
                 'folio_pago' => 'PAG-' . strtoupper(uniqid()),
@@ -430,11 +470,9 @@ class CajeroController extends Controller
                 'registrado_por_user_id' => $cajera->id,
             ]);
 
-            $prestamo->increment('pagos_recibidos', $request->monto_abonado);
-            $prestamo->decrement('adeudo_pendiente', $request->monto_abonado);
             $prestamo->increment('pagos_realizados');
 
-            if ($prestamo->adeudo_pendiente <= 0) {
+            if ($prestamo->adeudo_pendiente <= 0 && ($prestamo->multas ?? 0) <= 0) {
                 $prestamo->update(['estado' => 'finalizado']);
             }
 
@@ -443,13 +481,14 @@ class CajeroController extends Controller
                 $corteService->actualizarRelacionPorAbono($distribuidora, floatval($request->monto_abonado));
             }
 
-            AuditService::registrar('REGISTRO_ABONO', "Abono de \${$request->monto_abonado} a {$prestamo->referencia}", [
+            AuditService::registrar('REGISTRO_ABONO', "Abono individual de \${$request->monto_abonado} a Vale {$prestamo->referencia} (Multas cubiertas: \${$abonoMultas})", [
                 'entidad_tipo' => 'pago_prestamos',
                 'entidad_id' => $pago->id,
+                'prestamo_id' => $prestamo->id,
             ]);
         });
 
-        return back()->with('success', 'Abono registrado correctamente.');
+        return back()->with('success', "Abono de $" . number_format($request->monto_abonado, 2) . " aplicado exitosamente al vale {$prestamo->referencia}.");
     }
 
     /**

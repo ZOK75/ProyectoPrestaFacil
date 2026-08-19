@@ -125,6 +125,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
             'comision_apertura' => 0.00,
             'tasa_interes_quincenal' => 2.50,
             'plazo_quincenas' => 14,
+            'multa' => 300.00,
             'activo' => true,
         ]);
 
@@ -210,6 +211,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
             'comision_apertura' => 0.00,
             'tasa_interes_quincenal' => 2.50,
             'plazo_quincenas' => 10,
+            'multa' => 100.00,
             'activo' => true,
         ]);
 
@@ -226,7 +228,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
             'pagos_realizados' => 0,
             'pagos_recibidos' => 0.00,
             'adeudo_pendiente' => 1000.00,
-            'multas' => 0.00,
+            'multas' => 100.00,
             'estado' => 'activo',
             'estado_entrega' => 'entregado',
         ]);
@@ -435,6 +437,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
             'comision_apertura' => 0.00,
             'tasa_interes_quincenal' => 2.50,
             'plazo_quincenas' => 10,
+            'multa' => 300.00,
             'activo' => true,
         ]);
 

@@ -1,4 +1,6 @@
 <x-guest-layout>
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
     <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-slate-50">
         
         <!-- Tarjeta de Login -->
@@ -73,6 +75,14 @@
                     <x-input-error :messages="$errors->get('password')" class="mt-2" />
                 </div>
 
+                <!-- Google reCAPTCHA v2 Widget -->
+                <div class="mt-4 flex flex-col items-center">
+                    <div class="g-recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}"></div>
+                </div>
+                @error('g-recaptcha-response')
+                    <span class="text-red-500 text-sm mt-1 block">{{ $message }}</span>
+                @enderror
+
 
       
 
@@ -93,4 +103,4 @@
         </div>
 
     </div>
-</x-guest-layout> 
+</x-guest-layout>

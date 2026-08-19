@@ -84,7 +84,6 @@ class AuthenticatedSessionController extends Controller
 
         return redirect()->route('producto-vales.index');
 
-         dd($response->json('error-codes'));
     }
 
     /**

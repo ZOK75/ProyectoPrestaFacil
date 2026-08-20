@@ -88,4 +88,21 @@ class Cliente extends Model
     {
         return $this->hasMany(Prestamo::class, 'cliente_id')->orderBy('created_at', 'desc');
     }
+
+    /**
+     * Determina si el cliente tiene productos/préstamos activos o pendientes de pago/entrega.
+     * Si los tiene, NO se puede transferir a otra distribuidora.
+     */
+    public function tieneProductosActivos(): bool
+    {
+        return $this->prestamos()
+            ->where(function ($q) {
+                $q->where('estado', 'activo')
+                  ->orWhere('adeudo_pendiente', '>', 0)
+                  ->orWhere('estado_entrega', 'pendiente');
+            })
+            ->whereNotIn('estado', ['desactivado'])
+            ->whereNotIn('estado_entrega', ['cancelado'])
+            ->exists();
+    }
 }

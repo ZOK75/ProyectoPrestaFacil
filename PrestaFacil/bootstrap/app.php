@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\CheckRole;
+use App\Http\Middleware\EnsureVpnAccess;
 use App\Http\Middleware\VerificarCorteMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -23,8 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => CheckRole::class,
+            'require.vpn' => EnsureVpnAccess::class,
         ]);
     })
+
     ->withExceptions(function (Exceptions $exceptions) {
         // Manejador para error 419 (TokenMismatchException)
         $exceptions->render(function (TokenMismatchException $e, $request) {

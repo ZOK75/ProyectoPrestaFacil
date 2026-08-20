@@ -88,13 +88,14 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/dashboard', [GerenteGeneralController::class, 'index'])
                 ->name('gerente-general.dashboard');
             Route::post('/solicitudes-distribuidoras/{solicitud}/decidir', [GerenteGeneralController::class, 'decidirSolicitudDistribuidor'])
+                ->middleware('require.vpn')
                 ->name('gerente-general.solicitudes.decidir');
         });
 
         // Configuración General del Sistema (Lectura para Administrador, Edición solo Gerente General)
         Route::get('configuracion-general', [ConfiguracionController::class, 'edit'])->name('configuracion-general.edit');
-        Route::put('configuracion-general', [ConfiguracionController::class, 'update'])->name('configuracion-general.update');
-        Route::post('configuracion-general/simular-corte', [ConfiguracionController::class, 'simularCorte'])->name('configuracion-general.simular-corte');
+        Route::put('configuracion-general', [ConfiguracionController::class, 'update'])->middleware('require.vpn')->name('configuracion-general.update');
+        Route::post('configuracion-general/simular-corte', [ConfiguracionController::class, 'simularCorte'])->middleware('require.vpn')->name('configuracion-general.simular-corte');
     });
 
     // ──────────────────────────────────────────
@@ -104,6 +105,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/dashboard', [GerenteSucursalController::class, 'index'])
             ->name('gerente-sucursal.dashboard');
         Route::post('/solicitudes-distribuidoras/{solicitud}/decidir', [GerenteSucursalController::class, 'decidirSolicitudConCuenta'])
+            ->middleware('require.vpn')
             ->name('gerente-sucursal.solicitudes.decidir');
     });
 
@@ -117,12 +119,14 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/gerente-general/solicitudes-distribuidoras/{solicitud}/comparar', [GerenteSucursalController::class, 'compararSolicitudDistribuidor'])
             ->name('gerente-general.solicitudes.comparar');
         Route::post('/solicitudes-distribuidoras/{solicitud}/decidir-con-cuenta', [GerenteSucursalController::class, 'decidirSolicitudConCuenta'])
+            ->middleware('require.vpn')
             ->name('gerente.solicitudes.decidir-con-cuenta');
 
         // Transferencias
         Route::get('/gerente-sucursal/transferencias/{transferencia}/revisar', [GerenteSucursalController::class, 'revisarTransferencia'])
             ->name('gerente-sucursal.transferencias.revisar');
         Route::post('/gerente-sucursal/transferencias/{transferencia}/decidir', [GerenteSucursalController::class, 'decidirTransferencia'])
+            ->middleware('require.vpn')
             ->name('gerente-sucursal.transferencias.decidir');
     });
 
@@ -143,7 +147,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('distribuidores/{distribuidor}/solicitar-credito', [\App\Http\Controllers\CoordinadorController::class, 'solicitarCredito'])->name('distribuidores.solicitar-credito');
         Route::post('distribuidores/{distribuidor}/solicitar-transferencia', [\App\Http\Controllers\CoordinadorController::class, 'solicitarTransferencia'])->name('distribuidores.solicitar-transferencia');
         Route::get('transferencias/{transferencia}/revisar', [\App\Http\Controllers\CoordinadorController::class, 'revisarTransferencia'])->name('transferencias.revisar');
-        Route::post('transferencias/{transferencia}/decidir', [\App\Http\Controllers\CoordinadorController::class, 'decidirTransferencia'])->name('transferencias.decidir');
+        Route::post('transferencias/{transferencia}/decidir', [\App\Http\Controllers\CoordinadorController::class, 'decidirTransferencia'])->middleware('require.vpn')->name('transferencias.decidir');
     });
 
     // 5. Verificador Dashboard y Rutas
@@ -154,14 +158,14 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // 6. Procesamiento de incremento de crédito y creación de cuenta de distribuidor
-    Route::post('solicitudes-credito/{solicitud}/procesar', [\App\Http\Controllers\SolicitudCreditoController::class, 'procesar'])->name('solicitudes-credito.procesar');
-    Route::post('solicitudes-distribuidor/{solicitud}/crear-cuenta', [\App\Http\Controllers\SolicitudDistribuidorCuentaController::class, 'crearCuenta'])->name('solicitudes-distribuidor.crear-cuenta');
+    Route::post('solicitudes-credito/{solicitud}/procesar', [\App\Http\Controllers\SolicitudCreditoController::class, 'procesar'])->middleware('require.vpn')->name('solicitudes-credito.procesar');
+    Route::post('solicitudes-distribuidor/{solicitud}/crear-cuenta', [\App\Http\Controllers\SolicitudDistribuidorCuentaController::class, 'crearCuenta'])->middleware('require.vpn')->name('solicitudes-distribuidor.crear-cuenta');
 
     // 4. Bandeja de Solicitudes y Notificaciones de Clientes (Gerencia)
     Route::get('solicitudes-clientes', [SolicitudClienteController::class, 'index'])->name('solicitudes-clientes.index');
     Route::get('solicitudes-clientes/{solicitud}', [SolicitudClienteController::class, 'show'])->name('solicitudes-clientes.show');
-    Route::post('solicitudes-clientes/{solicitud}/aprobar', [SolicitudClienteController::class, 'aprobar'])->name('solicitudes-clientes.aprobar');
-    Route::post('solicitudes-clientes/{solicitud}/rechazar', [SolicitudClienteController::class, 'rechazar'])->name('solicitudes-clientes.rechazar');
+    Route::post('solicitudes-clientes/{solicitud}/aprobar', [SolicitudClienteController::class, 'aprobar'])->middleware('require.vpn')->name('solicitudes-clientes.aprobar');
+    Route::post('solicitudes-clientes/{solicitud}/rechazar', [SolicitudClienteController::class, 'rechazar'])->middleware('require.vpn')->name('solicitudes-clientes.rechazar');
 
     // ──────────────────────────────────────────
     // 4. MÓDULO CAJERO
@@ -207,8 +211,8 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:coordinador,administrador'])->prefix('autorizaciones')->group(function () {
         Route::get('/', [AutorizacionController::class, 'index'])->name('autorizaciones.index');
         Route::get('/{solicitud}', [AutorizacionController::class, 'show'])->name('autorizaciones.show');
-        Route::post('/{solicitud}/aprobar', [AutorizacionController::class, 'aprobar'])->name('autorizaciones.aprobar');
-        Route::post('/{solicitud}/rechazar', [AutorizacionController::class, 'rechazar'])->name('autorizaciones.rechazar');
+        Route::post('/{solicitud}/aprobar', [AutorizacionController::class, 'aprobar'])->middleware('require.vpn')->name('autorizaciones.aprobar');
+        Route::post('/{solicitud}/rechazar', [AutorizacionController::class, 'rechazar'])->middleware('require.vpn')->name('autorizaciones.rechazar');
     });
 
     // ──────────────────────────────────────────
@@ -217,16 +221,24 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:administrador'])->group(function () {
         Route::get('solicitudes-clientes', [SolicitudClienteController::class, 'index'])->name('solicitudes-clientes.index');
         Route::get('solicitudes-clientes/{solicitud}', [SolicitudClienteController::class, 'show'])->name('solicitudes-clientes.show');
-        Route::post('solicitudes-clientes/{solicitud}/aprobar', [SolicitudClienteController::class, 'aprobar'])->name('solicitudes-clientes.aprobar');
-        Route::post('solicitudes-clientes/{solicitud}/rechazar', [SolicitudClienteController::class, 'rechazar'])->name('solicitudes-clientes.rechazar');
+        Route::post('solicitudes-clientes/{solicitud}/aprobar', [SolicitudClienteController::class, 'aprobar'])->middleware('require.vpn')->name('solicitudes-clientes.aprobar');
+        Route::post('solicitudes-clientes/{solicitud}/rechazar', [SolicitudClienteController::class, 'rechazar'])->middleware('require.vpn')->name('solicitudes-clientes.rechazar');
     });
 
     // ──────────────────────────────────────────
     // 7. GESTIÓN DE USUARIOS (Gerente General, Gerente de Sucursal y Administrador)
     // ──────────────────────────────────────────
     Route::middleware(['role:gerente_general,gerente_de_sucursal,administrador'])->group(function () {
-        Route::resource('usuarios', UserController::class);
+        Route::get('usuarios', [UserController::class, 'index'])->name('usuarios.index');
+        Route::get('usuarios/create', [UserController::class, 'create'])->name('usuarios.create');
+        Route::post('usuarios', [UserController::class, 'store'])->name('usuarios.store');
+        Route::get('usuarios/{usuario}', [UserController::class, 'show'])->name('usuarios.show');
+        Route::get('usuarios/{usuario}/edit', [UserController::class, 'edit'])->name('usuarios.edit');
+        Route::put('usuarios/{usuario}', [UserController::class, 'update'])->middleware('require.vpn')->name('usuarios.update');
+        Route::patch('usuarios/{usuario}', [UserController::class, 'update'])->middleware('require.vpn');
+        Route::delete('usuarios/{usuario}', [UserController::class, 'destroy'])->middleware('require.vpn')->name('usuarios.destroy');
     });
+
 
     // ──────────────────────────────────────────
     // 8. CLIENTES (Distribuidores y Administrador)

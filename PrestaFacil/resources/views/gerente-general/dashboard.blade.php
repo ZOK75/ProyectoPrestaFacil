@@ -30,6 +30,13 @@
             </div>
 
             <div class="flex items-center gap-3 flex-wrap">
+                <a href="{{ route('sucursales.index') }}" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition">
+                    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                    Gestión Sucursales
+                </a>
+
                 <a href="{{ route('configuracion-general.edit') }}" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
@@ -138,6 +145,76 @@
             </div>
         </div>
     </div>
+
+    <!-- Sección: Solicitudes de Traspaso de Coordinadores (Paso 2: Autorización Final Gerencia General) -->
+    @if(isset($transferenciasCoordinadorPendientesGG) && $transferenciasCoordinadorPendientesGG->count() > 0)
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl shadow-xl overflow-hidden" x-data="{ openDecisionCoordId: null }">
+            <div class="p-6 border-b border-slate-800 bg-amber-950/20 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 font-bold">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Traspasos de Coordinador Pendientes de Aprobación Final</h2>
+                        <p class="text-slate-400 text-xs mt-0.5">Ambos Gerentes de Sucursal acordaron el traspaso. Como Gerente General debes emitir la autorización final (Propagación en Cascada).</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divide-y divide-slate-800">
+                @foreach($transferenciasCoordinadorPendientesGG as $tc)
+                    <div class="p-5 space-y-3">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-extrabold text-white text-base">{{ $tc->coordinador?->name }}</span>
+                                    <span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                        Coordinador
+                                    </span>
+                                </div>
+                                <p class="text-xs text-slate-300">
+                                    Sucursal Origen: <strong class="text-slate-200">{{ $tc->sucursalOrigen?->nombre }}</strong> (Gerente: {{ $tc->gerenteEmisor?->name }}) 
+                                    &rarr; Sucursal Destino: <strong class="text-emerald-400">{{ $tc->sucursalDestino?->nombre }}</strong> (Gerente: {{ $tc->gerenteReceptor?->name }})
+                                </p>
+                                <p class="text-xs text-slate-400 italic bg-slate-950/40 p-2.5 rounded-xl border border-slate-800">
+                                    "{{ $tc->motivo }}"
+                                </p>
+                            </div>
+
+                            <div class="shrink-0">
+                                <button @click="openDecisionCoordId = (openDecisionCoordId === '{{ $tc->id }}' ? null : '{{ $tc->id }}')" 
+                                        class="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-950/20 transition">
+                                    Evaluar Aprobación Final
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Panel desplegable de decisión -->
+                        <div x-show="openDecisionCoordId === '{{ $tc->id }}'" class="p-4 bg-slate-950/70 border border-slate-850 rounded-xl space-y-3" style="display: none;" x-transition>
+                            <form method="POST" action="{{ route('gerente-general.coordinadores.traspaso.decidir-final', $tc) }}" class="space-y-3">
+                                @csrf
+                                <input type="hidden" name="accion" id="dec_coord_gg_{{ $tc->id }}">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Observaciones Corporativas (Opcional)</label>
+                                    <textarea name="observaciones" rows="2" placeholder="Notas sobre esta aprobación o motivo de rechazo..." class="w-full bg-slate-900 border border-slate-800 rounded-xl text-white px-4 py-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"></textarea>
+                                </div>
+                                <div class="flex justify-end gap-2">
+                                    <button type="submit" onclick="document.getElementById('dec_coord_gg_{{ $tc->id }}').value = 'rechazar'; return confirm('¿Rechazar el traspaso del coordinador?')" class="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
+                                        ✕ Rechazar Traspaso
+                                    </button>
+                                    <button type="submit" onclick="document.getElementById('dec_coord_gg_{{ $tc->id }}').value = 'aprobar'; return confirm('¿Aprobar traspaso? El Coordinador y sus Distribuidoras se moverán en cascada a la nueva sucursal.')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg text-xs font-bold transition">
+                                        ✓ Aprobar Traspaso en Cascada
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
 
     <!-- Sección: Solicitudes de Traspaso de Distribuidoras (Pendientes de Autorización Corporativa / Gerencial) -->
     @if(isset($transferenciasPendientesGerente) && $transferenciasPendientesGerente->count() > 0)

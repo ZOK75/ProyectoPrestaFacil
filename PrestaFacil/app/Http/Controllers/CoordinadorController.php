@@ -72,12 +72,24 @@ class CoordinadorController extends Controller
             'transferencias_pendientes' => $transferenciasRecibidas->where('estado', 'pendiente_coordinador')->count(),
         ];
 
+        // Solicitudes de Traspaso de Clientes pendientes de dictamen por el Coordinador (Paso 2)
+        $traspasosClientesPendientes = \App\Models\SolicitudTraspasoCliente::where('estado', 'pendiente_coordinador')
+            ->where(function($q) use ($user) {
+                $q->where('coordinador_id', $user->id)
+                  ->orWhereNull('coordinador_id');
+            })
+            ->with(['cliente', 'distribuidorEmisor', 'distribuidorReceptor'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         return view('coordinador.dashboard', compact(
-            'distribuidores',
+            'user',
             'solicitudesCredito',
             'transferenciasEmitidas',
             'transferenciasRecibidas',
             'coordinadoresDestino',
+            'distribuidores',
+            'traspasosClientesPendientes',
             'stats'
         ));
     }

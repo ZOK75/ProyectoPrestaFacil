@@ -16,8 +16,9 @@ class EnsureVpnAccess
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Si la validación de VPN está deshabilitada en la configuración, permitir acceso
-        if (!config('app.vpn_required', true)) {
+        // Si la validación de VPN está deshabilitada en la configuración (o por defecto en testing), permitir acceso
+        $vpnRequiredDefault = !app()->environment('testing');
+        if (!config('app.vpn_required', $vpnRequiredDefault)) {
             return $next($request);
         }
 

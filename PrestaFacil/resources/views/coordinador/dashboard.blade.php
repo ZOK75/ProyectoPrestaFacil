@@ -200,6 +200,74 @@
                 </div>
             @endif
 
+            <!-- Traspasos de Clientes Pendientes de Aprobación Final del Coordinador (Paso 2) -->
+            @if(isset($traspasosClientesPendientes) && $traspasosClientesPendientes->count() > 0)
+                <div class="bg-slate-900 border border-sky-500/40 rounded-2xl shadow-xl overflow-hidden" x-data="{ openDecisionClienteId: null }">
+                    <div class="p-4 sm:p-5 border-b border-slate-800 bg-sky-950/20 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-300 font-bold">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h2 class="text-sm sm:text-base font-bold text-white">Traspasos de Cliente Pendientes de tu Aprobación</h2>
+                                <p class="text-slate-400 text-xs">Ambas Distribuidoras acordaron la transferencia del cliente. Dictamina como Coordinador para formalizar el cambio de cartera.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="divide-y divide-slate-800">
+                        @foreach($traspasosClientesPendientes as $tcp)
+                            <div class="p-4 sm:p-5 space-y-3">
+                                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div class="space-y-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-extrabold text-white text-sm">{{ $tcp->cliente?->nombre }}</span>
+                                            <span class="text-slate-500 text-xs font-mono">CURP: {{ $tcp->cliente?->curp }}</span>
+                                        </div>
+                                        <p class="text-xs text-slate-300">
+                                            De: <strong class="text-slate-200">{{ $tcp->distribuidorEmisor?->name }}</strong>
+                                            &rarr; Hacia: <strong class="text-sky-300">{{ $tcp->distribuidorReceptor?->name }}</strong>
+                                        </p>
+                                        <p class="text-xs text-slate-400 italic bg-slate-950/40 p-2 rounded-lg border border-slate-800">
+                                            "{{ $tcp->motivo }}"
+                                        </p>
+                                    </div>
+
+                                    <div class="shrink-0">
+                                        <button @click="openDecisionClienteId = (openDecisionClienteId === '{{ $tcp->id }}' ? null : '{{ $tcp->id }}')"
+                                                class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg transition">
+                                            Dictaminar Traspaso
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Formulario Desplegable de Decisión -->
+                                <div x-show="openDecisionClienteId === '{{ $tcp->id }}'" class="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3" style="display: none;" x-transition>
+                                    <form method="POST" action="{{ route('clientes.traspasos.decidir-coordinador', $tcp) }}" class="space-y-3">
+                                        @csrf
+                                        <input type="hidden" name="accion" id="dec_cli_coord_{{ $tcp->id }}">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Observaciones de Coordinación (Opcional)</label>
+                                            <textarea name="observaciones" rows="2" placeholder="Comentarios sobre la aprobación o rechazo..." class="w-full bg-slate-900 border border-slate-800 rounded-xl text-white px-4 py-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"></textarea>
+                                        </div>
+                                        <div class="flex justify-end gap-2">
+                                            <button type="submit" onclick="document.getElementById('dec_cli_coord_{{ $tcp->id }}').value = 'rechazar'; return confirm('¿Rechazar traspaso de cliente?')" class="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
+                                                ✕ Rechazar
+                                            </button>
+                                            <button type="submit" onclick="document.getElementById('dec_cli_coord_{{ $tcp->id }}').value = 'aprobar'; return confirm('¿Aprobar traspaso? El cliente pasará formalmente a la distribuidora receptora.')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg text-xs font-bold transition">
+                                                ✓ Aprobar Traspaso de Cliente
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             <!-- Transferencias Emitidas por este Coordinador -->
             @if($transferenciasEmitidas->count() > 0)
                 <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-sm overflow-hidden">

@@ -3,7 +3,7 @@
 @section('title', 'Panel de Gerente de Sucursal - PrestaFácil')
 
 @section('content')
-<div class="space-y-8">
+<div class="space-y-8" x-data="{ showTraspasoCoordModal: false, openDecisionCoordId: null }">
 
     <!-- Header Gerente de Sucursal -->
     <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl">
@@ -24,6 +24,13 @@
             </div>
 
             <div class="flex items-center gap-3 flex-wrap">
+                <button @click="showTraspasoCoordModal = true" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                    </svg>
+                    Traspasar Coordinador
+                </button>
+
                 <a href="{{ route('usuarios.create') }}" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -35,12 +42,6 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                     </svg>
                     Gestión de Usuarios
-                </a>
-                <a href="{{ route('producto-vales.index') }}" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition">
-                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z" />
-                    </svg>
-                    Catálogo de Vales
                 </a>
             </div>
         </div>
@@ -600,6 +601,124 @@
                 @endforeach
             </div>
         @endif
+    </div>
+
+    <!-- Sección: Solicitudes de Traspaso de Coordinadores Recibidas (Paso 1) -->
+    @if(isset($transferenciasCoordinadorRecibidas) && $transferenciasCoordinadorRecibidas->count() > 0)
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl shadow-xl overflow-hidden">
+            <div class="p-6 border-b border-slate-800 bg-amber-950/20 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 font-bold">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Solicitudes de Traspaso de Coordinador Recibidas</h2>
+                        <p class="text-slate-400 text-xs mt-0.5">Otro Gerente te solicita transferir un Coordinador a tu sucursal. Al aceptar, pasará al Gerente General para su autorización final.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divide-y divide-slate-800">
+                @foreach($transferenciasCoordinadorRecibidas as $tcr)
+                    <div class="p-5 space-y-3">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-extrabold text-white text-base">{{ $tcr->coordinador?->name }}</span>
+                                    <span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                        Coordinador
+                                    </span>
+                                </div>
+                                <p class="text-xs text-slate-300">
+                                    Sucursal Origen: <strong class="text-slate-200">{{ $tcr->sucursalOrigen?->nombre }}</strong> (Gerente: {{ $tcr->gerenteEmisor?->name }})
+                                </p>
+                                <p class="text-xs text-slate-400 italic bg-slate-950/40 p-2.5 rounded-xl border border-slate-800">
+                                    "{{ $tcr->motivo }}"
+                                </p>
+                            </div>
+
+                            <div class="shrink-0">
+                                <button @click="openDecisionCoordId = (openDecisionCoordId === '{{ $tcr->id }}' ? null : '{{ $tcr->id }}')" 
+                                        class="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-950/20 transition">
+                                    Revisar y Dictaminar
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Panel desplegable de decisión -->
+                        <div x-show="openDecisionCoordId === '{{ $tcr->id }}'" class="p-4 bg-slate-950/70 border border-slate-850 rounded-xl space-y-3" style="display: none;" x-transition>
+                            <form method="POST" action="{{ route('gerente-sucursal.coordinadores.traspaso.decidir', $tcr) }}" class="space-y-3">
+                                @csrf
+                                <input type="hidden" name="accion" id="dec_coord_gs_{{ $tcr->id }}">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Observaciones / Notas (Opcional)</label>
+                                    <textarea name="observaciones" rows="2" placeholder="Comentarios sobre la recepción..." class="w-full bg-slate-900 border border-slate-800 rounded-xl text-white px-4 py-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"></textarea>
+                                </div>
+                                <div class="flex justify-end gap-2">
+                                    <button type="submit" onclick="document.getElementById('dec_coord_gs_{{ $tcr->id }}').value = 'rechazar'; return confirm('¿Rechazar el traspaso del coordinador?')" class="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
+                                        ✕ Rechazar
+                                    </button>
+                                    <button type="submit" onclick="document.getElementById('dec_coord_gs_{{ $tcr->id }}').value = 'aceptar'; return confirm('¿Aceptar el traspaso? Pasará al Gerente General para su visto bueno final.')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg text-xs font-bold transition">
+                                        ✓ Aceptar y Enviar a Gerencia General
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
+    <!-- Modal Solicitar Traspaso de Coordinador -->
+    <div x-show="showTraspasoCoordModal" class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4" style="display: none;" x-transition>
+        <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" @click="showTraspasoCoordModal = false"></div>
+        <div class="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 z-50 text-left space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                    </svg>
+                    Solicitar Traspaso de Coordinador
+                </h3>
+                <button @click="showTraspasoCoordModal = false" class="text-slate-400 hover:text-white">&times;</button>
+            </div>
+
+            <form action="{{ route('gerente-sucursal.coordinadores.traspasar') }}" method="POST" class="space-y-4">
+                @csrf
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Coordinador a Transferir *</label>
+                    <select name="coordinador_id" required class="w-full bg-slate-950 border border-slate-800 rounded-xl text-white px-4 py-2.5 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none">
+                        <option value="">-- Selecciona un Coordinador de tu sucursal --</option>
+                        @foreach($coordinadoresSucursal as $c)
+                            <option value="{{ $c->id }}">{{ $c->name }} ({{ $c->distribuidoresCoordinados->count() }} distribuidoras)</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Gerente y Sucursal Destino *</label>
+                    <select name="gerente_receptor_id" required class="w-full bg-slate-950 border border-slate-800 rounded-xl text-white px-4 py-2.5 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none">
+                        <option value="">-- Selecciona el Gerente Destino --</option>
+                        @foreach($otrosGerentesSucursal as $og)
+                            <option value="{{ $og->id }}">{{ $og->name }} - {{ $og->sucursal?->nombre ?? 'Sucursal' }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Motivo del Traspaso *</label>
+                    <textarea name="motivo" rows="3" required placeholder="Explica las razones del traspaso..." class="w-full bg-slate-950 border border-slate-800 rounded-xl text-white px-4 py-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                    <button type="button" @click="showTraspasoCoordModal = false" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold">Enviar Solicitud al Gerente Destino</button>
+                </div>
+            </form>
+        </div>
     </div>
 
 </div>

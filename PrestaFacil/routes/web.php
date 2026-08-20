@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\DistribuidorController;
 use App\Http\Controllers\ProductoValeController;
+use App\Http\Controllers\SucursalController;
 use App\Http\Controllers\ConfiguracionController;
 use App\Http\Controllers\SolicitudClienteController;
 use App\Http\Controllers\UserController;
@@ -90,7 +91,19 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/solicitudes-distribuidoras/{solicitud}/decidir', [GerenteGeneralController::class, 'decidirSolicitudDistribuidor'])
                 ->middleware('require.vpn')
                 ->name('gerente-general.solicitudes.decidir');
+            Route::post('/coordinadores/traspaso/{transferencia}/decidir-final', [GerenteGeneralController::class, 'decidirTraspasoCoordinadorGG'])
+                ->middleware('require.vpn')
+                ->name('gerente-general.coordinadores.traspaso.decidir-final');
+            Route::post('/reasignar-gerente', [SucursalController::class, 'reasignarGerente'])
+                ->middleware('require.vpn')
+                ->name('gerente-general.reasignar-gerente');
         });
+
+        // CRUD de Sucursales (Gerente General / Administrador)
+        Route::get('sucursales', [SucursalController::class, 'index'])->name('sucursales.index');
+        Route::post('sucursales', [SucursalController::class, 'store'])->middleware('require.vpn')->name('sucursales.store');
+        Route::put('sucursales/{sucursal}', [SucursalController::class, 'update'])->middleware('require.vpn')->name('sucursales.update');
+        Route::patch('sucursales/{sucursal}/toggle-status', [SucursalController::class, 'toggleStatus'])->middleware('require.vpn')->name('sucursales.toggle-status');
 
         // Configuración General del Sistema (Lectura para Administrador, Edición solo Gerente General)
         Route::get('configuracion-general', [ConfiguracionController::class, 'edit'])->name('configuracion-general.edit');
@@ -107,6 +120,12 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/solicitudes-distribuidoras/{solicitud}/decidir', [GerenteSucursalController::class, 'decidirSolicitudConCuenta'])
             ->middleware('require.vpn')
             ->name('gerente-sucursal.solicitudes.decidir');
+        Route::post('/coordinadores/traspasar', [GerenteSucursalController::class, 'solicitarTraspasoCoordinador'])
+            ->middleware('require.vpn')
+            ->name('gerente-sucursal.coordinadores.traspasar');
+        Route::post('/coordinadores/traspaso/{transferencia}/decidir', [GerenteSucursalController::class, 'decidirTraspasoCoordinador'])
+            ->middleware('require.vpn')
+            ->name('gerente-sucursal.coordinadores.traspaso.decidir');
     });
 
     // Comparación, Dictamen y Transferencias (Gerente de Sucursal o Gerente General / Administrador)
@@ -245,6 +264,12 @@ Route::middleware(['auth'])->group(function () {
     // ──────────────────────────────────────────
     Route::middleware(['role:distribuidor,administrador'])->group(function () {
         Route::resource('clientes', ClienteController::class);
+        Route::post('clientes/{cliente}/traspasar', [ClienteController::class, 'solicitarTraspaso'])->middleware('require.vpn')->name('clientes.traspasar');
+        Route::post('clientes/traspasos/{traspaso}/decidir-receptor', [ClienteController::class, 'decidirTraspasoReceptor'])->middleware('require.vpn')->name('clientes.traspasos.decidir-receptor');
+    });
+
+    Route::middleware(['role:coordinador,gerente_general,administrador'])->group(function () {
+        Route::post('clientes/traspasos/{traspaso}/decidir-coordinador', [ClienteController::class, 'decidirTraspasoCoordinador'])->middleware('require.vpn')->name('clientes.traspasos.decidir-coordinador');
     });
 
     // ──────────────────────────────────────────

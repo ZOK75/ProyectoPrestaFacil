@@ -60,6 +60,12 @@ class GerenteGeneralController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Solicitudes de Traspaso de Coordinador pendientes de decisión final de la Gerencia General (Paso 2)
+        $transferenciasCoordinadorPendientesGG = \App\Models\SolicitudTransferenciaCoordinador::where('estado', 'pendiente_gerente_general')
+            ->with(['coordinador', 'gerenteEmisor', 'gerenteReceptor', 'sucursalOrigen', 'sucursalDestino'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         return view('gerente-general.dashboard', compact(
             'operador',
             'sucursales',
@@ -69,8 +75,108 @@ class GerenteGeneralController extends Controller
             'solicitudesCreditoPendientes',
             'solicitudesEnEspera',
             'solicitudesAprobadasSinCuenta',
-            'transferenciasPendientesGerente'
+            'transferenciasPendientesGerente',
+            'transferenciasCoordinadorPendientesGG'
         ));
+    }
+
+    /**
+     * Procesar la decisión final del Gerente General (Aprobar o Rechazar) para Traspaso de Coordinador (Paso 2).
+     * Si se aprueba, se traslada en cascada al Coordinador y sus Distribuidoras.
+     */
+    public function decidirTraspasoCoordinadorGG(Request $request, \App\Models\SolicitudTransferenciaCoordinador $transferencia)
+    {
+        $operador = Auth::user();
+        if (!$operador->esGerenteGeneral()) {
+            return back()->with('error', 'Acceso denegado. Únicamente la Gerencia General puede emitir el dictamen final.');
+        }
+
+        if ($transferencia->estado !== 'pendiente_gerente_general') {
+            return back()->with('error', 'Esta solicitud ya no está pendiente de autorización por la Gerencia General.');
+        }
+
+        $request->validate([
+            'accion' => 'required|in:aprobar,rechazar',
+            'observaciones' => 'nullable|string|max:1000',
+        ]);
+
+        $coordinador = $transferencia->coordinador;
+        $gerenteEmisor = $transferencia->gerenteEmisor;
+        $gerenteReceptor = $transferencia->gerenteReceptor;
+        $nuevaSucursalId = $transferencia->sucursal_destino_id;
+
+        if ($request->accion === 'rechazar') {
+            $transferencia->update([
+                'estado' => 'rechazada_gerente_general',
+                'observaciones_gerente_general' => $request->observaciones,
+                'resolved_at' => now(),
+            ]);
+
+            // Notificar a Gerente Emisor, Gerente Receptor y Coordinador
+            \App\Models\NotificacionCajero::enviar(
+                $gerenteEmisor->id,
+                'alerta',
+                'Traspaso de Coordinador Rechazado por Dirección General',
+                "La Gerencia General ha rechazado el traspaso del coordinador {$coordinador->name} a la sucursal {$transferencia->sucursalDestino?->nombre}." . ($request->observaciones ? " Motivo: {$request->observaciones}" : "")
+            );
+
+            \App\Models\NotificacionCajero::enviar(
+                $gerenteReceptor->id,
+                'alerta',
+                'Traspaso de Coordinador Rechazado por Dirección General',
+                "La Gerencia General ha rechazado la incorporación del coordinador {$coordinador->name} a tu sucursal." . ($request->observaciones ? " Motivo: {$request->observaciones}" : "")
+            );
+
+            \App\Models\NotificacionCajero::enviar(
+                $coordinador->id,
+                'alerta',
+                'Traspaso de Sucursal Cancelado',
+                "La Gerencia General no ha autorizado tu transferencia de sucursal. Permaneces asignado a la sucursal {$transferencia->sucursalOrigen?->nombre}."
+            );
+
+            return back()->with('info', "Has rechazado el traspaso del coordinador {$coordinador->name}.");
+        }
+
+        // APROBAR: Transferencia en CASCADA del Coordinador y sus Distribuidoras
+        \Illuminate\Support\Facades\DB::transaction(function () use ($transferencia, $coordinador, $nuevaSucursalId, $request) {
+            $transferencia->update([
+                'estado' => 'aprobada',
+                'observaciones_gerente_general' => $request->observaciones,
+                'resolved_at' => now(),
+            ]);
+
+            // 1. Mover al Coordinador
+            $coordinador->update(['sucursal_id' => $nuevaSucursalId]);
+
+            // 2. Mover en cascada a sus Distribuidoras asociadas
+            User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']))
+                ->where('coordinador_id', $coordinador->id)
+                ->update(['sucursal_id' => $nuevaSucursalId]);
+        });
+
+        // Notificaciones de Aprobación
+        \App\Models\NotificacionCajero::enviar(
+            $gerenteEmisor->id,
+            'informativa',
+            'Traspaso de Coordinador Aprobado',
+            "La Gerencia General ha autorizado formalmente la transferencia del coordinador {$coordinador->name} a la sucursal {$transferencia->sucursalDestino?->nombre}."
+        );
+
+        \App\Models\NotificacionCajero::enviar(
+            $gerenteReceptor->id,
+            'informativa',
+            'Coordinador Incorporado a tu Sucursal',
+            "¡Traspaso Aprobado! El coordinador {$coordinador->name} y sus distribuidoras asociadas han sido integrados oficialmente a tu sucursal."
+        );
+
+        \App\Models\NotificacionCajero::enviar(
+            $coordinador->id,
+            'informativa',
+            'Reasignación Oficial de Sucursal Aprobada',
+            "La Gerencia General ha aprobado tu transferencia a la sucursal {$transferencia->sucursalDestino?->nombre}. Toda tu estructura de distribuidoras se ha trasladado contigo."
+        );
+
+        return back()->with('success', "Has APROBADO la transferencia del coordinador {$coordinador->name} a la sucursal '{$transferencia->sucursalDestino?->nombre}' exitosamente.");
     }
 
     /**

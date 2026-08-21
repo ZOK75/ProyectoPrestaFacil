@@ -374,7 +374,7 @@
                            :class="decision === 'aprobar' ? 'bg-emerald-500/10 border-emerald-500 text-white shadow-lg shadow-emerald-950/20' : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'">
                         <input type="radio" value="aprobar" x-model="decision" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
                         <div>
-                            <span class="font-bold text-sm block" :class="decision === 'aprobar' ? 'text-emerald-300' : 'text-slate-300'">✓ APROBAR Y DAR DE ALTA</span>
+                            <span class="font-bold text-sm block" :class="decision === 'aprobar' ? 'text-emerald-300' : 'text-slate-300'">APROBAR Y DAR DE ALTA</span>
                             <span class="text-xs text-slate-400 block mt-0.5">Acredita a la distribuidora y genera sus credenciales de acceso al sistema.</span>
                         </div>
                     </label>
@@ -383,7 +383,7 @@
                            :class="decision === 'rechazar' ? 'bg-rose-500/10 border-rose-500 text-white shadow-lg shadow-rose-950/20' : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'">
                         <input type="radio" value="rechazar" x-model="decision" class="w-4 h-4 text-rose-600 focus:ring-rose-500">
                         <div>
-                            <span class="font-bold text-sm block" :class="decision === 'rechazar' ? 'text-rose-300' : 'text-slate-300'">✕ RECHAZAR SOLICITUD</span>
+                            <span class="font-bold text-sm block" :class="decision === 'rechazar' ? 'text-rose-300' : 'text-slate-300'">RECHAZAR SOLICITUD</span>
                             <span class="text-xs text-slate-400 block mt-0.5">Descarta definitivamente la postulación de esta candidata.</span>
                         </div>
                     </label>
@@ -438,8 +438,9 @@
                 <div class="flex justify-end gap-3 pt-2">
                     <button type="submit" x-show="decision === 'rechazar'" 
                             onclick="return confirm('¿Confirmas el RECHAZO definitivo de esta solicitud?')"
-                            class="px-6 py-3 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
-                        ✕ Confirmar Rechazo Definitivo
+                            class="inline-flex items-center gap-1.5 px-6 py-3 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        Confirmar Rechazo Definitivo
                     </button>
                     <button type="submit" x-show="decision === 'aprobar'"
                             onclick="return confirm('¿Aprobar y dar de alta inmediatamente la cuenta de distribuidora con contraseña igual a la CURP?')"
@@ -453,7 +454,8 @@
     @elseif($solicitud->estado === 'aprobado')
         <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl p-6 shadow-xl text-center space-y-2">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
-                ✓ Solicitud Aprobada y Cuenta Activada
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Solicitud Aprobada y Cuenta Activada
             </span>
             <p class="text-xs text-slate-300">
                 Esta solicitud ya fue aprobada y cuenta con un usuario activo en el sistema.
@@ -462,7 +464,8 @@
     @else
         <div class="bg-slate-900 border border-rose-500/30 rounded-2xl p-6 shadow-xl text-center space-y-2">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 uppercase tracking-wide">
-                ✕ Solicitud Rechazada
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                Solicitud Rechazada
             </span>
             <p class="text-xs text-slate-400 italic">
                 "{{ $solicitud->observaciones_resolucion ?? 'Sin motivo registrado.' }}"

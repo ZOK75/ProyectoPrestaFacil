@@ -85,7 +85,8 @@
                     <div class="bg-slate-950 p-4 rounded-xl border border-indigo-500/20 space-y-3">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-black text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-                                ✂️ Fecha de Corte
+                                <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                Fecha de Corte
                             </span>
                             <span class="text-[10px] text-slate-400 font-mono">Día del mes y hora</span>
                         </div>
@@ -145,7 +146,8 @@
                     <div class="bg-slate-950 p-4 rounded-xl border border-amber-500/20 space-y-3">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                                📅 Fecha Límite de Pago
+                                <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                Fecha Límite de Pago
                             </span>
                             <span class="text-[10px] text-slate-400 font-mono">Día del mes y hora</span>
                         </div>
@@ -204,7 +206,10 @@
 
                 <!-- Nota informativa de la regla de anteposición -->
                 <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 text-xs flex items-center gap-2">
-                    <span class="text-indigo-400 font-bold">💡 Regla de Anteposición:</span>
+                    <strong class="text-indigo-400 font-bold inline-flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Regla de Anteposición:
+                    </strong>
                     <span>Si el día y la hora límite son posteriores al corte dentro del mes, se mantienen en el <strong>mismo mes</strong>. Si son anteriores o iguales, se calculan para el <strong>siguiente mes</strong>.</span>
                 </div>
             </div>
@@ -359,7 +364,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                         </svg>
-                        ⚡ Simular Siguiente Corte (+15 Días)
+                        Simular Siguiente Corte (+15 Días)
                     </button>
                 </form>
             @endif

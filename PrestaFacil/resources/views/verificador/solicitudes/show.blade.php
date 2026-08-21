@@ -69,7 +69,7 @@
                 <label class="flex items-center gap-2 cursor-pointer select-none bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-emerald-500/50 transition">
                     <input type="checkbox" name="checks[personales]" value="1" x-model="checks.personales" class="w-4 h-4 text-emerald-600 rounded bg-slate-900 border-slate-700 focus:ring-emerald-500">
                     <span class="text-xs font-bold" :class="checks.personales ? 'text-emerald-400' : 'text-slate-400'">
-                        <span x-text="checks.personales ? '✓ Identificación Validada' : 'Pendiente de Validar'"></span>
+                        <span x-text="checks.personales ? 'Identificación Validada' : 'Pendiente de Validar'"></span>
                     </span>
                 </label>
             </div>
@@ -147,7 +147,7 @@
                 <label class="flex items-center gap-2 cursor-pointer select-none bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-emerald-500/50 transition">
                     <input type="checkbox" name="checks[direccion]" value="1" x-model="checks.direccion" class="w-4 h-4 text-emerald-600 rounded bg-slate-900 border-slate-700 focus:ring-emerald-500">
                     <span class="text-xs font-bold" :class="checks.direccion ? 'text-emerald-400' : 'text-slate-400'">
-                        <span x-text="checks.direccion ? '✓ Domicilio Verificado en Campo' : 'Pendiente de Validar'"></span>
+                        <span x-text="checks.direccion ? 'Domicilio Verificado en Campo' : 'Pendiente de Validar'"></span>
                     </span>
                 </label>
             </div>
@@ -206,7 +206,7 @@
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6" 
              x-data="{ familiares: {{ Js::from($familiaresData) }} }">
             
-            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
                 <div class="flex items-center gap-2">
                     <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
                     <h2 class="text-base sm:text-lg font-bold text-white">3. Vivienda, Referencias y Vehículos</h2>
@@ -214,7 +214,7 @@
                 <label class="flex items-center gap-2 cursor-pointer select-none bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800 hover:border-emerald-500/50 transition">
                     <input type="checkbox" name="checks[hogar]" value="1" x-model="checks.hogar" class="w-4 h-4 text-emerald-600 rounded bg-slate-900 border-slate-700 focus:ring-emerald-500">
                     <span class="text-xs font-bold" :class="checks.hogar ? 'text-emerald-400' : 'text-slate-400'">
-                        <span x-text="checks.hogar ? '✓ Vivienda e Inspección Acreditadas' : 'Pendiente de Validar'"></span>
+                        <span x-text="checks.hogar ? 'Vivienda e Inspección Acreditadas' : 'Pendiente de Validar'"></span>
                     </span>
                 </label>
             </div>
@@ -305,7 +305,7 @@
                            :class="dictamen === 'aceptado' ? 'bg-emerald-500/10 border-emerald-500 text-white' : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'">
                         <input type="radio" name="dictamen_verificador" value="aceptado" x-model="dictamen" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
                         <div>
-                            <span class="font-bold text-sm block" :class="dictamen === 'aceptado' ? 'text-emerald-300' : 'text-slate-300'">✓ ACEPTADO (Recomendado)</span>
+                            <span class="font-bold text-sm block" :class="dictamen === 'aceptado' ? 'text-emerald-300' : 'text-slate-300'">ACEPTADO (Recomendado)</span>
                             <span class="text-xs text-slate-400 block mt-0.5">La candidata cumple con los requisitos y el domicilio fue acreditado satisfactoriamente.</span>
                         </div>
                     </label>
@@ -314,7 +314,7 @@
                            :class="dictamen === 'rechazado' ? 'bg-rose-500/10 border-rose-500 text-white' : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'">
                         <input type="radio" name="dictamen_verificador" value="rechazado" x-model="dictamen" class="w-4 h-4 text-rose-600 focus:ring-rose-500">
                         <div>
-                            <span class="font-bold text-sm block" :class="dictamen === 'rechazado' ? 'text-rose-300' : 'text-slate-300'">✕ RECHAZADO</span>
+                            <span class="font-bold text-sm block" :class="dictamen === 'rechazado' ? 'text-rose-300' : 'text-slate-300'">RECHAZADO</span>
                             <span class="text-xs text-slate-400 block mt-0.5">Se encontraron inconsistencias graves o falsedad en el domicilio / información.</span>
                         </div>
                     </label>

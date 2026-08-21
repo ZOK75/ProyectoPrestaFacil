@@ -11,8 +11,9 @@
             <div>
                 <div class="flex items-center gap-2.5">
                     @if(Auth::user()->esAdministrador())
-                        <span class="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-                            🔒 Auditoría y Supervisión
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
+                            <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            Auditoría y Supervisión
                         </span>
                     @else
                         <span class="px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">
@@ -201,11 +202,13 @@
                                     <textarea name="observaciones" rows="2" placeholder="Notas sobre esta aprobación o motivo de rechazo..." class="w-full bg-slate-900 border border-slate-800 rounded-xl text-white px-4 py-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"></textarea>
                                 </div>
                                 <div class="flex justify-end gap-2">
-                                    <button type="submit" onclick="document.getElementById('dec_coord_gg_{{ $tc->id }}').value = 'rechazar'; return confirm('¿Rechazar el traspaso del coordinador?')" class="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
-                                        ✕ Rechazar Traspaso
+                                    <button type="submit" onclick="document.getElementById('dec_coord_gg_{{ $tc->id }}').value = 'rechazar'; return confirm('¿Rechazar el traspaso del coordinador?')" class="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        Rechazar Traspaso
                                     </button>
-                                    <button type="submit" onclick="document.getElementById('dec_coord_gg_{{ $tc->id }}').value = 'aprobar'; return confirm('¿Aprobar traspaso? El Coordinador y sus Distribuidoras se moverán en cascada a la nueva sucursal.')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg text-xs font-bold transition">
-                                        ✓ Aprobar Traspaso en Cascada
+                                    <button type="submit" onclick="document.getElementById('dec_coord_gg_{{ $tc->id }}').value = 'aprobar'; return confirm('¿Aprobar traspaso? El Coordinador y sus Distribuidoras se moverán en cascada a la nueva sucursal.')" class="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg text-xs font-bold transition">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                        Aprobar Traspaso en Cascada
                                     </button>
                                 </div>
                             </form>

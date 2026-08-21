@@ -67,6 +67,11 @@ class AuthenticatedSessionController extends Controller
 
         $user = Auth::user()->load('rol');
 
+        // El rol Verificador solo requiere correo y contraseña (sin Google 2FA ni Mailtrap)
+        if ($user->esVerificador()) {
+            return $this->proceedAfterGoogle2FA($user, $request);
+        }
+
         $shouldEnforce2FA = !App::environment('testing') || session('testing_2fa_flow', false);
 
         // CASO 1: Primer inicio de sesión (Usuario no ha vinculado ni activado Google 2FA aún)

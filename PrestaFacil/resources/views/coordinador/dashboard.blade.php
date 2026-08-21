@@ -251,14 +251,14 @@
                                         <div>
                                             <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Observaciones de Coordinación (Opcional)</label>
                                             <textarea name="observaciones" rows="2" placeholder="Comentarios sobre la aprobación o rechazo..." class="w-full bg-slate-900 border border-slate-800 rounded-xl text-white px-4 py-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"></textarea>
-                                        </div>
-                                        <div class="flex justify-end gap-2">
-                                            <button type="submit" onclick="document.getElementById('dec_cli_coord_{{ $tcp->id }}').value = 'rechazar'; return confirm('¿Rechazar traspaso de cliente?')" class="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
-                                                ✕ Rechazar
-                                            </button>
-                                            <button type="submit" onclick="document.getElementById('dec_cli_coord_{{ $tcp->id }}').value = 'aprobar'; return confirm('¿Aprobar traspaso? El cliente pasará formalmente a la distribuidora receptora.')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg text-xs font-bold transition">
-                                                ✓ Aprobar Traspaso de Cliente
-                                            </button>
+                                            <button type="submit" onclick="document.getElementById('dec_cli_coord_{{ $tcp->id }}').value = 'rechazar'; return confirm('¿Rechazar traspaso de cliente?')" class="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
+                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                 Rechazar
+                                             </button>
+                                             <button type="submit" onclick="document.getElementById('dec_cli_coord_{{ $tcp->id }}').value = 'aprobar'; return confirm('¿Aprobar traspaso? El cliente pasará formalmente a la distribuidora receptora.')" class="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg text-xs font-bold transition">
+                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                 Aprobar Traspaso de Cliente
+                                             </button>
                                         </div>
                                     </form>
                                 </div>

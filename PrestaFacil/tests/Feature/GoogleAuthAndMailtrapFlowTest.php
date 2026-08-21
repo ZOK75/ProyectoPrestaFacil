@@ -121,4 +121,22 @@ class GoogleAuthAndMailtrapFlowTest extends TestCase
 
         $response->assertRedirect(route('2fa.challenge'));
     }
+
+    public function test_verificador_omite_google_auth_y_mailtrap_ingresando_directo()
+    {
+        $rolVer = Rol::where('nombre', 'Verificador')->first();
+        $user = User::factory()->create([
+            'rol_id' => $rolVer->id,
+            'google2fa_enabled' => false,
+            'google2fa_secret' => null,
+        ]);
+
+        $response = $this->withSession(['testing_2fa_flow' => true])->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertRedirect(route('verificador.dashboard'));
+        $this->assertAuthenticatedAs($user);
+    }
 }

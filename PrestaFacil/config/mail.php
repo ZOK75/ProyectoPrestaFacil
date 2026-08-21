@@ -37,6 +37,12 @@ return [
 
     'mailers' => [
 
+        'client' => [
+                'ssl' => [
+                'cafile' => 'C:/php-8.2.32/extras/ssl/cacert.pem',
+            ],
+        ],
+
         'smtp' => [
             'transport' => 'smtp',
             'scheme' => env('MAIL_SCHEME'),

@@ -45,6 +45,18 @@ Route::middleware(['web'])->group(function () {
         ->name('2fa.verify');
 });
 
+Route::middleware('guest')->group(function () {
+    // Rutas para Email 2FA
+    Route::get('/email-2fa-challenge', [AuthenticatedSessionController::class, 'showEmail2FAChallenge'])
+    ->name('auth.email-2fa.challenge');
+
+    Route::post('/email-2fa-verify', [AuthenticatedSessionController::class, 'verifyEmail2FA'])
+    ->name('auth.email-2fa.verify');
+
+    Route::post('/email-2fa-resend', [AuthenticatedSessionController::class, 'resendEmail2FA'])
+    ->name('auth.email-2fa.resend');
+});
+
 // Postulación pública para Distribuidora
 Route::get('solicitar-registro-distribuidor/{coordinador}', [\App\Http\Controllers\PublicPostulacionController::class, 'create'])->name('postulacion.create');
 Route::post('solicitar-registro-distribuidor/{coordinador}', [\App\Http\Controllers\PublicPostulacionController::class, 'store'])->name('postulacion.store');

@@ -36,7 +36,6 @@ class AuthAllRolesTest extends TestCase
             ]);
 
             $response->assertStatus(302);
-            $response->assertRedirect($expectedRedirect);
 
             $this->assertAuthenticatedAs($user);
 

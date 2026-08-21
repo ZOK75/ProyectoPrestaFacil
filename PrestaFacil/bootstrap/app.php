@@ -56,4 +56,18 @@ return Application::configure(basePath: dirname(__DIR__))
                     ->withErrors(['email' => 'La sesión o el token de seguridad expiraron. Por favor ingresa tus datos nuevamente.']);
             }
         });
+
+        // Manejador global de excepciones (error 500 genérico seguro sin exponer datos)
+        $exceptions->render(function (\Throwable $e, $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'error' => 'Error del servidor',
+                    'message' => '¡Ops! Algo salió mal, por favor inténtalo más tarde.',
+                ], 500);
+            }
+
+            if (!app()->environment('testing') && !config('app.debug')) {
+                return response()->view('errors.500', [], 500);
+            }
+        });
     })->create();

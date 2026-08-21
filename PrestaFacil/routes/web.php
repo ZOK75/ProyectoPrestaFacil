@@ -36,6 +36,13 @@ Route::get('/', function () {
 
 // Autenticación de dos factores (2FA)
 Route::middleware(['web'])->group(function () {
+    // Configuración inicial de QR para usuarios nuevos
+    Route::get('/2fa-setup', [AuthenticatedSessionController::class, 'show2faSetup'])
+        ->name('2fa.setup');
+
+    Route::post('/2fa-setup', [AuthenticatedSessionController::class, 'confirm2faSetup'])
+        ->name('2fa.setup.confirm');
+
     // Vista para pedir el código de 6 dígitos
     Route::get('/2fa-challenge', [AuthenticatedSessionController::class, 'show2faChallenge'])
         ->name('2fa.challenge');
@@ -182,21 +189,25 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // 5. Verificador Dashboard y Rutas
-    Route::prefix('verificador')->name('verificador.')->group(function () {
+    Route::middleware(['role:verificador'])->prefix('verificador')->name('verificador.')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\VerificadorController::class, 'dashboard'])->name('dashboard');
         Route::get('/solicitudes/{solicitud}', [\App\Http\Controllers\VerificadorController::class, 'showSolicitud'])->name('solicitudes.show');
         Route::post('/solicitudes/{solicitud}/procesar', [\App\Http\Controllers\VerificadorController::class, 'procesarSolicitud'])->name('solicitudes.procesar');
     });
 
     // 6. Procesamiento de incremento de crédito y creación de cuenta de distribuidor
-    Route::post('solicitudes-credito/{solicitud}/procesar', [\App\Http\Controllers\SolicitudCreditoController::class, 'procesar'])->middleware('require.vpn')->name('solicitudes-credito.procesar');
-    Route::post('solicitudes-distribuidor/{solicitud}/crear-cuenta', [\App\Http\Controllers\SolicitudDistribuidorCuentaController::class, 'crearCuenta'])->middleware('require.vpn')->name('solicitudes-distribuidor.crear-cuenta');
+    Route::middleware(['role:coordinador,gerente_sucursal,gerente_general,administrador'])->group(function () {
+        Route::post('solicitudes-credito/{solicitud}/procesar', [\App\Http\Controllers\SolicitudCreditoController::class, 'procesar'])->middleware('require.vpn')->name('solicitudes-credito.procesar');
+        Route::post('solicitudes-distribuidor/{solicitud}/crear-cuenta', [\App\Http\Controllers\SolicitudDistribuidorCuentaController::class, 'crearCuenta'])->middleware('require.vpn')->name('solicitudes-distribuidor.crear-cuenta');
+    });
 
-    // 4. Bandeja de Solicitudes y Notificaciones de Clientes (Gerencia)
-    Route::get('solicitudes-clientes', [SolicitudClienteController::class, 'index'])->name('solicitudes-clientes.index');
-    Route::get('solicitudes-clientes/{solicitud}', [SolicitudClienteController::class, 'show'])->name('solicitudes-clientes.show');
-    Route::post('solicitudes-clientes/{solicitud}/aprobar', [SolicitudClienteController::class, 'aprobar'])->middleware('require.vpn')->name('solicitudes-clientes.aprobar');
-    Route::post('solicitudes-clientes/{solicitud}/rechazar', [SolicitudClienteController::class, 'rechazar'])->middleware('require.vpn')->name('solicitudes-clientes.rechazar');
+    // 7. Bandeja de Solicitudes y Notificaciones de Clientes (Gerencia / Admin)
+    Route::middleware(['role:gerente_sucursal,gerente_general,administrador'])->group(function () {
+        Route::get('solicitudes-clientes', [SolicitudClienteController::class, 'index'])->name('solicitudes-clientes.index');
+        Route::get('solicitudes-clientes/{solicitud}', [SolicitudClienteController::class, 'show'])->name('solicitudes-clientes.show');
+        Route::post('solicitudes-clientes/{solicitud}/aprobar', [SolicitudClienteController::class, 'aprobar'])->middleware('require.vpn')->name('solicitudes-clientes.aprobar');
+        Route::post('solicitudes-clientes/{solicitud}/rechazar', [SolicitudClienteController::class, 'rechazar'])->middleware('require.vpn')->name('solicitudes-clientes.rechazar');
+    });
 
     // ──────────────────────────────────────────
     // 4. MÓDULO CAJERO

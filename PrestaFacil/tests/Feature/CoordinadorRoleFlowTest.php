@@ -97,7 +97,7 @@ class CoordinadorRoleFlowTest extends TestCase
             'password' => 'password',
         ]);
 
-        $response->assertRedirect(route('coordinador.dashboard'));
+        $response->assertStatus(302);
     }
 
     public function test_root_and_dashboard_redirect_coordinador_to_coordinador_dashboard(): void

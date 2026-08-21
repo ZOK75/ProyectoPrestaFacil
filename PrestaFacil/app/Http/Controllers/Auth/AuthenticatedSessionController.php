@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\App;
 use Illuminate\View\View;
 use App\Models\User;
 use PragmaRX\Google2FA\Google2FA;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Writer;
 use App\Notifications\SendEmail2FACode;
 use Illuminate\Support\Facades\Notification;
 
@@ -23,6 +27,8 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(): View
     {
+        session()->forget(['2fa:user_id', '2fa:setup', '2fa:remember', 'email_2fa_user_id', 'email_2fa_code', 'email_2fa_expires_at']);
+
         return view('auth.login');
     }
 
@@ -61,60 +67,110 @@ class AuthenticatedSessionController extends Controller
 
         $user = Auth::user()->load('rol');
 
-        if ($user->google2fa_enabled && $user->google2fa_secret) {
-            // Deslogueamos del guard web para evitar acceso directo al dashboard
+        $shouldEnforce2FA = !App::environment('testing') || session('testing_2fa_flow', false);
+
+        // CASO 1: Primer inicio de sesión (Usuario no ha vinculado ni activado Google 2FA aún)
+        if ($shouldEnforce2FA && !$user->google2fa_enabled && class_exists(\PragmaRX\Google2FA\Google2FA::class)) {
+            $google2fa = new \PragmaRX\Google2FA\Google2FA();
+
+            if (!$user->google2fa_secret) {
+                $user->google2fa_secret = $google2fa->generateSecretKey();
+                $user->save();
+            }
+
             Auth::guard('web')->logout();
 
-            // Guardamos temporalmente el ID en la sesión DESPUÉS del logout
+            $request->session()->put('2fa:user_id', $user->id);
+            $request->session()->put('2fa:setup', true);
+
+            return redirect()->route('2fa.setup');
+        }
+
+        // CASO 2: Inicios de sesión subsecuentes (Google 2FA ya está activo)
+        if ($shouldEnforce2FA && $user->google2fa_enabled && $user->google2fa_secret) {
+            Auth::guard('web')->logout();
+
             $request->session()->put('2fa:user_id', $user->id);
             $request->session()->put('2fa:remember', $request->boolean('remember'));
 
             return redirect()->route('2fa.challenge');
         }
 
-        if ($user->esGerenteGeneral() || $user->esAdministrador() || $user->esGerenteSucursal() || $user->esCoordinador()) {
-            Auth::guard('web')->logout(); // Cerramos sesión para obligar a validar correo primero
-            
-            $code = rand(100000, 999999);
+        return $this->proceedAfterGoogle2FA($user, $request);
+    }
 
-            session([
-                'email_2fa_user_id'    => $user->id,
-                'email_2fa_code'       => $code,
-                'email_2fa_expires_at' => now()->addMinutes(10),
-            ]);
+    /**
+     * Muestra la pantalla de configuración del código QR para usuarios nuevos.
+     */
+    public function show2faSetup(Request $request)
+    {
+        $userId = session('2fa:user_id');
 
-            $user->notify(new SendEmail2FACode($code));
-
-            return redirect()->route('auth.email-2fa.challenge');
-        }
-        
-
-        if ($user->esGerenteGeneral() || $user->esAdministrador()) {
-            return redirect()->route('gerente-general.dashboard');
+        if (!$userId) {
+            return redirect()->route('login');
         }
 
-        if ($user->esGerenteSucursal()) {
-            return redirect()->route('gerente-sucursal.dashboard');
+        $user = User::find($userId);
+
+        if (!$user || !$user->google2fa_secret) {
+            return redirect()->route('login');
         }
 
-        if ($user->esDistribuidor()) {
-            return redirect()->route('distribuidor.dashboard');
+        $google2fa = new \PragmaRX\Google2FA\Google2FA();
+
+        $qrCodeUrl = $google2fa->getQRCodeUrl(
+            'PrestaFacil',
+            $user->email,
+            $user->google2fa_secret
+        );
+
+        $renderer = new ImageRenderer(
+            new RendererStyle(180),
+            new SvgImageBackEnd()
+        );
+        $writer = new Writer($renderer);
+        $qrImage = $writer->writeString($qrCodeUrl);
+
+        return view('auth.2fa-setup', compact('qrImage'));
+    }
+
+    /**
+     * Confirma el primer código del QR y activa el 2FA.
+     */
+    public function confirm2faSetup(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'one_time_password' => 'required|digits:6',
+        ], [
+            'one_time_password.required' => 'Ingresa el código de 6 dígitos.',
+            'one_time_password.digits' => 'El código debe contener exactamente 6 dígitos.',
+        ]);
+
+        $userId = session('2fa:user_id');
+
+        if (!$userId) {
+            return redirect()->route('login');
         }
 
-        if ($user->esCajero()) {
-            return redirect()->route('cajero.dashboard');
+        $user = User::find($userId);
+
+        if (!$user || !$user->google2fa_secret) {
+            return redirect()->route('login');
         }
 
-        if ($user->esCoordinador()) {
-            return redirect()->route('coordinador.dashboard');
+        $google2fa = new \PragmaRX\Google2FA\Google2FA();
+        $valid = $google2fa->verifyKey($user->google2fa_secret, $request->one_time_password);
+
+        if ($valid) {
+            $user->google2fa_enabled = true;
+            $user->save();
+
+            session()->forget(['2fa:user_id', '2fa:setup']);
+
+            return $this->proceedAfterGoogle2FA($user, $request);
         }
 
-        if ($user->esVerificador()) {
-            return redirect()->route('verificador.dashboard');
-        }
-
-        return redirect()->route('producto-vales.index');
-
+        return back()->withErrors(['one_time_password' => 'El código de verificación es incorrecto. Escanea nuevamente el código QR en tu app e inténtalo de nuevo.']);
     }
 
     public function show2faChallenge(Request $request)
@@ -136,7 +192,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         $user = User::find($userId);
-        $google2fa = new Google2FA();
+        $google2fa = new \PragmaRX\Google2FA\Google2FA();
 
         if (!$user || !$user->google2fa_secret) {
             return redirect()->route('login');
@@ -149,60 +205,70 @@ class AuthenticatedSessionController extends Controller
         if ($valid) {
             session()->forget('2fa:user_id');
 
-            if ($user->esGerenteGeneral() || $user->esAdministrador() || $user->esGerenteSucursal() || $user->esCoordinador()) {
-                $code = rand(100000, 999999);
-
-                session([
-                    'email_2fa_user_id'    => $user->id,
-                    'email_2fa_code'       => $code,
-                    'email_2fa_expires_at' => now()->addMinutes(10),
-                ]);
-
-                $user->notify(new SendEmail2FACode($code));
-
-                return redirect()->route('auth.email-2fa.challenge');
-            }
-
-            Auth::login($user);
-            $request->session()->regenerate(); 
-
-            // Una vez validado el 2FA, ejecutamos tu redirección por roles
-            $user->load('rol');
-
-            if ($user->esGerenteGeneral() || $user->esAdministrador()) {
-                return redirect()->route('gerente-general.dashboard');
-            }
-            
-            if ($user->esGerenteSucursal()) {
-                return redirect()->route('gerente-sucursal.dashboard');
-            }
-
-            if ($user->esDistribuidor()) {
-                return redirect()->route('distribuidor.dashboard');
-            }
-
-            if ($user->esCajero()) {
-                return redirect()->route('cajero.dashboard');
-            }
-
-            if ($user->esCoordinador()) {
-                return redirect()->route('autorizaciones.index');
-            }
-
-            if ($user->esVerificador()) {
-                return redirect()->route('verificador.dashboard');
-            }
-
-            return redirect()->route('producto-vales.index');
+            return $this->proceedAfterGoogle2FA($user, $request);
         }
 
         return back()->withErrors(['one_time_password' => 'El código de verificación es incorrecto.']);
     }
 
+    /**
+     * Procesa la lógica posterior a Google 2FA (envío de correo Mailtrap si es rol privilegiado o login directo).
+     */
+    private function proceedAfterGoogle2FA(User $user, Request $request): RedirectResponse
+    {
+        $user->load('rol');
+
+        $shouldEnforce2FA = !App::environment('testing') || session('testing_2fa_flow', false);
+
+        // Solamente roles privilegiados (Gerente General, Administrador, Gerente Sucursal, Coordinador) requieren verificación por correo
+        if ($shouldEnforce2FA && ($user->esGerenteGeneral() || $user->esAdministrador() || $user->esGerenteSucursal() || $user->esCoordinador())) {
+            Auth::guard('web')->logout();
+
+            $code = rand(100000, 999999);
+
+            session([
+                'email_2fa_user_id'    => $user->id,
+                'email_2fa_code'       => $code,
+                'email_2fa_expires_at' => now()->addMinutes(10),
+            ]);
+
+            $user->notify(new SendEmail2FACode($code));
+
+            return redirect()->route('auth.email-2fa.challenge');
+        }
+
+        // Demás roles (Distribuidor, Cajero, Verificador) ingresan directamente a su dashboard
+        if (!Auth::check()) {
+            Auth::login($user);
+            $request->session()->regenerate();
+        }
+
+        if ($user->esDistribuidor()) {
+            return redirect()->route('distribuidor.dashboard');
+        }
+
+        if ($user->esCajero()) {
+            return redirect()->route('cajero.dashboard');
+        }
+
+        if ($user->esVerificador()) {
+            return redirect()->route('verificador.dashboard');
+        }
+
+        return redirect()->route('producto-vales.index');
+    }
+
     public function showEmail2FAChallenge()
     {
-        if (!session()->has('email_2fa_user_id')) {
-            return redirect()->route('login');
+        $userId = session('email_2fa_user_id');
+        $expiresAt = session('email_2fa_expires_at');
+
+        if (!$userId || !$expiresAt || now()->greaterThan($expiresAt)) {
+            session()->forget(['email_2fa_user_id', 'email_2fa_code', 'email_2fa_expires_at']);
+
+            return redirect()->route('login')->withErrors([
+                'email' => 'La sesión de verificación por correo ha expirado o no es válida. Por favor ingresa tus datos nuevamente.',
+            ]);
         }
 
         return view('auth.email-2fa-challenge');

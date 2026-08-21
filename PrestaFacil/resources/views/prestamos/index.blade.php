@@ -54,10 +54,14 @@
                     @elseif($esPeriodoATiempo) bg-amber-500/10 border-amber-500/30 text-amber-300
                     @else bg-rose-500/10 border-rose-500/30 text-rose-300 @endif">
                     <div class="flex items-center justify-between font-bold pb-1 mb-1 border-b border-white/10">
-                        <span>
-                            @if($esAntesDeCorte) 🟢 Periodo Anticipado Activo (Gana Puntos)
-                            @elseif($esPeriodoATiempo) 🟡 Corte Realizado (Pago a Tiempo)
-                            @else 🔴 Periodo Vencido (Multa & -20% Puntos) @endif
+                        <span class="inline-flex items-center gap-1.5">
+                            @if($esAntesDeCorte)
+                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Periodo Anticipado Activo (Gana Puntos)
+                            @elseif($esPeriodoATiempo)
+                                <span class="w-2 h-2 rounded-full bg-amber-400"></span> Corte Realizado (Pago a Tiempo)
+                            @else
+                                <span class="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span> Periodo Vencido (Multa & -20% Puntos)
+                            @endif
                         </span>
                         <span class="font-mono text-[10px]">
                             Puntos: {{ Auth::user()->puntos ?? 0 }}
@@ -153,11 +157,11 @@
                 </select>
 
                 <select name="estado" class="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none">
-                    <option value="">Todos estados</option>
-                    <option value="pendiente" {{ request('estado') === 'pendiente' ? 'selected' : '' }}>• Pendientes (Caja)</option>
-                    <option value="activo" {{ request('estado') === 'activo' ? 'selected' : '' }}>• Activos</option>
-                    <option value="finalizado" {{ request('estado') === 'finalizado' ? 'selected' : '' }}>• Liquidados</option>
-                    <option value="desactivado" {{ request('estado') === 'desactivado' ? 'selected' : '' }}>✕ Desactivados</option>
+                    <option value="">Todos los estados</option>
+                    <option value="pendiente" {{ request('estado') === 'pendiente' ? 'selected' : '' }}>Pendientes (Caja)</option>
+                    <option value="activo" {{ request('estado') === 'activo' ? 'selected' : '' }}>Activos</option>
+                    <option value="finalizado" {{ request('estado') === 'finalizado' ? 'selected' : '' }}>Liquidados</option>
+                    <option value="desactivado" {{ request('estado') === 'desactivado' ? 'selected' : '' }}>Desactivados</option>
                 </select>
 
                 <button type="submit" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition">

@@ -123,7 +123,7 @@
                         <div>
                             <span class="text-xs font-bold text-white block">Identificación INE</span>
                             <span class="text-[10px] text-slate-400 block">
-                                {{ $cliente->path_ine_pdf ? '✓ Documento listo' : 'Sin archivo' }}
+                                {{ $cliente->path_ine_pdf ? 'Documento listo' : 'Sin archivo' }}
                             </span>
                         </div>
                     </div>
@@ -144,7 +144,7 @@
                         <div>
                             <span class="text-xs font-bold text-white block">Comp. Domicilio</span>
                             <span class="text-[10px] text-slate-400 block">
-                                {{ $cliente->path_comprobante_pdf ? '✓ Documento listo' : 'Sin archivo' }}
+                                {{ $cliente->path_comprobante_pdf ? 'Documento listo' : 'Sin archivo' }}
                             </span>
                         </div>
                     </div>

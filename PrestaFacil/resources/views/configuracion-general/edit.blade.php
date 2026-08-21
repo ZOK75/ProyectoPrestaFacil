@@ -58,7 +58,7 @@
                 </svg>
             </div>
             <div>
-                <strong>🔒 Modo Lectura:</strong> Estás visualizando la configuración como <span class="text-white font-semibold">{{ $operador?->name }}</span> ({{ $operador?->rol?->nombre ?? 'Sin rol' }}). Únicamente el <strong>Gerente General</strong> tiene permisos para modificar estos parámetros.
+                <strong class="text-amber-300">Modo Lectura:</strong> Estás visualizando la configuración como <span class="text-white font-semibold">{{ $operador?->name }}</span> ({{ $operador?->rol?->nombre ?? 'Sin rol' }}). Únicamente el <strong>Gerente General</strong> tiene permisos para modificar estos parámetros.
             </div>
         </div>
     @endif

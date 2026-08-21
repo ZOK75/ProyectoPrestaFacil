@@ -68,9 +68,9 @@
                 <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Estado</label>
                 <select name="estado" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
                     <option value="">Todos los estados</option>
-                    <option value="pendiente" {{ request('estado') === 'pendiente' ? 'selected' : '' }}>⏳ Pendiente</option>
-                    <option value="aprobada" {{ request('estado') === 'aprobada' ? 'selected' : '' }}>✅ Aprobada</option>
-                    <option value="rechazada" {{ request('estado') === 'rechazada' ? 'selected' : '' }}>❌ Rechazada</option>
+                    <option value="pendiente" {{ request('estado') === 'pendiente' ? 'selected' : '' }}>Pendiente</option>
+                    <option value="aprobada" {{ request('estado') === 'aprobada' ? 'selected' : '' }}>Aprobada</option>
+                    <option value="rechazada" {{ request('estado') === 'rechazada' ? 'selected' : '' }}>Rechazada</option>
                 </select>
             </div>
 
@@ -79,8 +79,8 @@
                 <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Tipo de Solicitud</label>
                 <select name="tipo" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
                     <option value="">Todos los tipos</option>
-                    <option value="actualizacion" {{ request('tipo') === 'actualizacion' ? 'selected' : '' }}>📝 Actualización de Datos</option>
-                    <option value="desactivacion" {{ request('tipo') === 'desactivacion' ? 'selected' : '' }}>🚫 Baja / Desactivación</option>
+                    <option value="actualizacion" {{ request('tipo') === 'actualizacion' ? 'selected' : '' }}>Actualización de Datos</option>
+                    <option value="desactivacion" {{ request('tipo') === 'desactivacion' ? 'selected' : '' }}>Baja / Desactivación</option>
                 </select>
             </div>
 
@@ -193,8 +193,9 @@
                                             <!-- Botón Rápido Aprobar -->
                                             <form method="POST" action="{{ route('solicitudes-clientes.aprobar', $sol) }}" onsubmit="return confirm('¿Aprobar inmediatamente esta solicitud para {{ $sol->cliente?->nombre }}?');">
                                                 @csrf
-                                                <button type="submit" class="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition" title="Aprobar Solicitud">
-                                                    ✓ Aceptar
+                                                <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition" title="Aprobar Solicitud">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                    Aceptar
                                                 </button>
                                             </form>
                                         @endif

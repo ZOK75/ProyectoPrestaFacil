@@ -35,11 +35,13 @@
                 </span>
             @elseif($solicitud->estado === 'aprobada')
                 <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
-                    ✓ Aprobada por {{ $solicitud->aprobadoPor?->name ?? 'Gerencia' }}
+                    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    Aprobada por {{ $solicitud->aprobadoPor?->name ?? 'Gerencia' }}
                 </span>
             @else
                 <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/30 text-xs font-bold">
-                    ✕ Rechazada por {{ $solicitud->rechazadoPor?->name ?? 'Gerencia' }}
+                    <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    Rechazada por {{ $solicitud->rechazadoPor?->name ?? 'Gerencia' }}
                 </span>
             @endif
         </div>
@@ -215,9 +217,10 @@
                         <input type="text" name="observaciones_resolucion" placeholder="Comentarios de aprobación..." 
                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
                     </div>
-                    <button type="submit" class="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-lg shadow-emerald-600/20 transition"
+                    <button type="submit" class="w-full inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-lg shadow-emerald-600/20 transition"
                             onclick="return confirm('¿Confirmas que deseas APROBAR esta solicitud?');">
-                        ✓ Autorizar y Aplicar Cambios
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        Autorizar y Aplicar Cambios
                     </button>
                 </form>
 
@@ -231,9 +234,10 @@
                         <input type="text" name="motivo_rechazo" required placeholder="Ingresa el motivo del rechazo..." 
                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500">
                     </div>
-                    <button type="submit" class="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-lg shadow-rose-600/20 transition"
+                    <button type="submit" class="w-full inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-lg shadow-rose-600/20 transition"
                             onclick="return confirm('¿Confirmas que deseas RECHAZAR esta solicitud?');">
-                        ✕ Rechazar Solicitud
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        Rechazar Solicitud
                     </button>
                 </form>
             </div>

@@ -84,8 +84,9 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 @if($prestamo->cliente->path_ine_pdf)
                     <a href="{{ Storage::url($prestamo->cliente->path_ine_pdf) }}" target="_blank" class="flex items-center justify-between p-2.5 bg-slate-950 border border-slate-700 hover:border-indigo-500 rounded-xl text-xs text-indigo-300 font-bold transition">
-                        <span class="flex items-center gap-1.5">
-                            📄 Ver PDF INE
+                        <span class="inline-flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                            Ver PDF INE
                         </span>
                         <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                     </a>
@@ -97,8 +98,9 @@
 
                 @if($prestamo->cliente->path_comprobante_pdf)
                     <a href="{{ Storage::url($prestamo->cliente->path_comprobante_pdf) }}" target="_blank" class="flex items-center justify-between p-2.5 bg-slate-950 border border-slate-700 hover:border-indigo-500 rounded-xl text-xs text-indigo-300 font-bold transition">
-                        <span class="flex items-center gap-1.5">
-                            🏠 Ver Comprobante
+                        <span class="inline-flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                            Ver Comprobante
                         </span>
                         <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                     </a>
@@ -161,8 +163,9 @@
             </form>
         @endif
 
-        <a href="{{ route('cajero.solicitar-modificacion', $prestamo) }}" x-show="!ineCoincide || !comprobanteCoincide" x-transition class="block w-full py-3 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white text-center font-bold text-sm rounded-xl transition-colors">
-            ⚠️ Los datos NO coinciden (Solicitar Corrección)
+        <a href="{{ route('cajero.solicitar-modificacion', $prestamo) }}" x-show="!ineCoincide || !comprobanteCoincide" x-transition class="flex items-center justify-center gap-2 w-full py-3 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white text-center font-bold text-sm rounded-xl transition-colors">
+            <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            Los datos NO coinciden (Solicitar Corrección)
         </a>
     </div>
 

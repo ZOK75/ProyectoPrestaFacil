@@ -226,8 +226,8 @@
         </div>
 
         @if($solicitudesCreditoPendientes->isEmpty())
-            <div class="p-8 text-center text-slate-500 text-sm">
-                🎉 No hay solicitudes de incremento de crédito pendientes.
+            <div class="p-8 text-center text-slate-500 text-sm font-medium">
+                No hay solicitudes de incremento de crédito pendientes.
             </div>
         @else
             <div class="overflow-x-auto" x-data="{ openCommentId: null }">
@@ -385,8 +385,8 @@
         </div>
 
         @if($solicitudesAprobadasSinCuenta->isEmpty())
-            <div class="p-8 text-center text-slate-500 text-sm">
-                🎉 No hay distribuidoras aprobadas pendientes de asignación de cuenta.
+            <div class="p-8 text-center text-slate-500 text-sm font-medium">
+                No hay distribuidoras aprobadas pendientes de asignación de cuenta.
             </div>
         @else
             <div class="overflow-x-auto">

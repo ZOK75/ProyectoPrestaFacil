@@ -55,18 +55,20 @@
     <div class="bg-slate-900 border {{ $solicitud->dictamen_verificador === 'aceptado' ? 'border-emerald-500/40 bg-emerald-950/10' : 'border-rose-500/40 bg-rose-950/10' }} rounded-2xl p-5 sm:p-6 shadow-xl space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
             <div class="flex items-center gap-2">
-                <span class="text-lg">📋</span>
+                <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
                 <h3 class="text-sm font-bold text-white uppercase tracking-wider">Dictamen Emitido por Verificador de Campo</h3>
             </div>
             <div class="flex items-center gap-2">
                 <span class="text-xs text-slate-400">Verificador: <strong class="text-slate-200">{{ $solicitud->verificador?->name ?? 'Verificador Asignado' }}</strong></span>
                 @if($solicitud->dictamen_verificador === 'aceptado')
-                    <span class="px-3 py-1 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
-                        ✓ Aceptado / Favorable
+                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        Aceptado / Favorable
                     </span>
                 @else
-                    <span class="px-3 py-1 rounded-full text-xs font-black bg-rose-500/20 text-rose-400 border border-rose-500/30 uppercase tracking-wide">
-                        ✕ Rechazado en Campo
+                    <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-rose-500/20 text-rose-400 border border-rose-500/30 uppercase tracking-wide">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        Rechazado en Campo
                     </span>
                 @endif
             </div>

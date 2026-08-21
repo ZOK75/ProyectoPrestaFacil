@@ -39,7 +39,7 @@
             </div>
 
             <button type="submit"
-                class="w-full bg-[#009966] hover:bg-emerald-700 text-white font-medium py-2.5 rounded-lg text-sm shadow-sm transition duration-200">
+                class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm shadow-md shadow-emerald-600/20 transition duration-200">
                 Verificar Código
             </button>
         </form>

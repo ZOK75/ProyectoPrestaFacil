@@ -38,13 +38,11 @@ class SendEmail2FACode extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-                ->subject('Tu codigo de verificacion - PrestaFacil.')
-                ->greeting('¡Hola!')
-                ->line('Has intentado acceder como usuario administrativo.')
-                ->line('Tu codigo de acceso de 6 digitos es:')
-                ->line('**' . $this->code . '**')
-                ->line('Este codigo expira en 10 minutos.')
-                ->line('Sino fuiste tu, ignora este correo.');
+            ->subject('Código de Verificación 2FA - PrestaFácil')
+            ->view('emails.2fa-code', [
+                'code' => $this->code,
+                'user' => $notifiable,
+            ]);
     }
 
     /**

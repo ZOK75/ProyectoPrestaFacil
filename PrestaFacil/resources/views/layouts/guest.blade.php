@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'PrestaFacil') }}</title>
+    <title>{{ config('app.name', 'PrestaFácil') }}</title>
+
+    <!-- Favicon PrestaFácil -->
+    <link rel="icon" type="image/jpeg" href="{{ asset('img/Prestamo.jpg') }}">
+    <link rel="shortcut icon" href="{{ asset('img/Prestamo.jpg') }}">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">

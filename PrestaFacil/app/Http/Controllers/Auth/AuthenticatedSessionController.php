@@ -18,6 +18,7 @@ use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Writer;
 use App\Notifications\SendEmail2FACode;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Log;
 
 
 class AuthenticatedSessionController extends Controller
@@ -172,6 +173,8 @@ class AuthenticatedSessionController extends Controller
 
             session()->forget(['2fa:user_id', '2fa:setup']);
 
+            $user = User::with('rol')->find($user->id);
+
             return $this->proceedAfterGoogle2FA($user, $request);
         }
 
@@ -196,7 +199,7 @@ class AuthenticatedSessionController extends Controller
             return redirect()->route('login');
         }
 
-        $user = User::find($userId);
+        $user = User::with('rol')->find($userId);
         $google2fa = new \PragmaRX\Google2FA\Google2FA();
 
         if (!$user || !$user->google2fa_secret) {
@@ -209,6 +212,8 @@ class AuthenticatedSessionController extends Controller
 
         if ($valid) {
             session()->forget('2fa:user_id');
+
+            $user = User::with('rol')->find($user->id);
 
             return $this->proceedAfterGoogle2FA($user, $request);
         }
@@ -237,7 +242,12 @@ class AuthenticatedSessionController extends Controller
                 'email_2fa_expires_at' => now()->addMinutes(10),
             ]);
 
-            $user->notify(new SendEmail2FACode($code));
+            try {
+                $user->notify(new SendEmail2FACode($code));
+                Log::info('Correo 2FA de Mailtrap enviado correctamente a: ' . $user->email);
+            } catch (\Throwable $e) {
+                Log::error('Falla al enviar correo 2FA Mailtrap a ' . $user->email . ': ' . $e->getMessage());
+            }
 
             return redirect()->route('auth.email-2fa.challenge');
         }

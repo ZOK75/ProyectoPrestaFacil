@@ -90,6 +90,19 @@ class GerenteSucursalController extends Controller
             ->where('activo', true)
             ->get();
 
+        // Distribuidoras en riesgo por 3+ retrasos o marcadas como morosas
+        $distribuidorasMorosasOEnRiesgo = User::where('sucursal_id', $sucursalId)
+            ->whereHas('rol', fn($q) => $q->whereIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']))
+            ->where('activo', true)
+            ->where(function($q) {
+                $q->where('conteo_retrasos', '>=', 3)
+                  ->orWhere('es_morosa', true);
+            })
+            ->with(['coordinador', 'morosaPor'])
+            ->orderBy('es_morosa', 'desc')
+            ->orderBy('conteo_retrasos', 'desc')
+            ->get();
+
         return view('gerente-sucursal.dashboard', compact(
             'operador',
             'personalSucursal',
@@ -101,7 +114,8 @@ class GerenteSucursalController extends Controller
             'transferenciasPendientesGerente',
             'transferenciasCoordinadorRecibidas',
             'otrosGerentesSucursal',
-            'coordinadoresSucursal'
+            'coordinadoresSucursal',
+            'distribuidorasMorosasOEnRiesgo'
         ));
     }
 
@@ -543,5 +557,34 @@ class GerenteSucursalController extends Controller
         }
 
         return back()->with('success', "Has aceptado el traspaso del coordinador {$coordinador->name}. La solicitud fue enviada al Gerente General para su resolución final.");
+    }
+
+    /**
+     * Dictamen Gerencial de Morosidad (Gerente General, Gerente de Sucursal o Administrador):
+     * Marca o desmarca a una distribuidora en estado de morosidad.
+     */
+    public function decidirMorosidad(Request $request, User $distribuidor)
+    {
+        $gerente = Auth::user();
+        if (!$gerente->esGerenteGeneral() && !$gerente->esGerenteSucursal() && !$gerente->esAdministrador()) {
+            abort(403, 'No estás autorizado para gestionar el estado de morosidad.');
+        }
+
+        if ($gerente->esGerenteSucursal() && $distribuidor->sucursal_id !== $gerente->sucursal_id) {
+            abort(403, 'Esta distribuidora no pertenece a tu sucursal.');
+        }
+
+        $request->validate([
+            'accion' => 'required|in:marcar,desmarcar',
+            'motivo' => 'nullable|string|max:500',
+        ]);
+
+        if ($request->accion === 'marcar') {
+            $distribuidor->marcarComoMorosa($gerente, $request->motivo);
+            return back()->with('warning', "Se ha marcado a la distribuidora {$distribuidor->name} como MOROSA. Sus vales pendientes fueron desactivados y la colocación de nuevos vales ha sido bloqueada.");
+        } else {
+            $distribuidor->desmarcarMorosidad();
+            return back()->with('success', "Se ha retirado el estado de morosidad a la distribuidora {$distribuidor->name}. Ya puede volver a emitir vales con normalidad.");
+        }
     }
 }

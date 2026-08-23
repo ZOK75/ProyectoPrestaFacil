@@ -103,12 +103,21 @@
         <!-- Botones de Acción -->
         <div class="flex items-center gap-2 pt-2 border-t border-slate-800">
             @if(!$operador || !$operador->esAdministrador())
-                <a href="{{ route('prestamos.create') }}" class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs text-center shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-1">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    Asignar Vale
-                </a>
+                @if($operador && $operador->esDistribuidor() && $operador->esMorosa())
+                    <button disabled class="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-500 font-bold text-xs text-center border border-slate-700 cursor-not-allowed flex items-center justify-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                        </svg>
+                        Bloqueado (Morosa)
+                    </button>
+                @else
+                    <a href="{{ route('prestamos.create') }}" class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs text-center shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Asignar Vale
+                    </a>
+                @endif
             @endif
 
             <a href="{{ route('prestamos.relacion-pdf') }}" target="_blank" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs text-center transition flex items-center justify-center gap-1">

@@ -260,6 +260,12 @@ class CorteCobranzaService
 
                         if ($multaTotalPeriodo > 0) {
                             $dist->increment('multas', $multaTotalPeriodo);
+                            $dist->increment('conteo_retrasos');
+                            $dist->refresh();
+
+                            if ($dist->conteo_retrasos >= 3 && !$dist->es_morosa) {
+                                $this->notificarGerentesTercerRetraso($dist);
+                            }
 
                             $relacion->update([
                                 'monto_total_periodo' => $total15nalExigible,
@@ -369,7 +375,7 @@ class CorteCobranzaService
         ];
 
         DB::transaction(function () use ($config, $ahora, &$resultados) {
-            $distribuidoras = User::whereHas('rol', fn ($q) => $q->where('nombre', 'Distribuidor'))
+            $distribuidoras = User::whereHas('rol', fn ($q) => $q->whereIn('nombre', ['Distribuidor', 'distribuidor', 'Distribuidora', 'distribuidora']))
                 ->where('activo', true)
                 ->get();
 
@@ -398,6 +404,13 @@ class CorteCobranzaService
 
                 if ($multaTotalEsteCiclo > 0) {
                     $dist->increment('multas', $multaTotalEsteCiclo);
+                    $dist->increment('conteo_retrasos');
+                    $dist->refresh();
+
+                    // Verificar si alcanzó 3 retrasos para alertar a los gerentes
+                    if ($dist->conteo_retrasos >= 3 && !$dist->es_morosa) {
+                        $this->notificarGerentesTercerRetraso($dist);
+                    }
                 }
 
                 $dist->refresh();
@@ -447,5 +460,56 @@ class CorteCobranzaService
         });
 
         return $resultados;
+    }
+
+    /**
+     * Notifica a la Gerencia General y al Gerente de Sucursal cuando una distribuidora
+     * acumula 3 retrasos en sus cortes de cobranza para evaluar su morosidad.
+     */
+    public function notificarGerentesTercerRetraso(User $distribuidora): void
+    {
+        $titulo = "🚨 Alerta: 3er Retraso de Pago - Distribuidora {$distribuidora->name}";
+        $mensaje = "La distribuidora {$distribuidora->name} ha acumulado {$distribuidora->conteo_retrasos} retrasos consecutivos en sus cortes de cobranza. Como Gerente, evalúa la situación y decide si marcarla como Morosa para suspender la colocación de vales.";
+
+        $data = [
+            'tipo_alerta' => 'tercer_retraso_morosidad',
+            'distribuidora_id' => $distribuidora->id,
+            'distribuidora_nombre' => $distribuidora->name,
+            'conteo_retrasos' => $distribuidora->conteo_retrasos,
+            'total_adeudo' => $distribuidora->totalAdeudoGlobal(),
+        ];
+
+        // 1. Notificar a todos los Gerentes Generales y Administradores
+        $gerentesGenerales = User::whereHas('rol', fn ($q) => $q->whereIn('nombre', ['Gerente General', 'Administrador']))
+            ->where('activo', true)
+            ->get();
+
+        foreach ($gerentesGenerales as $gg) {
+            NotificacionCajero::enviar(
+                $gg->id,
+                'alerta_morosidad_3er_retraso',
+                $titulo,
+                $mensaje,
+                array_merge($data, ['url' => route('gerente-general.dashboard', [], false)])
+            );
+        }
+
+        // 2. Notificar al Gerente de Sucursal de la distribuidora
+        if ($distribuidora->sucursal_id) {
+            $gerentesSucursal = User::whereHas('rol', fn ($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente Sucursal']))
+                ->where('sucursal_id', $distribuidora->sucursal_id)
+                ->where('activo', true)
+                ->get();
+
+            foreach ($gerentesSucursal as $gs) {
+                NotificacionCajero::enviar(
+                    $gs->id,
+                    'alerta_morosidad_3er_retraso',
+                    $titulo,
+                    $mensaje,
+                    array_merge($data, ['url' => route('gerente-sucursal.dashboard', [], false)])
+                );
+            }
+        }
     }
 }

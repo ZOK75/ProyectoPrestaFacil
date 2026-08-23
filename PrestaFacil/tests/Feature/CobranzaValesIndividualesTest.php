@@ -271,4 +271,196 @@ class CobranzaValesIndividualesTest extends TestCase
         $this->assertEquals(400.00, $this->distribuidor->multas, 'Las multas de la distribuidora deben acumularse a $400.');
         $this->assertEquals(4400.00, $this->distribuidor->totalAdeudoGlobal());
     }
+
+    public function test_third_delay_notifies_gerente_general_and_gerente_sucursal(): void
+    {
+        $rolGS = Rol::firstOrCreate(['nombre' => 'Gerente de Sucursal']);
+        $gerenteSucursal = User::factory()->create([
+            'rol_id' => $rolGS->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VAL-DEL-100',
+            'nombre' => 'Vale de Retrasos',
+            'monto_prestamo' => 2000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 0.00,
+            'plazo_quincenas' => 8,
+            'tasa_interes_quincenal' => 2.00,
+            'multa' => 150.00,
+            'activo' => true,
+        ]);
+
+        Prestamo::create([
+            'referencia' => 'VAL-DEL-001',
+            'cliente_id' => $this->cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $this->distribuidor->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 2000.00,
+            'cuota_quincenal' => 250.00,
+            'monto_total_pagar' => 2500.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 2000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+        ]);
+
+        // Simular 3 cortes consecutivos
+        $this->actingAs($this->gerenteGeneral)->post(route('configuracion-general.simular-corte'));
+        $this->distribuidor->refresh();
+        $this->assertEquals(1, $this->distribuidor->conteo_retrasos);
+
+        $this->actingAs($this->gerenteGeneral)->post(route('configuracion-general.simular-corte'));
+        $this->distribuidor->refresh();
+        $this->assertEquals(2, $this->distribuidor->conteo_retrasos);
+
+        // 3er corte simulado: debe disparar la alerta del 3er retraso
+        $this->actingAs($this->gerenteGeneral)->post(route('configuracion-general.simular-corte'));
+        $this->distribuidor->refresh();
+        $this->assertEquals(3, $this->distribuidor->conteo_retrasos);
+
+        // Verificar que se emitieron las notificaciones para Gerente General y Gerente de Sucursal
+        $notifGG = \App\Models\NotificacionCajero::where('user_id', $this->gerenteGeneral->id)
+            ->where('tipo', 'alerta_morosidad_3er_retraso')
+            ->first();
+        $this->assertNotNull($notifGG, 'El Gerente General debe recibir notificación de 3er retraso.');
+
+        $notifGS = \App\Models\NotificacionCajero::where('user_id', $gerenteSucursal->id)
+            ->where('tipo', 'alerta_morosidad_3er_retraso')
+            ->first();
+        $this->assertNotNull($notifGS, 'El Gerente de Sucursal debe recibir notificación de 3er retraso.');
+    }
+
+    public function test_gerente_can_mark_distribuidora_as_morosa_and_cancels_pending_vales(): void
+    {
+        $rolGS = Rol::firstOrCreate(['nombre' => 'Gerente de Sucursal']);
+        $gerenteSucursal = User::factory()->create([
+            'rol_id' => $rolGS->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VAL-PEND-100',
+            'nombre' => 'Vale Pendiente',
+            'monto_prestamo' => 2000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 0.00,
+            'plazo_quincenas' => 8,
+            'tasa_interes_quincenal' => 2.00,
+            'multa' => 150.00,
+            'activo' => true,
+        ]);
+
+        // Vale 1: Pendiente de entrega en ventanilla
+        $valePendiente = Prestamo::create([
+            'referencia' => 'VAL-PEND-001',
+            'cliente_id' => $this->cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $this->distribuidor->id,
+            'tipo' => 'prevale',
+            'monto_prestamo' => 2000.00,
+            'cuota_quincenal' => 250.00,
+            'monto_total_pagar' => 2500.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 2000.00,
+            'multas' => 0.00,
+            'estado' => 'pendiente',
+            'estado_entrega' => 'pendiente',
+            'activo' => true,
+        ]);
+
+        // Gerente de Sucursal decide marcar como morosa
+        $response = $this->actingAs($gerenteSucursal)->post(route('gerente.distribuidores.decidir-morosidad', $this->distribuidor), [
+            'accion' => 'marcar',
+            'motivo' => 'Acumuló 3 retrasos de corte sin abono',
+        ]);
+
+        $response->assertSessionHas('warning');
+
+        $this->distribuidor->refresh();
+        $this->assertTrue($this->distribuidor->esMorosa());
+        $this->assertNotNull($this->distribuidor->morosa_at);
+        $this->assertEquals($gerenteSucursal->id, $this->distribuidor->morosa_by_user_id);
+
+        // El vale pendiente debe haber sido desactivado y cancelado
+        $valePendiente->refresh();
+        $this->assertEquals('desactivado', $valePendiente->estado);
+        $this->assertEquals('cancelado', $valePendiente->estado_entrega);
+        $this->assertFalse($valePendiente->activo);
+        $this->assertNotNull($valePendiente->desactivado_at);
+    }
+
+    public function test_morosa_distribuidora_is_blocked_from_assigning_vales(): void
+    {
+        $productoVale = ProductoVale::create([
+            'clave' => 'VAL-BLOQ-100',
+            'nombre' => 'Vale Bloqueado',
+            'monto_prestamo' => 2000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 0.00,
+            'plazo_quincenas' => 8,
+            'tasa_interes_quincenal' => 2.00,
+            'multa' => 150.00,
+            'activo' => true,
+        ]);
+
+        $this->distribuidor->update(['es_morosa' => true]);
+
+        // 1. Intento de acceder al formulario de asignación
+        $responseCreate = $this->actingAs($this->distribuidor)->get(route('prestamos.create'));
+        $responseCreate->assertRedirect(route('distribuidor.dashboard'));
+        $responseCreate->assertSessionHas('error');
+
+        // 2. Intento de enviar creación de vale por POST
+        $responseStore = $this->actingAs($this->distribuidor)->post(route('prestamos.store'), [
+            'cliente_id' => $this->cliente->id,
+            'producto_vale_id' => $productoVale->id,
+        ]);
+
+        $responseStore->assertSessionHasErrors(['cliente_id']);
+
+        // 3. Validación en servicio de validación de entrega de vales
+        $validacionService = app(\App\Services\ValidacionValeService::class);
+        $prestamoTest = new Prestamo([
+            'monto_prestamo' => 2000.00,
+            'cliente_id' => $this->cliente->id,
+        ]);
+        $errores = $validacionService->validarEntregaPrevale($prestamoTest, $this->distribuidor);
+        $this->assertContains('La distribuidora está bloqueada por morosidad.', $errores);
+    }
+
+    public function test_gerente_can_unmark_morosidad_and_restore_distribuidora_operations(): void
+    {
+        $this->distribuidor->update([
+            'es_morosa' => true,
+            'conteo_retrasos' => 3,
+            'morosa_at' => now(),
+            'morosa_by_user_id' => $this->gerenteGeneral->id,
+        ]);
+
+        // Gerente General retira la morosidad
+        $response = $this->actingAs($this->gerenteGeneral)->post(route('gerente.distribuidores.decidir-morosidad', $this->distribuidor), [
+            'accion' => 'desmarcar',
+        ]);
+
+        $response->assertSessionHas('success');
+
+        $this->distribuidor->refresh();
+        $this->assertFalse($this->distribuidor->esMorosa());
+        $this->assertEquals(0, $this->distribuidor->conteo_retrasos);
+        $this->assertNull($this->distribuidor->morosa_at);
+
+        // Ahora la distribuidora sí puede entrar a crear vales
+        $responseCreate = $this->actingAs($this->distribuidor)->get(route('prestamos.create'));
+        $responseCreate->assertOk();
+    }
 }

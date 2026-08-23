@@ -86,6 +86,7 @@ class PrestamoSeeder extends Seeder
                 'comision_apertura' => 0.00,
                 'tasa_interes_quincenal' => 2.50,
                 'plazo_quincenas' => 14,
+                'multa' => 150.00,
                 'activo' => true,
             ]
         );
@@ -99,6 +100,7 @@ class PrestamoSeeder extends Seeder
                 'comision_apertura' => 0.00,
                 'tasa_interes_quincenal' => 2.50,
                 'plazo_quincenas' => 14,
+                'multa' => 250.00,
                 'activo' => true,
             ]
         );

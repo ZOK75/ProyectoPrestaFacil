@@ -127,6 +127,11 @@ class PrestamoController extends Controller
                 ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
         }
 
+        if ($operador && $operador->esDistribuidor() && $operador->esMorosa()) {
+            return redirect()->route('distribuidor.dashboard')
+                ->with('error', 'Tu cuenta se encuentra bloqueada por estado de morosidad debido a retrasos en tus cortes. No tienes permitido asignar nuevos vales.');
+        }
+
         // Obtener únicamente vales activos
         $valesActivos = ProductoVale::where('activo', true)
             ->orderBy('monto_prestamo', 'asc')
@@ -173,6 +178,12 @@ class PrestamoController extends Controller
         if ($operador && $operador->esAdministrador()) {
             return redirect()->route('prestamos.index')
                 ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
+        }
+
+        if ($operador && $operador->esDistribuidor() && $operador->esMorosa()) {
+            return back()->withErrors([
+                'cliente_id' => 'Tu cuenta se encuentra bloqueada por estado de morosidad debido a retrasos en tus cortes. No tienes permitido asignar nuevos vales.'
+            ])->withInput();
         }
 
         $cliente = Cliente::findOrFail($request->cliente_id);

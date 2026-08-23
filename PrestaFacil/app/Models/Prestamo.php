@@ -137,7 +137,13 @@ class Prestamo extends Model
 
     public function multaConfigurada(): float
     {
-        return floatval($this->productoVale?->multa ?? 0.0);
+        $multa = floatval($this->productoVale?->multa ?? 0.0);
+        if ($multa <= 0) {
+            $config = Configuracion::actual();
+            $multaConfig = floatval($config->multa_adeudo ?? 0.0);
+            return $multaConfig > 0 ? $multaConfig : 150.00;
+        }
+        return $multa;
     }
 
     public function totalAdeudoConMultas(): float

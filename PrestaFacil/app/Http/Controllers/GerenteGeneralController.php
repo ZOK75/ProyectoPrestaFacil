@@ -66,6 +66,18 @@ class GerenteGeneralController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Distribuidoras en riesgo por 3+ retrasos o marcadas como morosas a nivel nacional
+        $distribuidorasMorosasOEnRiesgo = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']))
+            ->where('activo', true)
+            ->where(function($q) {
+                $q->where('conteo_retrasos', '>=', 3)
+                  ->orWhere('es_morosa', true);
+            })
+            ->with(['sucursal', 'coordinador', 'morosaPor'])
+            ->orderBy('es_morosa', 'desc')
+            ->orderBy('conteo_retrasos', 'desc')
+            ->get();
+
         return view('gerente-general.dashboard', compact(
             'operador',
             'sucursales',
@@ -76,7 +88,8 @@ class GerenteGeneralController extends Controller
             'solicitudesEnEspera',
             'solicitudesAprobadasSinCuenta',
             'transferenciasPendientesGerente',
-            'transferenciasCoordinadorPendientesGG'
+            'transferenciasCoordinadorPendientesGG',
+            'distribuidorasMorosasOEnRiesgo'
         ));
     }
 

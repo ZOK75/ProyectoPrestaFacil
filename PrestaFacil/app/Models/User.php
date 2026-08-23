@@ -40,6 +40,10 @@ class User extends Authenticatable
         'limite_credito',
         'limite_credito_anterior',
         'multas',
+        'conteo_retrasos',
+        'es_morosa',
+        'morosa_at',
+        'morosa_by_user_id',
         'referencia_pago_distribuidor',
         'puntos',
         'activo',
@@ -72,6 +76,9 @@ class User extends Authenticatable
             'limite_credito' => 'decimal:2',
             'limite_credito_anterior' => 'decimal:2',
             'multas' => 'decimal:2',
+            'conteo_retrasos' => 'integer',
+            'es_morosa' => 'boolean',
+            'morosa_at' => 'datetime',
             'puntos' => 'integer',
             'google2fa_enabled' => 'boolean',
             'google2fa_secret' => 'encrypted',
@@ -403,12 +410,89 @@ class User extends Authenticatable
     }
 
     /**
+     * Usuario que marcó a esta distribuidora como morosa.
+     */
+    public function morosaPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'morosa_by_user_id');
+    }
+
+    /**
      * Determina si la distribuidora está bloqueada por morosidad.
-     * TODO: Implementar lógica real con tabla de strikes
      */
     public function esMorosa(): bool
     {
-        return false;
+        return (bool)($this->es_morosa ?? false);
+    }
+
+    /**
+     * Marca a la distribuidora como morosa, desactiva vales pendientes y envía notificaciones.
+     */
+    public function marcarComoMorosa(User $gerente, ?string $motivo = null): void
+    {
+        $this->update([
+            'es_morosa' => true,
+            'morosa_at' => now(),
+            'morosa_by_user_id' => $gerente->id,
+        ]);
+
+        // Desactivar todos los vales pendientes (que aún no han sido cobrados/activados en caja)
+        Prestamo::where('created_by_user_id', $this->id)
+            ->where('estado', 'pendiente')
+            ->update([
+                'estado' => 'desactivado',
+                'estado_entrega' => 'cancelado',
+                'activo' => false,
+                'desactivado_at' => now(),
+                'desactivado_by_user_id' => $gerente->id,
+            ]);
+
+        // Notificar a la distribuidora
+        NotificacionCajero::enviar(
+            $this->id,
+            'alerta',
+            '🚫 Cuenta Declarada en Estado de Morosidad',
+            "Tu cuenta ha sido declarada en estado de morosidad por la Gerencia ({$gerente->name})" . ($motivo ? " por motivo: {$motivo}" : "") . ". Se han cancelado todos tus vales pendientes de entrega y la colocación de nuevos vales está suspendida."
+        );
+
+        // Notificar al coordinador si tiene asignado
+        if ($this->coordinador_id) {
+            NotificacionCajero::enviar(
+                $this->coordinador_id,
+                'alerta',
+                'Distribuidora Marcada como Morosa',
+                "La distribuidora {$this->name} ha sido declarada en estado de morosidad por la Gerencia ({$gerente->name}). Todos sus vales pendientes fueron cancelados."
+            );
+        }
+    }
+
+    /**
+     * Desmarca el estado de morosidad y rehabilita la operación normal.
+     */
+    public function desmarcarMorosidad(): void
+    {
+        $this->update([
+            'es_morosa' => false,
+            'morosa_at' => null,
+            'morosa_by_user_id' => null,
+            'conteo_retrasos' => 0,
+        ]);
+
+        NotificacionCajero::enviar(
+            $this->id,
+            'informativa',
+            '✅ Estado de Morosidad Retirado',
+            "La Gerencia ha retirado la restricción de morosidad de tu cuenta. Ya puedes generar y asignar vales con normalidad."
+        );
+
+        if ($this->coordinador_id) {
+            NotificacionCajero::enviar(
+                $this->coordinador_id,
+                'informativa',
+                'Morosidad Retirada a Distribuidora',
+                "Se ha retirado el estado de morosidad a la distribuidora {$this->name}. Ya puede volver a emitir vales."
+            );
+        }
     }
 
     /**

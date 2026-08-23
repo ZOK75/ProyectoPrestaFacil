@@ -42,6 +42,26 @@
         </div>
     </div>
 
+    <!-- Banner Alerta de Morosidad si está bloqueada -->
+    @if($distribuidor->esMorosa())
+        <div class="bg-rose-950/60 border-2 border-rose-500/60 rounded-2xl p-4 shadow-xl space-y-2">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-rose-600/30 border border-rose-500 flex items-center justify-center text-rose-300 font-bold shrink-0">
+                    <svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-extrabold text-white leading-tight">Cuenta Suspendida por Morosidad</h3>
+                    <p class="text-[11px] text-rose-300 mt-0.5">Tu cuenta ha sido declarada en estado de morosidad debido a retrasos en tus cortes. La colocación de nuevos vales ha sido bloqueada.</p>
+                </div>
+            </div>
+            @if($distribuidor->morosa_at)
+                <p class="text-[10px] text-slate-400">Estado aplicado el {{ $distribuidor->morosa_at->format('d/m/Y H:i') }}. Contacta a tu coordinador o gerencia para regularizar tu saldo.</p>
+            @endif
+        </div>
+    @endif
+
     <!-- Tarjeta Billetera Digital de Crédito (Estilo Tarjeta de Crédito Móvil) -->
     <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950 border border-indigo-500/30 p-5 shadow-2xl space-y-4">
         <!-- Aura de brillo -->
@@ -105,12 +125,21 @@
 
     <!-- Acciones Rápidas Móviles (Botones Touch) -->
     <div class="space-y-2 pt-1">
-        <a href="{{ route('prestamos.create') }}" class="w-full py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-xl shadow-indigo-600/30 transition flex items-center justify-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
-            Emitir Nuevo Vale de Préstamo
-        </a>
+        @if($distribuidor->esMorosa())
+            <button disabled class="w-full py-3 px-4 rounded-2xl bg-slate-800 text-slate-500 font-bold text-sm border border-slate-700 cursor-not-allowed flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                </svg>
+                Emisión Bloqueada por Morosidad
+            </button>
+        @else
+            <a href="{{ route('prestamos.create') }}" class="w-full py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-xl shadow-indigo-600/30 transition flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Emitir Nuevo Vale de Préstamo
+            </a>
+        @endif
 
         <div class="grid grid-cols-2 gap-2">
             <a href="{{ route('clientes.create') }}" class="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-emerald-500/30 text-xs font-bold text-center transition flex items-center justify-center gap-1.5 shadow">

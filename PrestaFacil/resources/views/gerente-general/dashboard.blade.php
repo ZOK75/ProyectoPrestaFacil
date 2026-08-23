@@ -147,6 +147,129 @@
         </div>
     </div>
 
+    <!-- Sección: Alertas de Morosidad y Distribuidoras con 3+ Retrasos (Decisión Gerencial) -->
+    @if(isset($distribuidorasMorosasOEnRiesgo) && $distribuidorasMorosasOEnRiesgo->count() > 0)
+        <div class="bg-slate-900 border border-rose-500/40 rounded-2xl shadow-xl overflow-hidden" x-data="{ openMorosidadDistId: null }">
+            <div class="p-6 border-b border-slate-800 bg-rose-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-300 font-bold">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            Supervisión de Morosidad y Alertas de Retraso
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-500/30 text-rose-300 border border-rose-500/40">
+                                {{ $distribuidorasMorosasOEnRiesgo->count() }}
+                            </span>
+                        </h2>
+                        <p class="text-slate-400 text-xs mt-0.5">Distribuidoras que acumulan 3 o más cortes con retraso o que han sido declaradas en morosidad. Evalúa la suspensión de emisión de vales.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-950/60 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                        <tr>
+                            <th class="px-6 py-3.5">Distribuidora</th>
+                            <th class="px-6 py-3.5">Sucursal / Coord.</th>
+                            <th class="px-6 py-3.5 text-center">Retrasos Acumulados</th>
+                            <th class="px-6 py-3.5 text-right">Adeudo Exigible</th>
+                            <th class="px-6 py-3.5 text-center">Estado Morosidad</th>
+                            <th class="px-6 py-3.5 text-right">Acción Gerencial</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        @foreach($distribuidorasMorosasOEnRiesgo as $distM)
+                            <tr class="hover:bg-slate-800/40 transition">
+                                <td class="px-6 py-4">
+                                    <div class="font-bold text-white">{{ $distM->name }}</div>
+                                    <div class="text-xs text-slate-400">{{ $distM->email }}</div>
+                                    <div class="text-[11px] font-mono text-indigo-400">{{ $distM->referenciaPago() }}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="text-xs font-semibold text-slate-200">{{ $distM->sucursal?->nombre ?? 'Sin sucursal' }}</div>
+                                    <div class="text-[11px] text-slate-400">Coord: {{ $distM->coordinador?->name ?? 'Sin asignar' }}</div>
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black {{ $distM->conteo_retrasos >= 3 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30' }}">
+                                        {{ $distM->conteo_retrasos }} {{ $distM->conteo_retrasos == 1 ? 'corte' : 'cortes' }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-right font-mono font-bold text-rose-300">
+                                    ${{ number_format($distM->totalAdeudoGlobal(), 2) }}
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    @if($distM->esMorosa())
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-600/20 text-rose-300 border border-rose-500/40 text-xs font-extrabold uppercase tracking-wide">
+                                            <span class="w-2 h-2 rounded-full bg-rose-400 animate-ping"></span>
+                                            MOROSA (Bloqueada)
+                                        </span>
+                                        @if($distM->morosa_at)
+                                            <div class="text-[10px] text-slate-500 mt-1">Desde {{ $distM->morosa_at->format('d/m/Y H:i') }}</div>
+                                        @endif
+                                    @else
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-bold uppercase tracking-wider">
+                                            ⚠️ Alerta (3+ Retrasos)
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <button @click="openMorosidadDistId = (openMorosidadDistId === '{{ $distM->id }}' ? null : '{{ $distM->id }}')"
+                                            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-md transition {{ $distM->esMorosa() ? 'bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30' : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/20' }}">
+                                        {{ $distM->esMorosa() ? 'Quitar Morosidad' : 'Marcar como Morosa' }}
+                                    </button>
+                                </td>
+                            </tr>
+                            <!-- Panel desplegable de confirmación y motivo -->
+                            <tr x-show="openMorosidadDistId === '{{ $distM->id }}'" class="bg-slate-950/60" style="display: none;" x-transition>
+                                <td colspan="6" class="px-6 py-4">
+                                    <form method="POST" action="{{ route('gerente.distribuidores.decidir-morosidad', $distM) }}" class="space-y-3">
+                                        @csrf
+                                        <input type="hidden" name="accion" value="{{ $distM->esMorosa() ? 'desmarcar' : 'marcar' }}">
+                                        
+                                        <div class="p-4 rounded-xl border {{ $distM->esMorosa() ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-rose-950/20 border-rose-500/30' }}">
+                                            <h4 class="text-sm font-bold text-white mb-1">
+                                                {{ $distM->esMorosa() ? '¿Deseas levantar el estado de morosidad para ' . $distM->name . '?' : '¿Declarar a ' . $distM->name . ' en Estado de Morosidad?' }}
+                                            </h4>
+                                            <p class="text-xs text-slate-400">
+                                                {{ $distM->esMorosa() ? 'Al retirar la morosidad, se reseteará su conteo de retrasos y la distribuidora podrá volver a emitir vales.' : 'Al marcar como morosa, TODOS sus vales pendientes de cobro en ventanilla se cancelarán/desactivarán automáticamente y no podrá asignar nuevos vales.' }}
+                                            </p>
+
+                                            @if(!$distM->esMorosa())
+                                                <div class="mt-3">
+                                                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Motivo / Observaciones (Opcional)</label>
+                                                    <textarea name="motivo" rows="2" placeholder="Motivo de la morosidad o notas para auditoría..." class="w-full bg-slate-900 border border-slate-800 rounded-xl text-white px-4 py-2 text-xs focus:ring-1 focus:ring-rose-500 focus:outline-none"></textarea>
+                                                </div>
+                                            @endif
+
+                                            <div class="flex justify-end gap-2 mt-3">
+                                                <button type="button" @click="openMorosidadDistId = null" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold">
+                                                    Cancelar
+                                                </button>
+                                                @if($distM->esMorosa())
+                                                    <button type="submit" onclick="return confirm('¿Confirmas retirar el estado de morosidad?')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg">
+                                                        Confirmar Retiro de Morosidad
+                                                    </button>
+                                                @else
+                                                    <button type="submit" onclick="return confirm('¿Confirmas declarar en MOROSIDAD a esta distribuidora? Sus vales pendientes se cancelarán automáticamente.')" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg">
+                                                        Confirmar Estado de Morosidad
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </form>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
     <!-- Sección: Solicitudes de Traspaso de Coordinadores (Paso 2: Autorización Final Gerencia General) -->
     @if(isset($transferenciasCoordinadorPendientesGG) && $transferenciasCoordinadorPendientesGG->count() > 0)
         <div class="bg-slate-900 border border-amber-500/40 rounded-2xl shadow-xl overflow-hidden" x-data="{ openDecisionCoordId: null }">

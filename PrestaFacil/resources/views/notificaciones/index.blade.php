@@ -34,8 +34,8 @@
     <div class="space-y-3">
         @forelse($notificaciones as $notif)
             <div class="bg-slate-900 border {{ $notif->leida ? 'border-slate-800/80 opacity-80' : 'border-indigo-500/30 bg-slate-900/90 shadow-lg shadow-indigo-500/5' }} rounded-2xl p-4 transition">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="flex items-start gap-3">
+                <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div class="flex items-start gap-3 flex-1 min-w-0">
                         <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5
                             @if(str_contains($notif->tipo, 'corte')) bg-indigo-500/20 text-indigo-400
                             @elseif(str_contains($notif->tipo, 'multa')) bg-rose-500/20 text-rose-400
@@ -61,71 +61,71 @@
                             @endif
                         </div>
 
-                        <div class="space-y-1">
-                            <div class="flex items-center gap-2">
-                                <h3 class="text-sm font-extrabold text-white">{{ $notif->titulo }}</h3>
+                        <div class="space-y-1 min-w-0 flex-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h3 class="text-sm font-extrabold text-white break-words">{{ $notif->titulo }}</h3>
                                 @if(!$notif->leida)
-                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">NUEVA</span>
+                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shrink-0">NUEVA</span>
                                 @endif
                             </div>
-                            <p class="text-xs text-slate-300 leading-relaxed">{{ $notif->mensaje }}</p>
+                            <p class="text-xs text-slate-300 leading-relaxed break-words">{{ $notif->mensaje }}</p>
                             <span class="text-[10px] text-slate-500 font-mono block pt-0.5">{{ $notif->created_at->diffForHumans() }} ({{ $notif->created_at->format('d/m/Y H:i') }})</span>
                         </div>
                     </div>
 
-                        <div class="flex items-center gap-2 shrink-0">
-                            @if($notif->tipo === 'corte_generado')
-                                @php
-                                    $pdfUrl = route('prestamos.relacion-pdf');
-                                    if (isset($notif->data['url']) && !empty($notif->data['url'])) {
-                                        $parsedPath = parse_url($notif->data['url'], PHP_URL_PATH);
-                                        if ($parsedPath) {
-                                            $pdfUrl = url($parsedPath);
-                                        }
-                                    }
-                                @endphp
-                                <a href="{{ $pdfUrl }}" target="_blank" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-[11px] font-bold text-white transition flex items-center gap-1.5 shadow">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                    </svg>
-                                    Abrir PDF
-                                </a>
-                            @elseif(isset($notif->data['url']) && !empty($notif->data['url']))
-                                @php
-                                    $actionUrl = $notif->data['url'];
-                                    $parsedPath = parse_url($actionUrl, PHP_URL_PATH);
+                    <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto pt-2 sm:pt-0">
+                        @if($notif->tipo === 'corte_generado')
+                            @php
+                                $pdfUrl = route('prestamos.relacion-pdf');
+                                if (isset($notif->data['url']) && !empty($notif->data['url'])) {
+                                    $parsedPath = parse_url($notif->data['url'], PHP_URL_PATH);
                                     if ($parsedPath) {
-                                        $actionUrl = url($parsedPath);
+                                        $pdfUrl = url($parsedPath);
                                     }
-                                    $btnText = 'Ver Detalle';
-                                    if (str_contains($notif->tipo, 'transferencia') || str_contains($notif->tipo, 'traspaso')) {
-                                        if (str_contains($notif->tipo, 'requiere_autorizacion') || str_contains($notif->tipo, 'distribuidora')) {
-                                            $btnText = 'Revisar Traspaso';
-                                        } else {
-                                            $btnText = 'Ver Traspaso';
-                                        }
+                                }
+                            @endphp
+                            <a href="{{ $pdfUrl }}" target="_blank" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-[11px] font-bold text-white transition flex items-center gap-1.5 shadow whitespace-nowrap">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                Abrir PDF
+                            </a>
+                        @elseif(isset($notif->data['url']) && !empty($notif->data['url']))
+                            @php
+                                $actionUrl = $notif->data['url'];
+                                $parsedPath = parse_url($actionUrl, PHP_URL_PATH);
+                                if ($parsedPath) {
+                                    $actionUrl = url($parsedPath);
+                                }
+                                $btnText = 'Ver Detalle';
+                                if (str_contains($notif->tipo, 'transferencia') || str_contains($notif->tipo, 'traspaso')) {
+                                    if (str_contains($notif->tipo, 'requiere_autorizacion') || str_contains($notif->tipo, 'distribuidora')) {
+                                        $btnText = 'Revisar Traspaso';
+                                    } else {
+                                        $btnText = 'Ver Traspaso';
                                     }
-                                @endphp
-                                <a href="{{ $actionUrl }}" class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-[11px] font-bold text-white transition flex items-center gap-1.5 shadow">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                    </svg>
-                                    {{ $btnText }}
-                                </a>
-                            @endif
+                                }
+                            @endphp
+                            <a href="{{ $actionUrl }}" class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-[11px] font-bold text-white transition flex items-center gap-1.5 shadow whitespace-nowrap">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                                {{ $btnText }}
+                            </a>
+                        @endif
 
-                            @if(!$notif->leida)
-                                <form novalidate action="{{ route('notificaciones.leer', $notif) }}" method="POST">
-                                    @csrf
-                                    <button type="submit" class="text-[10px] text-slate-400 hover:text-slate-200 transition">
-                                        Marcar leída
-                                    </button>
-                                </form>
-                            @endif
-                        </div>
+                        @if(!$notif->leida)
+                            <form novalidate action="{{ route('notificaciones.leer', $notif) }}" method="POST">
+                                @csrf
+                                <button type="submit" class="text-[10px] text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
+                                    Marcar leída
+                                </button>
+                            </form>
+                        @endif
                     </div>
                 </div>
+            </div>
             </div>
         @empty
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-500 space-y-3">

@@ -440,10 +440,6 @@ class PrestamoController extends Controller
     {
         $operador = $this->operador();
 
-        if ($redirect = $this->verificarBloqueoGerencial($operador)) {
-            return $redirect;
-        }
-
         $this->corteService->verificarYProcesarCortesYVencimientos();
         $configuracion = Configuracion::actual();
 

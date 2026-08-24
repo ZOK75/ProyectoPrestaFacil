@@ -199,25 +199,37 @@ class ProductionFixesTest extends TestCase
     }
 
     /**
-     * 5. Test Gerente General cannot create Verificadores
+     * 5. Test Gerente General can create Verificador but cannot create Distribuidor
      */
-    public function test_gerente_general_cannot_create_verificador(): void
+    public function test_gerente_general_can_create_verificador_but_not_distribuidor(): void
     {
         $ggRol = Rol::whereIn('nombre', ['Gerente General', 'gerente general'])->first();
+        $distRol = Rol::whereIn('nombre', ['Distribuidor', 'distribuidora'])->first();
         $verificadorRol = Rol::whereIn('nombre', ['Verificador', 'verificador'])->first();
         $sucursal = Sucursal::first();
 
         $gerenteGeneral = User::factory()->create(['rol_id' => $ggRol->id, 'sucursal_id' => $sucursal->id]);
 
-        $response = $this->actingAs($gerenteGeneral)->post(route('usuarios.store'), [
+        // Intentar crear Distribuidor (No permitido)
+        $responseDist = $this->actingAs($gerenteGeneral)->post(route('usuarios.store'), [
+            'name' => 'Prueba Distribuidor',
+            'email' => 'dist.test@prestafacil.com',
+            'password' => 'Password123456!',
+            'password_confirmation' => 'Password123456!',
+            'rol_id' => $distRol->id,
+            'sucursal_id' => $sucursal->id,
+        ]);
+        $responseDist->assertSessionHasErrors(['rol_id']);
+
+        // Crear Verificador (Sí permitido)
+        $responseVerif = $this->actingAs($gerenteGeneral)->post(route('usuarios.store'), [
             'name' => 'Prueba Verificador',
-            'email' => 'verificador.test@prestafacil.com',
+            'email' => 'verificadortest@prestafacil.com',
             'password' => 'Password123456!',
             'password_confirmation' => 'Password123456!',
             'rol_id' => $verificadorRol->id,
             'sucursal_id' => $sucursal->id,
         ]);
-
-        $response->assertSessionHasErrors(['rol_id']);
+        $responseVerif->assertSessionHas('success');
     }
 }

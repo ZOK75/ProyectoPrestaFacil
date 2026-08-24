@@ -705,7 +705,7 @@ class CajeroController extends Controller
             ]);
         });
 
-        return back()->with('success', "Canje exitoso. Entregar a distribuidora: $" . number_format($equivalenteEnDinero, 2));
+        return back()->with('success', "Puntos cobrados, realiza la transferencia correspondiente");
     }
 
     /**

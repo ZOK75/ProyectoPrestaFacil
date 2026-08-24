@@ -29,7 +29,7 @@
                 <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                     Nombre Completo <span class="text-rose-400">*</span>
                 </label>
-                <input type="text" name="name" value="{{ old('name') }}" placeholder="ej. Juan Pérez García" required
+                <input type="text" name="name" value="{{ old('name') }}" placeholder="ej. Juan Pérez García" required maxlength="50"
                     class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 @error('name') border-rose-500 @enderror">
                 @error('name')
                     <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>

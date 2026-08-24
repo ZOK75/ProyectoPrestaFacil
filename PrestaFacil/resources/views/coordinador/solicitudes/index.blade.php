@@ -63,13 +63,18 @@
                             <td class="p-4 text-right">
                                 <div class="flex items-center justify-end gap-3">
                                     <a href="{{ route('coordinador.solicitudes.show', $solicitud) }}" 
+                                       x-data="{ clicked: false }" @click="clicked = true" :class="{ 'pointer-events-none opacity-50': clicked }"
                                        class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-medium transition">
                                         Ver Detalle
                                     </a>
                                     @if($solicitud->estado === 'en espera')
                                         <form action="{{ route('coordinador.solicitudes.enviar-verificacion', $solicitud) }}" method="POST" class="inline">
                                             @csrf
-                                            <button type="submit" class="px-3 py-1.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 rounded-lg text-xs font-medium transition" onclick="return confirm('¿Confirmas que los datos son legítimos y deseas enviar la solicitud a verificación presencial?')">
+                                            <button type="submit" 
+                                                x-data="{ clicked: false }" 
+                                                @click="if(confirm('¿Confirmas que los datos son legítimos y deseas enviar la solicitud a verificación presencial?')) { clicked = true; return true; } else { return false; }" 
+                                                :class="{ 'pointer-events-none opacity-50': clicked }"
+                                                class="px-3 py-1.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 rounded-lg text-xs font-medium transition">
                                                 Validar y Enviar
                                             </button>
                                         </form>

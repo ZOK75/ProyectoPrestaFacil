@@ -16,21 +16,14 @@
         </a>
     </div>
 
-    @if ($errors->any())
-        <div class="p-5 rounded-2xl bg-rose-500/10 border border-rose-500/30 shadow-lg">
-            <div class="flex items-center gap-2 text-rose-400 font-bold mb-2">
+        <div class="p-5 rounded-2xl bg-rose-500/10 border border-rose-500/30 shadow-lg mb-6">
+            <div class="flex items-center gap-2 text-rose-400 font-bold">
                 <svg class="w-5 h-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                 </svg>
-                <span>Por favor, corrige los siguientes campos de la solicitud:</span>
+                <span>Faltan uno o más campos obligatorios por llenar o tienen formato incorrecto.</span>
             </div>
-            <ul class="list-disc list-inside text-rose-300 text-xs space-y-1 pl-1">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
         </div>
-    @endif
 
     <form action="{{ route('coordinador.solicitudes.store') }}" method="POST" class="space-y-6" novalidate>
         @csrf
@@ -189,7 +182,7 @@
                             <div class="flex items-end justify-between gap-2">
                                 <div class="flex-grow">
                                     <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Teléfono de Contacto (Opcional)</label>
-                                    <input type="text" :name="`datos_familiares[${index}][contacto]`" x-model="fam.contacto" placeholder="10 dígitos"
+                                    <input type="text" :name="`datos_familiares[${index}][contacto]`" x-model="fam.contacto" placeholder="10 dígitos" maxlength="10"
                                            class="w-full bg-slate-950 border border-slate-800 rounded-lg text-white px-3 py-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none">
                                 </div>
                                 <button type="button" @click="familiares.splice(index, 1)" 
@@ -208,13 +201,13 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
-                    + Agregar Familiar de Referencia
+                    Agregar Familiar de Referencia
                 </button>
             </div>
             
             <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1 uppercase tracking-wider">Datos de Vehículos (Opcional)</label>
-                <textarea name="datos_vehiculos" rows="2" 
+                <label class="block text-xs font-semibold text-slate-300 mb-1 uppercase tracking-wider">Datos de Vehículos <span class="text-rose-400">*</span></label>
+                <textarea name="datos_vehiculos" rows="2" required
                           class="w-full bg-slate-950 border @error('datos_vehiculos') border-rose-500 ring-1 ring-rose-500 @else border-slate-800 @enderror rounded-xl text-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none placeholder-slate-600 transition" 
                           placeholder="Ej: Nissan Versa 2018, Placas ABC-123. Si no tiene escribir 'No tengo'">{{ old('datos_vehiculos') }}</textarea>
                 @error('datos_vehiculos')
@@ -233,8 +226,8 @@
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1 uppercase tracking-wider">Referencias Laborales (Opcional)</label>
-                <textarea name="referencias_laborales" rows="2" 
+                <label class="block text-xs font-semibold text-slate-300 mb-1 uppercase tracking-wider">Referencias Laborales <span class="text-rose-400">*</span></label>
+                <textarea name="referencias_laborales" rows="2" required
                           class="w-full bg-slate-950 border @error('referencias_laborales') border-rose-500 ring-1 ring-rose-500 @else border-slate-800 @enderror rounded-xl text-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none placeholder-slate-600 transition" 
                           placeholder="Ej: Comercio propio / Empleo anterior en Empresa XYZ, Tel: 81-5555-9999, Jefe Directo: Pedro Gómez">{{ old('referencias_laborales') }}</textarea>
                 @error('referencias_laborales')

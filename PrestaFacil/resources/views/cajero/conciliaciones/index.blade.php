@@ -89,7 +89,7 @@
                             </div>
                         </div>
 
-                        @if($c->estado === 'pendiente')
+                        @if(in_array($c->estado, ['pendiente', 'pendiente_coordinador', 'pendiente_gerencia']))
                             <span class="px-2 py-0.5 rounded text-[9px] font-black bg-amber-500/20 text-amber-300 uppercase border border-amber-500/30">Pendiente</span>
                         @elseif($c->estado === 'conciliado' || $c->estado === 'aprobada')
                             <span class="px-2 py-0.5 rounded text-[9px] font-black bg-emerald-500/20 text-emerald-300 uppercase border border-emerald-500/30">Conciliado</span>

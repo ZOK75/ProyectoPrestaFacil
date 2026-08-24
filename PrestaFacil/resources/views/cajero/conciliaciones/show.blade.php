@@ -13,7 +13,7 @@
 
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden space-y-4">
         
-        @if($conciliacion->estado === 'pendiente')
+        @if(in_array($conciliacion->estado, ['pendiente', 'pendiente_coordinador', 'pendiente_gerencia']))
             <div class="absolute top-0 left-0 w-full h-1.5 bg-amber-500"></div>
         @elseif($conciliacion->estado === 'conciliado' || $conciliacion->estado === 'aprobada')
             <div class="absolute top-0 left-0 w-full h-1.5 bg-emerald-500"></div>
@@ -27,7 +27,7 @@
                 <span class="text-[10px] font-mono text-slate-400">{{ $conciliacion->created_at->format('d/m/Y H:i:s') }}</span>
             </div>
             
-            @if($conciliacion->estado === 'pendiente')
+            @if(in_array($conciliacion->estado, ['pendiente', 'pendiente_coordinador', 'pendiente_gerencia']))
                 <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 uppercase border border-amber-500/30">Pendiente</span>
             @elseif($conciliacion->estado === 'conciliado' || $conciliacion->estado === 'aprobada')
                 <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 uppercase border border-emerald-500/30">Conciliado</span>

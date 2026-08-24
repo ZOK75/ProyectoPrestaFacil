@@ -177,8 +177,8 @@ class CoordinadorController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'nombres' => 'required|string|min:2|max:255',
-            'apellidos' => 'required|string|min:2|max:255',
+            'nombres' => ['required', 'string', 'min:2', 'max:255', 'regex:/^[a-zA-Z\sñÑáéíóúÁÉÍÓÚ]+$/'],
+            'apellidos' => ['required', 'string', 'min:2', 'max:255', 'regex:/^[a-zA-Z\sñÑáéíóúÁÉÍÓÚ]+$/'],
             'telefono' => 'required|string|regex:/^[0-9]{10}$/',
             'fecha_nacimiento' => 'required|date|before:today',
             'curp' => 'required|string|size:18|regex:/^[A-Z]{4}[0-9]{6}[H,M][A-Z]{5}[0-9,A-Z][0-9]$/i',
@@ -190,7 +190,7 @@ class CoordinadorController extends Controller
             'ciudad' => 'required|string|min:2|max:255',
             'estado_republica' => 'required|string|min:2|max:255',
             'datos_familiares' => 'nullable|array',
-            'datos_familiares.*.nombre' => 'required_with:datos_familiares|string|max:255',
+            'datos_familiares.*.nombre' => ['required_with:datos_familiares', 'string', 'max:255', 'regex:/^[a-zA-Z\sñÑáéíóúÁÉÍÓÚ]+$/'],
             'datos_familiares.*.parentesco' => 'required_with:datos_familiares|string|max:100',
             'datos_familiares.*.contacto' => 'nullable|string|max:100',
             'datos_vehiculos' => 'required|string|max:500',
@@ -200,9 +200,11 @@ class CoordinadorController extends Controller
             'nombres.required' => 'El nombre o nombres de la distribuidora son obligatorios.',
             'nombres.min' => 'El campo nombres debe tener al menos :min caracteres.',
             'nombres.max' => 'El campo nombres no puede superar los :max caracteres.',
+            'nombres.regex' => 'El nombre de la distribuidora solo puede contener letras y espacios.',
             'apellidos.required' => 'Los apellidos de la distribuidora son obligatorios.',
             'apellidos.min' => 'El campo apellidos debe tener al menos :min caracteres.',
             'apellidos.max' => 'El campo apellidos no puede superar los :max caracteres.',
+            'apellidos.regex' => 'Los apellidos solo pueden contener letras y espacios.',
             'telefono.required' => 'El número de teléfono celular es obligatorio.',
             'telefono.regex' => 'El número de teléfono debe contener exactamente 10 dígitos numéricos.',
             'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
@@ -233,6 +235,7 @@ class CoordinadorController extends Controller
             'referencias_laborales.required' => 'Las referencias laborales son obligatorias.',
             'referencias_laborales.max' => 'Las referencias laborales no pueden exceder los :max caracteres.',
             'datos_familiares.*.nombre.required_with' => 'El nombre completo del familiar de referencia es obligatorio.',
+            'datos_familiares.*.nombre.regex' => 'El nombre del familiar solo puede contener letras y espacios.',
             'datos_familiares.*.parentesco.required_with' => 'El parentesco del familiar de referencia es obligatorio.',
         ]);
 

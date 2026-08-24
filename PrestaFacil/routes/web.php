@@ -144,10 +144,8 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('require.vpn')
             ->name('gerente-sucursal.solicitudes.decidir');
         Route::post('/coordinadores/traspasar', [GerenteSucursalController::class, 'solicitarTraspasoCoordinador'])
-            ->middleware('require.vpn')
             ->name('gerente-sucursal.coordinadores.traspasar');
         Route::post('/coordinadores/traspaso/{transferencia}/decidir', [GerenteSucursalController::class, 'decidirTraspasoCoordinador'])
-            ->middleware('require.vpn')
             ->name('gerente-sucursal.coordinadores.traspaso.decidir');
     });
 
@@ -170,6 +168,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/gerente-sucursal/transferencias/{transferencia}/decidir', [GerenteSucursalController::class, 'decidirTransferencia'])
             ->middleware('require.vpn')
             ->name('gerente-sucursal.transferencias.decidir');
+        Route::post('/gerente/conciliaciones/{conciliacion}/decidir', [GerenteSucursalController::class, 'decidirConciliacionGerencia'])
+            ->name('gerente.conciliaciones.decidir');
     });
 
     // ──────────────────────────────────────────
@@ -189,7 +189,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('distribuidores/{distribuidor}/solicitar-credito', [\App\Http\Controllers\CoordinadorController::class, 'solicitarCredito'])->name('distribuidores.solicitar-credito');
         Route::post('distribuidores/{distribuidor}/solicitar-transferencia', [\App\Http\Controllers\CoordinadorController::class, 'solicitarTransferencia'])->name('distribuidores.solicitar-transferencia');
         Route::get('transferencias/{transferencia}/revisar', [\App\Http\Controllers\CoordinadorController::class, 'revisarTransferencia'])->name('transferencias.revisar');
-        Route::post('transferencias/{transferencia}/decidir', [\App\Http\Controllers\CoordinadorController::class, 'decidirTransferencia'])->middleware('require.vpn')->name('transferencias.decidir');
+        Route::post('transferencias/{transferencia}/decidir', [\App\Http\Controllers\CoordinadorController::class, 'decidirTransferencia'])->name('transferencias.decidir');
+        Route::post('conciliaciones/{conciliacion}/decidir', [\App\Http\Controllers\CoordinadorController::class, 'decidirConciliacion'])->name('conciliaciones.decidir');
     });
 
     // 5. Verificador Dashboard y Rutas
@@ -291,8 +292,8 @@ Route::middleware(['auth'])->group(function () {
     // ──────────────────────────────────────────
     Route::middleware(['role:distribuidor,administrador'])->group(function () {
         Route::resource('clientes', ClienteController::class);
-        Route::post('clientes/{cliente}/traspasar', [ClienteController::class, 'solicitarTraspaso'])->middleware('require.vpn')->name('clientes.traspasar');
-        Route::post('clientes/traspasos/{traspaso}/decidir-receptor', [ClienteController::class, 'decidirTraspasoReceptor'])->middleware('require.vpn')->name('clientes.traspasos.decidir-receptor');
+        Route::post('clientes/{cliente}/traspasar', [ClienteController::class, 'solicitarTraspaso'])->name('clientes.traspasar');
+        Route::post('clientes/traspasos/{traspaso}/decidir-receptor', [ClienteController::class, 'decidirTraspasoReceptor'])->name('clientes.traspasos.decidir-receptor');
     });
 
     Route::middleware(['role:coordinador,gerente_general,administrador'])->group(function () {

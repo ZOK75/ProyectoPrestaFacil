@@ -332,6 +332,10 @@ class CajeroController extends Controller
             'observaciones' => 'nullable|string|max:500',
         ]);
 
+        if (floatval($request->monto_abonado) >= 1000000) {
+            return back()->with('error', 'Límite de un solo abono debe ser menor a 1 millón.')->withInput();
+        }
+
         // Validar que la referencia ingresada coincida con la referencia oficial de la distribuidora
         $refIngresada = strtoupper(trim($request->referencia_pago));
         $refOficial = strtoupper(trim($distribuidora->referenciaPago()));
@@ -359,13 +363,11 @@ class CajeroController extends Controller
                 $abonoM = min($montoRestante, floatval($pm->multas));
                 $pm->decrement('multas', $abonoM);
                 $montoRestante -= $abonoM;
-            }
 
-            // Recalcular multas en distribuidora
-            $multasRestantesTotal = Prestamo::where('created_by_user_id', $distribuidora->id)
-                ->where('estado', 'activo')
-                ->sum('multas');
-            $distribuidora->update(['multas' => $multasRestantesTotal]);
+                if ($distribuidora->multas > 0) {
+                    $distribuidora->decrement('multas', min($abonoM, floatval($distribuidora->multas)));
+                }
+            }
 
             // 2. Distribuir a los préstamos activos con adeudo pendiente
             $prestamos = Prestamo::where('created_by_user_id', $distribuidora->id)
@@ -383,11 +385,11 @@ class CajeroController extends Controller
 
                 $pago = PagoPrestamo::create([
                     'prestamo_id' => $prestamo->id,
-                    'folio_pago' => 'PAG-' . strtoupper(uniqid()),
+                    'folio_pago' => 'PAG-DIST-' . strtoupper(uniqid()),
                     'numero_quincena' => $prestamo->pagos_realizados + 1,
                     'monto_abonado' => $pagoPrestamo,
                     'metodo_pago' => $request->metodo_pago,
-                    'observaciones' => ($request->observaciones ? $request->observaciones . ' | ' : '') . "Abono distribuidora (Ref: {$request->referencia_pago})",
+                    'observaciones' => "Abono general distribuidora. " . ($request->observaciones ?? ''),
                     'registrado_por_user_id' => $cajera->id,
                 ]);
 
@@ -432,6 +434,10 @@ class CajeroController extends Controller
      */
     public function registrarAbono(RegistrarAbonoRequest $request, Prestamo $prestamo)
     {
+        if (floatval($request->monto_abonado) >= 1000000) {
+            return back()->with('error', 'Límite de un solo abono debe ser menor a 1 millón.')->withInput();
+        }
+
         $cajera = $this->cajera();
         $ahora = now();
         $distribuidora = $prestamo->createdBy;
@@ -558,6 +564,17 @@ class CajeroController extends Controller
             'evidencia' => 'nullable|file|max:5120',
         ]);
 
+        // Verificar si ya existe una conciliación pendiente para esta referencia o pago
+        $existente = Conciliacion::where(function($q) use ($request) {
+            if ($request->prestamo_id) $q->orWhere('prestamo_id', $request->prestamo_id);
+            if ($request->pago_prestamo_id) $q->orWhere('pago_prestamo_id', $request->pago_prestamo_id);
+            if ($request->referencia_conciliacion) $q->orWhere('referencia_conciliacion', $request->referencia_conciliacion);
+        })->whereIn('estado', ['pendiente_coordinador', 'pendiente_gerencia', 'pendiente'])->first();
+
+        if ($existente) {
+            return back()->with('error', 'Ya existe una solicitud de conciliación manual pendiente para esta referencia o pago.')->withInput();
+        }
+
         $cajera = $this->cajera();
         
         $path = null;
@@ -566,10 +583,12 @@ class CajeroController extends Controller
         }
 
         DB::transaction(function () use ($request, $cajera, $path) {
+            $distribuidoraId = $request->distribuidora_id ?: ($request->prestamo_id ? Prestamo::find($request->prestamo_id)?->created_by_user_id : null);
+
             $conciliacion = Conciliacion::create([
                 'prestamo_id' => $request->prestamo_id ?: null,
                 'pago_prestamo_id' => $request->pago_prestamo_id ?: null,
-                'distribuidora_id' => $request->distribuidora_id ?: null,
+                'distribuidora_id' => $distribuidoraId,
                 'referencia_original' => $request->referencia_original,
                 'referencia_conciliacion' => $request->referencia_conciliacion,
                 'fecha_pago' => $request->fecha_pago,
@@ -579,7 +598,7 @@ class CajeroController extends Controller
                 'motivo' => $request->motivo,
                 'evidencia_path' => $path,
                 'solicitante_id' => $cajera->id,
-                'estado' => 'pendiente',
+                'estado' => 'pendiente_coordinador',
             ]);
 
             $solicitud = SolicitudAutorizacion::create([
@@ -601,18 +620,29 @@ class CajeroController extends Controller
                 'evidencia_path' => $path,
             ]);
 
-            NotificacionService::notificarAutorizadores(
-                $cajera->sucursal_id,
-                'NUEVA_CONCILIACION',
-                'Solicitud de Conciliación Manual',
-                "La cajera {$cajera->name} solicita una corrección/conciliación de pago (Ref: {$request->referencia_conciliacion})",
-                ['entidad_tipo' => 'solicitudes_autorizacion', 'entidad_id' => $solicitud->id]
-            );
+            // Notificar a los coordinadores de la sucursal del cajero
+            $coordinadores = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Coordinador', 'coordinador']))
+                ->where('sucursal_id', $cajera->sucursal_id)
+                ->where('activo', true)
+                ->get();
 
-            AuditService::registrar('SOLICITUD_CONCILIACION', "Conciliación por \${$request->monto_corregido} con referencia {$request->referencia_conciliacion}");
+            foreach ($coordinadores as $coord) {
+                NotificacionCajero::enviar(
+                    $coord->id,
+                    'conciliacion_solicitada_coordinador',
+                    'Solicitud de Conciliación Manual',
+                    "La cajera {$cajera->name} solicita la revisión y pre-aprobación de una conciliación manual por \${$request->monto_corregido}.",
+                    [
+                        'conciliacion_id' => $conciliacion->id,
+                        'referencia' => $request->referencia_conciliacion,
+                    ]
+                );
+            }
+
+            AuditService::registrar('SOLICITUD_CONCILIACION', "Conciliación por \${$request->monto_corregido} enviada a Coordinación por {$cajera->name}");
         });
 
-        return back()->with('success', 'Solicitud de conciliación enviada a Coordinación.');
+        return back()->with('success', 'Solicitud de conciliación enviada exitosamente a Coordinación para su pre-aprobación.');
     }
     
     public function mostrarConciliacion(Conciliacion $conciliacion)

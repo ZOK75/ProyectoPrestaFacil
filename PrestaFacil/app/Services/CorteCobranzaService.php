@@ -52,7 +52,15 @@ class CorteCobranzaService
                         continue;
                     }
 
-                    $totalProductos = floatval(Prestamo::where('created_by_user_id', $dist->id)->where('estado', 'activo')->sum('monto_prestamo'));
+                    $totalProductos = floatval(Prestamo::where('created_by_user_id', $dist->id)
+                        ->where(function($q) {
+                            $q->where('estado', 'activo')
+                              ->orWhere(function($q2) {
+                                  $q2->where('estado', 'finalizado')
+                                     ->where('updated_at', '>=', now()->subDays(30));
+                              });
+                        })
+                        ->sum('monto_prestamo'));
                     $totalQuincenal = floatval(Prestamo::where('created_by_user_id', $dist->id)->where('estado', 'activo')->sum('cuota_quincenal'));
                     $multasDistribuidora = floatval($dist->multas ?? 0.0);
                     $total15nalExigible = $totalQuincenal + $multasDistribuidora;

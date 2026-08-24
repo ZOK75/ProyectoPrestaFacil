@@ -21,7 +21,7 @@ class VerificadorController extends Controller
 
         // Solicitudes pendientes de evaluar en la sucursal del verificador
         $solicitudesPendientes = SolicitudDistribuidor::where('sucursal_id', $user->sucursal_id)
-            ->where('estado', 'en espera de verificacion')
+            ->whereIn('estado', ['en espera de verificacion', 'en espera'])
             ->orderBy('created_at', 'desc')
             ->get();
 

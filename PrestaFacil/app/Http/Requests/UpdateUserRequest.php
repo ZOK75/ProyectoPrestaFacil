@@ -18,7 +18,7 @@ class UpdateUserRequest extends FormRequest
         $userId = $this->route('usuario')?->id ?? $this->route('usuario');
 
         return [
-            'name' => ['required', 'string', 'min:3', 'max:255'],
+            'name' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[a-zA-Z\sñÑáéíóúÁÉÍÓÚ]+$/'],
             'email' => [
                 'required',
                 'string',
@@ -41,6 +41,8 @@ class UpdateUserRequest extends FormRequest
         return [
             'name.required' => 'El nombre del usuario es obligatorio.',
             'name.min' => 'El nombre del usuario debe tener al menos 3 caracteres.',
+            'name.max' => 'El nombre del usuario no debe superar los 50 caracteres.',
+            'name.regex' => 'El nombre del usuario solo puede contener letras y espacios.',
             'email.required' => 'El correo electrónico es obligatorio.',
             'email.email' => 'Ingresa un correo electrónico válido.',
             'email.unique' => 'Este correo ya lo usa otro usuario.',

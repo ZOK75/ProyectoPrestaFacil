@@ -15,7 +15,7 @@ class StoreUserRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'min:3', 'max:255'],
+            'name' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[a-zA-Z\sñÑáéíóúÁÉÍÓÚ]+$/'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'confirmed', Password::min(12)],
             'rol_id' => ['required', 'exists:roles,id'],
@@ -29,6 +29,8 @@ class StoreUserRequest extends FormRequest
         return [
             'name.required' => 'El nombre del usuario es obligatorio.',
             'name.min' => 'El nombre del usuario debe tener al menos 3 caracteres.',
+            'name.max' => 'El nombre del usuario no debe superar los 50 caracteres.',
+            'name.regex' => 'El nombre del usuario solo puede contener letras y espacios.',
             'email.required' => 'El correo electrónico es obligatorio.',
             'email.email' => 'Ingresa un correo electrónico válido.',
             'email.unique' => 'Este correo electrónico ya está registrado en el sistema.',

@@ -21,7 +21,7 @@
 
         <div>
             <label for="name" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Nombre Completo</label>
-            <input id="name" name="name" type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl text-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition" value="{{ old('name', $user->name) }}" required autofocus autocomplete="name" />
+            <input id="name" name="name" type="text" maxlength="50" class="w-full bg-slate-950 border border-slate-800 rounded-xl text-white px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition" value="{{ old('name', $user->name) }}" required autofocus autocomplete="name" />
             @if($errors->has('name'))
                 <span class="text-xs text-rose-400 font-semibold mt-1 block">{{ $errors->first('name') }}</span>
             @endif

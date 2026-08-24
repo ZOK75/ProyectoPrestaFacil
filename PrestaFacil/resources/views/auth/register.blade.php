@@ -28,6 +28,7 @@
                        required 
                        autofocus 
                        autocomplete="name"
+                       maxlength="50"
                        placeholder="Juan Pérez"
                        class="w-full px-4 py-3 bg-white border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl text-slate-800 placeholder-slate-400 text-sm transition duration-150 ease-in-out outline-none">
                 <x-input-error :messages="$errors->get('name')" class="mt-2" />

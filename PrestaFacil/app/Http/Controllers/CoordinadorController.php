@@ -193,9 +193,9 @@ class CoordinadorController extends Controller
             'datos_familiares.*.nombre' => 'required_with:datos_familiares|string|max:255',
             'datos_familiares.*.parentesco' => 'required_with:datos_familiares|string|max:100',
             'datos_familiares.*.contacto' => 'nullable|string|max:100',
-            'datos_vehiculos' => 'nullable|string|max:500',
+            'datos_vehiculos' => 'required|string|max:500',
             'datos_casa' => 'required|string|min:5|max:1000',
-            'referencias_laborales' => 'nullable|string|max:1000',
+            'referencias_laborales' => 'required|string|max:1000',
         ], [
             'nombres.required' => 'El nombre o nombres de la distribuidora son obligatorios.',
             'nombres.min' => 'El campo nombres debe tener al menos :min caracteres.',
@@ -228,7 +228,9 @@ class CoordinadorController extends Controller
             'datos_casa.required' => 'La descripción y características de la casa son obligatorias.',
             'datos_casa.min' => 'La descripción de la vivienda debe contener al menos :min caracteres.',
             'datos_casa.max' => 'La descripción de la casa no puede exceder los :max caracteres.',
+            'datos_vehiculos.required' => 'Los datos de vehículos son obligatorios.',
             'datos_vehiculos.max' => 'Los datos de vehículos no pueden exceder los :max caracteres.',
+            'referencias_laborales.required' => 'Las referencias laborales son obligatorias.',
             'referencias_laborales.max' => 'Las referencias laborales no pueden exceder los :max caracteres.',
             'datos_familiares.*.nombre.required_with' => 'El nombre completo del familiar de referencia es obligatorio.',
             'datos_familiares.*.parentesco.required_with' => 'El parentesco del familiar de referencia es obligatorio.',
@@ -255,6 +257,20 @@ class CoordinadorController extends Controller
             'sucursal_id' => Auth::user()->sucursal_id,
             'estado' => 'en espera de verificacion',
         ]);
+
+        $verificadores = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Verificador', 'verificador']))
+            ->where('sucursal_id', Auth::user()->sucursal_id)
+            ->where('activo', true)
+            ->get();
+
+        foreach ($verificadores as $verificador) {
+            \App\Models\NotificacionCajero::enviar(
+                $verificador->id,
+                'solicitud_verificacion',
+                'Nueva Solicitud de Distribuidora por Verificar',
+                "El coordinador " . Auth::user()->name . " ha registrado a '{$request->nombres} {$request->apellidos}' y requiere verificación domiciliaria/presencial."
+            );
+        }
 
         return redirect()->route('coordinador.solicitudes.index')
                          ->with('success', 'Solicitud de distribuidora creada exitosamente y enviada a verificación.');
@@ -287,6 +303,20 @@ class CoordinadorController extends Controller
             'estado' => 'en espera de verificacion'
         ]);
 
+        $verificadores = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Verificador', 'verificador']))
+            ->where('sucursal_id', Auth::user()->sucursal_id)
+            ->where('activo', true)
+            ->get();
+
+        foreach ($verificadores as $verificador) {
+            \App\Models\NotificacionCajero::enviar(
+                $verificador->id,
+                'solicitud_verificacion',
+                'Solicitud de Distribuidora Enviada a Verificación',
+                "El coordinador " . Auth::user()->name . " ha enviado la solicitud de '{$solicitud->nombres} {$solicitud->apellidos}' para su verificación presencial."
+            );
+        }
+
         return redirect()->route('coordinador.solicitudes.index')
                          ->with('success', 'La solicitud ha sido enviada al Verificador para la evaluación presencial.');
     }
@@ -304,18 +334,19 @@ class CoordinadorController extends Controller
         }
 
         $request->validate([
-            'limite_nuevo' => 'required|numeric|min:' . ($distribuidor->limite_credito + 0.01),
+            'limite_nuevo' => 'required|numeric|max:999999|min:' . ($distribuidor->limite_credito + 0.01),
             'motivo' => 'required|string|min:5|max:500',
         ], [
             'limite_nuevo.required' => 'Debes ingresar el nuevo límite de crédito solicitado.',
             'limite_nuevo.numeric' => 'El nuevo límite de crédito debe ser un número válido.',
             'limite_nuevo.min' => 'El nuevo límite ($:value) debe ser mayor al límite de crédito actual ($' . number_format($distribuidor->limite_credito, 2) . ').',
+            'limite_nuevo.max' => 'El nuevo límite de crédito no puede exceder los $999,999.00.',
             'motivo.required' => 'El motivo o justificación del aumento de crédito es obligatorio.',
             'motivo.min' => 'El motivo debe contener al menos :min caracteres.',
             'motivo.max' => 'El motivo no puede exceder los :max caracteres.',
         ]);
 
-        SolicitudCredito::create([
+        $solicitud = SolicitudCredito::create([
             'distribuidor_id' => $distribuidor->id,
             'coordinador_id' => $coordinador->id,
             'limite_actual' => $distribuidor->limite_credito,
@@ -323,6 +354,23 @@ class CoordinadorController extends Controller
             'motivo' => $request->motivo,
             'estado' => 'pendiente',
         ]);
+
+        $gerentes = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente General', 'Administrador']))
+            ->where(function($q) use ($coordinador) {
+                $q->where('sucursal_id', $coordinador->sucursal_id)
+                  ->orWhereHas('rol', fn($r) => $r->whereIn('nombre', ['Gerente General', 'Administrador']));
+            })
+            ->where('activo', true)
+            ->get();
+
+        foreach ($gerentes as $gerente) {
+            \App\Models\NotificacionCajero::enviar(
+                $gerente->id,
+                'solicitud_credito',
+                'Nueva Solicitud de Aumento de Crédito',
+                "El coordinador {$coordinador->name} solicita un aumento para {$distribuidor->name} de $" . number_format($distribuidor->limite_credito, 2) . " a $" . number_format($request->limite_nuevo, 2) . "."
+            );
+        }
 
         return redirect()->route('coordinador.dashboard')
             ->with('success', 'Solicitud de incremento de crédito enviada al Gerente de Sucursal para su autorización.');
@@ -341,11 +389,13 @@ class CoordinadorController extends Controller
 
         $request->validate([
             'coordinador_receptor_id' => 'required|exists:users,id|different:coordinador_emisor_id',
+            'distribuidor_reasignacion_id' => 'nullable|exists:users,id',
             'motivo' => 'required|string|min:5|max:600',
         ], [
             'coordinador_receptor_id.required' => 'Debes seleccionar el coordinador de destino.',
             'coordinador_receptor_id.exists' => 'El coordinador seleccionado no es válido o no existe.',
             'coordinador_receptor_id.different' => 'No puedes transferirte la distribuidora a ti mismo.',
+            'distribuidor_reasignacion_id.exists' => 'La distribuidora de reasignación no es válida.',
             'motivo.required' => 'El motivo del traspaso de la distribuidora es obligatorio.',
             'motivo.min' => 'El motivo del traspaso debe contener al menos :min caracteres.',
             'motivo.max' => 'El motivo del traspaso no puede superar los :max caracteres.',
@@ -367,6 +417,25 @@ class CoordinadorController extends Controller
 
         $sucursalOrigenId = $distribuidor->sucursal_id ?? $emisor->sucursal_id;
         $sucursalDestinoId = $receptor->sucursal_id ?? $sucursalOrigenId;
+
+        // Si se seleccionó una distribuidora para reasignar la cartera
+        if ($request->filled('distribuidor_reasignacion_id')) {
+            if ($request->distribuidor_reasignacion_id == $distribuidor->id) {
+                return back()->with('error', 'No puedes reasignar los clientes a la misma distribuidora que se está transfiriendo.');
+            }
+            
+            $nuevoDistribuidor = User::findOrFail($request->distribuidor_reasignacion_id);
+            if ($nuevoDistribuidor->esDistribuidor() && $nuevoDistribuidor->coordinador_id == $emisor->id) {
+                \Illuminate\Support\Facades\DB::transaction(function () use ($distribuidor, $nuevoDistribuidor) {
+                    \App\Models\Cliente::where('created_by_user_id', $distribuidor->id)
+                        ->update(['created_by_user_id' => $nuevoDistribuidor->id]);
+                    \App\Models\Prestamo::where('created_by_user_id', $distribuidor->id)
+                        ->update(['created_by_user_id' => $nuevoDistribuidor->id]);
+                });
+            } else {
+                return back()->with('error', 'La distribuidora de reasignación seleccionada no es válida o no pertenece a tu coordinación.');
+            }
+        }
 
         $transferencia = SolicitudTransferencia::create([
             'distribuidor_id' => $distribuidor->id,

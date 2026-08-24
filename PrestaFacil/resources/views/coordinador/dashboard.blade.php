@@ -423,7 +423,7 @@
                                 </div>
                             </td>
                             <td class="p-3.5 sm:p-4">
-                                <span class="px-2.5 py-1 rounded-md text-[11px] font-semibold border
+                                <span class="whitespace-nowrap px-2.5 py-1 rounded-md text-[11px] font-semibold border
                                     @if(strtoupper($dist->categoria_distribuidor) === 'ORO') bg-amber-500/10 text-amber-400 border-amber-500/20
                                     @elseif(strtoupper($dist->categoria_distribuidor) === 'PLATA') bg-slate-300/10 text-slate-300 border-slate-300/20
                                     @elseif(strtoupper($dist->categoria_distribuidor) === 'BRONCE') bg-orange-500/10 text-orange-400 border-orange-500/20
@@ -634,6 +634,17 @@
                             @endforeach
                         </select>
                         <p class="text-[10px] text-slate-500 mt-1">El coordinador receptor recibirá una notificación para revisar a la distribuidora y su cartera activa de préstamos.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Reasignar Cartera de Clientes a (Opcional)</label>
+                        <select name="distribuidor_reasignacion_id" class="w-full bg-slate-950 border border-slate-800 rounded-xl text-white px-4 py-2.5 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                            <option value="">No reasignar (la distribuidora conserva sus clientes)</option>
+                            @foreach($distribuidores as $d)
+                                <option value="{{ $d->id }}" x-show="transferDistId != '{{ $d->id }}'">{{ $d->name }}</option>
+                            @endforeach
+                        </select>
+                        <p class="text-[10px] text-slate-500 mt-1">Si seleccionas una distribuidora local, todos los clientes de la distribuidora transferida pasarán a la nueva antes de irse.</p>
                     </div>
 
                     <div>

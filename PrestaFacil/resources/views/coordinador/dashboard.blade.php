@@ -128,6 +128,63 @@
         </div>
     </div>
 
+    <!-- SECCIÓN: Conciliaciones Manuales Pendientes de Revisión por el Coordinador -->
+    @if(isset($conciliacionesPendientes) && $conciliacionesPendientes->count() > 0)
+        <div class="bg-slate-900 border border-cyan-500/40 rounded-2xl shadow-xl overflow-hidden mb-6">
+            <div class="p-4 sm:p-5 border-b border-slate-800 bg-cyan-950/20 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-300 font-bold">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-sm sm:text-base font-bold text-white">Conciliaciones Manuales de Cajero (Pre-Aprobación Requerida)</h2>
+                        <p class="text-slate-400 text-xs">Revisa y dictamina las solicitudes de conciliación enviadas por los cajeros de tu sucursal.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divide-y divide-slate-800">
+                @foreach($conciliacionesPendientes as $conc)
+                    <div class="p-4 sm:p-5 space-y-3">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <span class="text-xs font-bold text-cyan-400 font-mono">Ref. Conciliación: {{ $conc->referencia_conciliacion ?: 'N/A' }}</span>
+                                <p class="text-xs text-slate-300">Solicitado por: <strong>{{ $conc->solicitante?->name }}</strong> (Cajero) &bull; {{ $conc->created_at->format('d/m/Y H:i') }}</p>
+                                @if($conc->distribuidora)
+                                    <p class="text-xs text-slate-400">Distribuidora: <strong class="text-white">{{ $conc->distribuidora->name }}</strong></p>
+                                @endif
+                                <p class="text-xs text-slate-300 mt-1 italic bg-slate-950/60 p-2 rounded-lg border border-slate-800">"{{ $conc->motivo }}"</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <span class="text-xs text-slate-500 block uppercase">Monto a Conciliar</span>
+                                <span class="text-lg font-black text-emerald-400 font-mono">${{ number_format($conc->monto_corregido, 2) }}</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 pt-2 border-t border-slate-800/80">
+                            <form action="{{ route('coordinador.conciliaciones.decidir', $conc) }}" method="POST" class="inline-flex gap-2">
+                                @csrf
+                                <input type="hidden" name="accion" value="aceptar">
+                                <button type="submit" onclick="return confirm('¿Deseas pre-aprobar esta conciliación y enviarla a Gerencia?')" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow">
+                                    Pre-Aprobar y Enviar a Gerencia
+                                </button>
+                            </form>
+                            <form action="{{ route('coordinador.conciliaciones.decidir', $conc) }}" method="POST" class="inline-flex gap-2">
+                                @csrf
+                                <input type="hidden" name="accion" value="rechazar">
+                                <button type="submit" onclick="return confirm('¿Deseas rechazar esta conciliación?')" class="px-3.5 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
+                                    Rechazar Conciliación
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <!-- SECCIÓN: Solicitudes de Transferencia de Distribuidoras (Recibidas y Emitidas) -->
     @if($transferenciasRecibidas->count() > 0 || $transferenciasEmitidas->count() > 0)
         <div class="space-y-4">

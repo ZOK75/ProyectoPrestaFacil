@@ -66,6 +66,17 @@ class GerenteGeneralController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Conciliaciones manuales pre-aprobadas por el coordinador pendientes a nivel corporativo
+        $conciliacionesPendientesGerencia = \App\Models\Conciliacion::where('estado', 'pendiente_gerencia')
+            ->with(['solicitante.sucursal', 'distribuidora', 'prestamo.cliente'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Histórico de Relaciones/Cortes de Cobranza (PDFs)
+        $cortesRealizados = \App\Models\RelacionCobranza::with('distribuidora.sucursal')
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+
         return view('gerente-general.dashboard', compact(
             'operador',
             'sucursales',
@@ -76,7 +87,9 @@ class GerenteGeneralController extends Controller
             'solicitudesEnEspera',
             'solicitudesAprobadasSinCuenta',
             'transferenciasPendientesGerente',
-            'transferenciasCoordinadorPendientesGG'
+            'transferenciasCoordinadorPendientesGG',
+            'conciliacionesPendientesGerencia',
+            'cortesRealizados'
         ));
     }
 

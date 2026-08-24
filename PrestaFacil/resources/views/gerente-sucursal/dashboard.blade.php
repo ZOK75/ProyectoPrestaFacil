@@ -676,6 +676,63 @@
         </div>
     @endif
 
+    <!-- SECCIÓN: Conciliaciones Manuales Pre-Aprobadas por Coordinador -->
+    @if(isset($conciliacionesPendientesGerencia) && $conciliacionesPendientesGerencia->count() > 0)
+        <div class="bg-slate-900 border border-cyan-500/40 rounded-2xl shadow-xl overflow-hidden mb-6">
+            <div class="p-5 border-b border-slate-800 bg-cyan-950/20 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-300 font-bold">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-white">Conciliaciones Manuales Pendientes de Autorización Gerencial</h2>
+                        <p class="text-slate-400 text-xs">Pre-aprobadas previamente por Coordinación. Dictamina para aplicar corrección de pago.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divide-y divide-slate-800">
+                @foreach($conciliacionesPendientesGerencia as $cg)
+                    <div class="p-5 space-y-3">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <span class="text-xs font-bold text-cyan-400 font-mono">Ref. Conciliación: {{ $cg->referencia_conciliacion ?: 'N/A' }}</span>
+                                <p class="text-xs text-slate-300">Cajero Solicitante: <strong>{{ $cg->solicitante?->name }}</strong> &bull; {{ $cg->created_at->format('d/m/Y H:i') }}</p>
+                                @if($cg->distribuidora)
+                                    <p class="text-xs text-slate-400">Distribuidora: <strong class="text-white">{{ $cg->distribuidora->name }}</strong></p>
+                                @endif
+                                <p class="text-xs text-slate-300 mt-1 italic bg-slate-950/60 p-2 rounded-lg border border-slate-800">"{{ $cg->motivo }}"</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <span class="text-xs text-slate-500 block uppercase">Monto a Conciliar</span>
+                                <span class="text-xl font-black text-emerald-400 font-mono">${{ number_format($cg->monto_corregido, 2) }}</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 pt-2 border-t border-slate-800/80">
+                            <form action="{{ route('gerente.conciliaciones.decidir', $cg) }}" method="POST" class="inline-flex gap-2">
+                                @csrf
+                                <input type="hidden" name="accion" value="aceptar">
+                                <button type="submit" onclick="return confirm('¿Aprobar esta conciliación manual?')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow">
+                                    Aprobar Conciliación
+                                </button>
+                            </form>
+                            <form action="{{ route('gerente.conciliaciones.decidir', $cg) }}" method="POST" class="inline-flex gap-2">
+                                @csrf
+                                <input type="hidden" name="accion" value="rechazar">
+                                <button type="submit" onclick="return confirm('¿Rechazar esta conciliación manual?')" class="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
+                                    Rechazar Conciliación
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <!-- Modal Solicitar Traspaso de Coordinador -->
     <div x-show="showTraspasoCoordModal" class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4" style="display: none;" x-transition>
         <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" @click="showTraspasoCoordModal = false"></div>

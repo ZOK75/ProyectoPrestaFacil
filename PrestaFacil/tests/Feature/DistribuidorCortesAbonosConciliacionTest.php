@@ -292,7 +292,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
 
         $conciliacion = \App\Models\Conciliacion::where('referencia_conciliacion', 'REF-CORRECTA-456')->first();
         $this->assertNotNull($conciliacion);
-        $this->assertEquals('pendiente', $conciliacion->estado);
+        $this->assertEquals('pendiente_coordinador', $conciliacion->estado);
 
         $solicitud = SolicitudAutorizacion::where('entidad_id', $conciliacion->id)->first();
         $this->assertNotNull($solicitud);

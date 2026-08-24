@@ -12,9 +12,8 @@
     pagoSeleccionado: null,
     
     buscarPagos() {
-        if (!this.searchMonto && !this.searchFecha) return;
         this.buscandoPagos = true;
-        fetch(`{{ route('cajero.conciliaciones.buscar-pagos') }}?monto=${encodeURIComponent(this.searchMonto)}&fecha=${encodeURIComponent(this.searchFecha)}`)
+        fetch(`{{ route('cajero.conciliaciones.buscar-pagos') }}?monto=${encodeURIComponent(this.searchMonto || '')}&fecha=${encodeURIComponent(this.searchFecha || '')}`)
             .then(res => res.json())
             .then(data => {
                 this.pagosEncontrados = data;
@@ -28,7 +27,7 @@
     seleccionarPago(pago) {
         this.pagoSeleccionado = pago;
         if (this.$refs.montoOriginalInput) this.$refs.montoOriginalInput.value = pago.monto_abonado;
-        if (this.$refs.montoCorregidoInput) this.$refs.montoCorregidoInput.value = pago.monto_abonado;
+        if (this.$refs.montoCorregidoInput) this.$refs.montoCorregidoInput.value = '';
         if (this.$refs.prestamoIdInput) this.$refs.prestamoIdInput.value = pago.prestamo_id;
         if (this.$refs.pagoIdInput) this.$refs.pagoIdInput.value = pago.id;
         if (this.$refs.fechaPagoInput) this.$refs.fechaPagoInput.value = pago.created_at ? pago.created_at.substring(0, 10) : '';

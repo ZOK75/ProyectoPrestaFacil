@@ -373,7 +373,7 @@ class User extends Authenticatable
      */
     public function rolesPermitidos()
     {
-        $query = Rol::query()->whereNotIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']);
+        $query = Rol::query()->whereNotIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora', 'Verificador', 'verificador']);
 
         if ($this->esGerenteGeneral()) {
             $query->where('nombre', '!=', 'Gerente General');

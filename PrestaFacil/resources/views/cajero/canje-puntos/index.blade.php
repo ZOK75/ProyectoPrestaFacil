@@ -99,8 +99,8 @@
                     </div>
 
                     <div class="bg-emerald-950/30 border border-emerald-900/50 rounded-xl p-3 mt-4">
-                        <span class="block text-[10px] font-bold text-slate-500 uppercase">Monto a Entregar en Efectivo</span>
-                        <span class="block text-2xl font-black text-emerald-400" x-text="'$' + (puntosCanjear * valorPunto).toFixed(2)"></span>
+                        <span class="block text-[10px] font-bold text-slate-500 uppercase">Monto a Entregar por Transferencia</span>
+                        <span class="block text-2xl font-black text-emerald-400" x-text="'$' + Math.floor(puntosCanjear * valorPunto)"></span>
                     </div>
 
                     <div class="flex gap-2 pt-4">
@@ -108,7 +108,7 @@
                             Cancelar
                         </button>
                         <button type="submit" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm rounded-xl transition-colors shadow-lg shadow-emerald-500/20">
-                            Entregar Efectivo
+                            Entregar por Transferencia
                         </button>
                     </div>
                 </form>

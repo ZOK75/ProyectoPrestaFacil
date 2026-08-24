@@ -436,6 +436,109 @@
         </div>
     </div>
 
+    <!-- SECCIÓN: Conciliaciones Manuales Pre-Aprobadas por Coordinador -->
+    @if(isset($conciliacionesPendientesGerencia) && $conciliacionesPendientesGerencia->count() > 0)
+        <div class="bg-slate-900 border border-cyan-500/40 rounded-3xl shadow-xl overflow-hidden mb-6">
+            <div class="p-6 border-b border-slate-800 bg-cyan-950/20 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-300 font-bold">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-white">Conciliaciones Manuales Pendientes (Corporativo)</h2>
+                        <p class="text-slate-400 text-xs">Pre-aprobadas previamente por Coordinación. Dictamina para autorizar correcciones de pago.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divide-y divide-slate-800">
+                @foreach($conciliacionesPendientesGerencia as $cg)
+                    <div class="p-5 space-y-3">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <span class="text-xs font-bold text-cyan-400 font-mono">Ref. Conciliación: {{ $cg->referencia_conciliacion ?: 'N/A' }}</span>
+                                <p class="text-xs text-slate-300">Cajero Solicitante: <strong>{{ $cg->solicitante?->name }}</strong> ({{ $cg->solicitante?->sucursal?->nombre ?? 'Sucursal' }}) &bull; {{ $cg->created_at->format('d/m/Y H:i') }}</p>
+                                @if($cg->distribuidora)
+                                    <p class="text-xs text-slate-400">Distribuidora: <strong class="text-white">{{ $cg->distribuidora->name }}</strong></p>
+                                @endif
+                                <p class="text-xs text-slate-300 mt-1 italic bg-slate-950/60 p-2 rounded-lg border border-slate-800">"{{ $cg->motivo }}"</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <span class="text-xs text-slate-500 block uppercase">Monto a Conciliar</span>
+                                <span class="text-xl font-black text-emerald-400 font-mono">${{ number_format($cg->monto_corregido, 2) }}</span>
+                            </div>
+                        </div>
+
+                        @if(!Auth::user()->esAdministrador())
+                            <div class="flex items-center gap-2 pt-2 border-t border-slate-800/80">
+                                <form action="{{ route('gerente.conciliaciones.decidir', $cg) }}" method="POST" class="inline-flex gap-2">
+                                    @csrf
+                                    <input type="hidden" name="accion" value="aceptar">
+                                    <button type="submit" onclick="return confirm('¿Aprobar esta conciliación manual?')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow">
+                                        Aprobar Conciliación
+                                    </button>
+                                </form>
+                                <form action="{{ route('gerente.conciliaciones.decidir', $cg) }}" method="POST" class="inline-flex gap-2">
+                                    @csrf
+                                    <input type="hidden" name="accion" value="rechazar">
+                                    <button type="submit" onclick="return confirm('¿Rechazar esta conciliación manual?')" class="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
+                                        Rechazar Conciliación
+                                    </button>
+                                </form>
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
+    <!-- SECCIÓN: Histórico de Cortes de Cobranza (PDFs) -->
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl shadow-xl overflow-hidden mb-6">
+        <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Histórico de Cortes de Cobranza (PDFs)
+            </h2>
+            <a href="{{ route('prestamos.relacion-pdf') }}" target="_blank" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition">
+                Generar Relación General &rarr;
+            </a>
+        </div>
+
+        @if(isset($cortesRealizados) && $cortesRealizados->count() > 0)
+            <div class="divide-y divide-slate-800">
+                @foreach($cortesRealizados as $corte)
+                    <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-800/30 transition">
+                        <div>
+                            <span class="text-xs font-extrabold text-white">Distribuidora: {{ $corte->distribuidora?->name }}</span>
+                            <p class="text-xs text-slate-400">Sucursal: {{ $corte->distribuidora?->sucursal?->nombre ?? 'N/A' }} &bull; Fecha Corte: {{ $corte->fecha_corte ? $corte->fecha_corte->format('d/m/Y H:i') : 'N/A' }}</p>
+                            <span class="text-[11px] text-emerald-400 font-mono font-bold">Monto Periodo: ${{ number_format($corte->monto_total_periodo, 2) }}</span>
+                        </div>
+                        <div>
+                            <a href="{{ route('prestamos.relacion-pdf') }}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                Descargar PDF
+                            </a>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+            @if($cortesRealizados->hasPages())
+                <div class="p-4 border-t border-slate-800">
+                    {{ $cortesRealizados->links() }}
+                </div>
+            @endif
+        @else
+            <div class="p-8 text-center text-slate-500 text-xs">
+                No se han registrado cortes de cobranza en el historial.
+            </div>
+        @endif
+    </div>
+
     <!-- Directorio de Sucursales -->
     <div class="bg-slate-900 border border-slate-800 rounded-3xl shadow-xl overflow-hidden">
         <div class="p-6 border-b border-slate-800 flex items-center justify-between">

@@ -82,6 +82,15 @@ class CoordinadorController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Conciliaciones manuales pendientes de revisión por el Coordinador
+        $conciliacionesPendientes = \App\Models\Conciliacion::where('estado', 'pendiente_coordinador')
+            ->whereHas('solicitante', function($q) use ($user) {
+                $q->where('sucursal_id', $user->sucursal_id);
+            })
+            ->with(['solicitante', 'distribuidora', 'prestamo.cliente'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         return view('coordinador.dashboard', compact(
             'user',
             'solicitudesCredito',
@@ -90,6 +99,7 @@ class CoordinadorController extends Controller
             'coordinadoresDestino',
             'distribuidores',
             'traspasosClientesPendientes',
+            'conciliacionesPendientes',
             'stats'
         ));
     }
@@ -245,11 +255,11 @@ class CoordinadorController extends Controller
             'referencias_laborales' => $request->referencias_laborales,
             'coordinador_id' => Auth::id(),
             'sucursal_id' => Auth::user()->sucursal_id,
-            'estado' => 'en espera',
+            'estado' => 'en espera de verificacion',
         ]);
 
         return redirect()->route('coordinador.solicitudes.index')
-                         ->with('success', 'Solicitud de distribuidora creada exitosamente y puesta en espera.');
+                         ->with('success', 'Solicitud de distribuidora creada exitosamente y enviada a verificación.');
     }
 
     /**
@@ -528,5 +538,77 @@ class CoordinadorController extends Controller
 
         return redirect()->route('coordinador.dashboard')
             ->with('success', "Has aceptado la transferencia de {$distribuidora->name}. La solicitud fue turnada a la Gerencia para su autorización definitiva.");
+    }
+
+    /**
+     * Pre-aprobar o Rechazar una conciliación manual por el Coordinador.
+     */
+    public function decidirConciliacion(Request $request, \App\Models\Conciliacion $conciliacion)
+    {
+        $request->validate([
+            'accion' => 'required|in:aceptar,rechazar',
+            'observaciones' => 'nullable|string|max:500',
+        ]);
+
+        $coordinador = Auth::user();
+
+        if ($request->accion === 'rechazar') {
+            $conciliacion->update([
+                'estado' => 'rechazada',
+                'observaciones_resolucion' => $request->observaciones,
+                'resolved_at' => now(),
+            ]);
+
+            if ($conciliacion->solicitante_id) {
+                NotificacionCajero::enviar(
+                    $conciliacion->solicitante_id,
+                    'conciliacion_rechazada',
+                    'Conciliación Manual Rechazada',
+                    "El coordinador {$coordinador->name} rechazó la solicitud de conciliación (Ref: {$conciliacion->referencia_conciliacion})." . ($request->observaciones ? " Motivo: \"{$request->observaciones}\"" : ""),
+                    ['url' => route('cajero.conciliaciones.index')]
+                );
+            }
+
+            return back()->with('info', 'Has rechazado la solicitud de conciliación.');
+        }
+
+        // Si acepta: Pasa a estado 'pendiente_gerencia' y notifica a Gerente de Sucursal y Gerente General
+        $conciliacion->update([
+            'estado' => 'pendiente_gerencia',
+            'observaciones_resolucion' => $request->observaciones,
+        ]);
+
+        // Notificar a Gerente de Sucursal (de la sucursal del cajero)
+        $gerentesSucursal = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente Sucursal']))
+            ->where('sucursal_id', $conciliacion->solicitante->sucursal_id ?? $coordinador->sucursal_id)
+            ->where('activo', true)
+            ->get();
+
+        foreach ($gerentesSucursal as $gs) {
+            NotificacionCajero::enviar(
+                $gs->id,
+                'conciliacion_pendiente_gerencia',
+                'Conciliación Pre-Aprobada por Coordinación',
+                "El coordinador {$coordinador->name} pre-aprobó la conciliación de pago del cajero {$conciliacion->solicitante?->name}. Se requiere la autorización de Gerencia.",
+                ['url' => route('gerente-sucursal.dashboard')]
+            );
+        }
+
+        // Notificar a Gerente General / Administrador
+        $gerentesGenerales = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente General', 'gerente general', 'Administrador', 'administrador']))
+            ->where('activo', true)
+            ->get();
+
+        foreach ($gerentesGenerales as $gg) {
+            NotificacionCajero::enviar(
+                $gg->id,
+                'conciliacion_pendiente_gerencia',
+                'Conciliación Pre-Aprobada (Corporativo)',
+                "El coordinador {$coordinador->name} pre-aprobó la conciliación de pago por $" . number_format($conciliacion->monto_corregido, 2) . ". Requiere visto bueno de Gerencia.",
+                ['url' => route('gerente-general.dashboard')]
+            );
+        }
+
+        return back()->with('success', 'Has pre-aprobado la conciliación. Ha sido turnada a Gerencia para su aprobación final.');
     }
 }

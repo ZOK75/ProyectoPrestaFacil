@@ -332,6 +332,10 @@ class CajeroController extends Controller
             'observaciones' => 'nullable|string|max:500',
         ]);
 
+        if (floatval($request->monto_abonado) >= 1000000) {
+            return back()->with('error', 'Límite de un solo abono debe ser menor a 1 millón.')->withInput();
+        }
+
         // Validar que la referencia ingresada coincida con la referencia oficial de la distribuidora
         $refIngresada = strtoupper(trim($request->referencia_pago));
         $refOficial = strtoupper(trim($distribuidora->referenciaPago()));
@@ -432,6 +436,10 @@ class CajeroController extends Controller
      */
     public function registrarAbono(RegistrarAbonoRequest $request, Prestamo $prestamo)
     {
+        if (floatval($request->monto_abonado) >= 1000000) {
+            return back()->with('error', 'Límite de un solo abono debe ser menor a 1 millón.')->withInput();
+        }
+
         $cajera = $this->cajera();
         $ahora = now();
         $distribuidora = $prestamo->createdBy;
@@ -559,6 +567,18 @@ class CajeroController extends Controller
         ]);
 
         $cajera = $this->cajera();
+
+        // Evitar duplicados pendientes
+        $existente = Conciliacion::whereIn('estado', ['pendiente', 'pendiente_coordinador', 'pendiente_gerencia'])
+            ->where(function($q) use ($request) {
+                if ($request->filled('prestamo_id')) $q->orWhere('prestamo_id', $request->prestamo_id);
+                if ($request->filled('referencia_conciliacion')) $q->orWhere('referencia_conciliacion', $request->referencia_conciliacion);
+                if ($request->filled('referencia_original')) $q->orWhere('referencia_original', $request->referencia_original);
+            })->first();
+
+        if ($existente) {
+            return back()->with('error', 'Ya existe una solicitud de conciliación manual pendiente para esta referencia o pago.')->withInput();
+        }
         
         $path = null;
         if ($request->hasFile('evidencia')) {
@@ -579,7 +599,7 @@ class CajeroController extends Controller
                 'motivo' => $request->motivo,
                 'evidencia_path' => $path,
                 'solicitante_id' => $cajera->id,
-                'estado' => 'pendiente',
+                'estado' => 'pendiente_coordinador',
             ]);
 
             $solicitud = SolicitudAutorizacion::create([
@@ -601,13 +621,24 @@ class CajeroController extends Controller
                 'evidencia_path' => $path,
             ]);
 
-            NotificacionService::notificarAutorizadores(
-                $cajera->sucursal_id,
-                'NUEVA_CONCILIACION',
-                'Solicitud de Conciliación Manual',
-                "La cajera {$cajera->name} solicita una corrección/conciliación de pago (Ref: {$request->referencia_conciliacion})",
-                ['entidad_tipo' => 'solicitudes_autorizacion', 'entidad_id' => $solicitud->id]
-            );
+            // Notificar a los coordinadores de la sucursal
+            $coordinadores = User::whereHas('rol', fn($q) => $q->where('nombre', 'coordinador'))
+                ->where('sucursal_id', $cajera->sucursal_id)
+                ->get();
+
+            foreach ($coordinadores as $coord) {
+                NotificacionCajero::enviar(
+                    $coord->id,
+                    'conciliacion_pendiente',
+                    'Nueva Solicitud de Conciliación Manual',
+                    "La cajera {$cajera->name} solicita la conciliación de un pago por $" . number_format($request->monto_corregido, 2) . ". Requiere tu primera revisión.",
+                    [
+                        'url' => route('coordinador.dashboard'),
+                        'entidad_tipo' => 'conciliaciones',
+                        'entidad_id' => $conciliacion->id,
+                    ]
+                );
+            }
 
             AuditService::registrar('SOLICITUD_CONCILIACION', "Conciliación por \${$request->monto_corregido} con referencia {$request->referencia_conciliacion}");
         });

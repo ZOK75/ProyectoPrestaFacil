@@ -129,22 +129,22 @@
     </div>
 
     <!-- SECCIÓN: Conciliaciones Manuales Pendientes de Revisión por el Coordinador -->
-    @if(isset($conciliacionesPendientes) && $conciliacionesPendientes->count() > 0)
-        <div class="bg-slate-900 border border-cyan-500/40 rounded-2xl shadow-xl overflow-hidden mb-6">
-            <div class="p-4 sm:p-5 border-b border-slate-800 bg-cyan-950/20 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-300 font-bold">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 class="text-sm sm:text-base font-bold text-white">Conciliaciones Manuales de Cajero (Pre-Aprobación Requerida)</h2>
-                        <p class="text-slate-400 text-xs">Revisa y dictamina las solicitudes de conciliación enviadas por los cajeros de tu sucursal.</p>
-                    </div>
+    <div class="bg-slate-900 border border-cyan-500/40 rounded-2xl shadow-xl overflow-hidden mb-6">
+        <div class="p-4 sm:p-5 border-b border-slate-800 bg-cyan-950/20 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-300 font-bold">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-sm sm:text-base font-bold text-white">Conciliaciones Manuales de Cajero</h2>
+                    <p class="text-slate-400 text-xs">Revisa y dictamina las solicitudes de conciliación enviadas por los cajeros de tu sucursal.</p>
                 </div>
             </div>
+        </div>
 
+        @if(isset($conciliacionesPendientes) && $conciliacionesPendientes->count() > 0)
             <div class="divide-y divide-slate-800">
                 @foreach($conciliacionesPendientes as $conc)
                     <div class="p-4 sm:p-5 space-y-3">
@@ -182,8 +182,12 @@
                     </div>
                 @endforeach
             </div>
-        </div>
-    @endif
+        @else
+            <div class="p-6 text-center text-slate-500 text-xs">
+                No hay solicitudes de conciliación manual pendientes de revisión en tu sucursal.
+            </div>
+        @endif
+    </div>
 
     <!-- SECCIÓN: Solicitudes de Transferencia de Distribuidoras (Recibidas y Emitidas) -->
     @if($transferenciasRecibidas->count() > 0 || $transferenciasEmitidas->count() > 0)

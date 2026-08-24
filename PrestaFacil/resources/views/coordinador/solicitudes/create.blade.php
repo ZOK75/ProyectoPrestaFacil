@@ -16,6 +16,7 @@
         </a>
     </div>
 
+    @if ($errors->any())
         <div class="p-5 rounded-2xl bg-rose-500/10 border border-rose-500/30 shadow-lg mb-6">
             <div class="flex items-center gap-2 text-rose-400 font-bold">
                 <svg class="w-5 h-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -24,6 +25,7 @@
                 <span>Faltan uno o más campos obligatorios por llenar o tienen formato incorrecto.</span>
             </div>
         </div>
+    @endif
 
     <form action="{{ route('coordinador.solicitudes.store') }}" method="POST" class="space-y-6" novalidate>
         @csrf

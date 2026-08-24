@@ -23,7 +23,7 @@
                 <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                     Nombre Completo <span class="text-rose-400">*</span>
                 </label>
-                <input type="text" name="name" value="{{ old('name', $usuario->name) }}" required
+                <input type="text" name="name" value="{{ old('name', $usuario->name) }}" required maxlength="50"
                     class="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500 @error('name') border-rose-500 @enderror">
                 @error('name')
                     <p class="text-xs text-rose-400 mt-1">{{ $message }}</p>
@@ -101,6 +101,7 @@
             </div>
 
             <!-- Ajustes de Distribuidor: Categoría y Límite de Crédito -->
+            @if($usuario->esDistribuidor())
             <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-4">
                 <h3 class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider">
                     Parámetros de Distribución
@@ -138,6 +139,7 @@
                     <span class="text-[10px] text-slate-500 mt-1 block">Dejar en blanco para generar automáticamente.</span>
                 </div>
             </div>
+            @endif
 
             <!-- Botones -->
             <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">

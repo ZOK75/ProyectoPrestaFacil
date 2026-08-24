@@ -50,9 +50,10 @@ class UserController extends Controller
             }
         }
 
-        // Un gerente de sucursal solo ve los usuarios de su propia sucursal
+        // Un gerente de sucursal solo ve los usuarios de su propia sucursal y ciertos roles
         if ($operador->esGerenteSucursal()) {
-            $query->where('sucursal_id', $operador->sucursal_id);
+            $query->where('sucursal_id', $operador->sucursal_id)
+                  ->whereHas('rol', fn($q) => $q->whereIn('nombre', ['Coordinador', 'Cajero', 'Distribuidor', 'Distribuidora', 'coordinador', 'cajero', 'distribuidor', 'distribuidora']));
         }
 
         // Filtro por texto
@@ -102,6 +103,11 @@ class UserController extends Controller
                 ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar usuarios.');
         }
 
+        if ($operador->esGerenteSucursal()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'Acceso denegado: El rol de Gerente de Sucursal no tiene permisos para registrar usuarios nuevos.');
+        }
+
         if ($operador->esDistribuidor()) {
             return redirect()->route('usuarios.index')
                 ->with('error', 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
@@ -123,6 +129,11 @@ class UserController extends Controller
         if ($operador->esAdministrador()) {
             return redirect()->route('usuarios.index')
                 ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar usuarios.');
+        }
+
+        if ($operador->esGerenteSucursal()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'Acceso denegado: El rol de Gerente de Sucursal no tiene permisos para registrar usuarios nuevos.');
         }
 
         if ($operador->esDistribuidor()) {
@@ -252,13 +263,20 @@ class UserController extends Controller
         }
 
         // Si no se envía contraseña, no se modifica
+        $passwordChanged = false;
         if (!empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
+            $passwordChanged = true;
         } else {
             unset($data['password']);
         }
 
         $usuario->update($data);
+
+        // Prevenir cierre de sesión si el usuario editó su propia contraseña
+        if ($passwordChanged && Auth::id() === $usuario->id) {
+            Auth::login($usuario);
+        }
 
         return redirect()->route('usuarios.index')
             ->with('success', "El usuario '{$usuario->name}' fue actualizado correctamente.");

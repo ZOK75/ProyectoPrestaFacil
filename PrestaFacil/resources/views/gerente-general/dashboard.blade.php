@@ -109,7 +109,7 @@
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <form action="{{ route('configuracion-general.simular-corte') }}" method="POST" onsubmit="return confirm('¿Deseas simular y ejecutar el siguiente corte quincenal? Se procesarán los vales y abonos, se aplicarán las multas moratorias por vale y se avanzará el ciclo 15 días (+15d).');">
+                <form novalidate action="{{ route('configuracion-general.simular-corte') }}" method="POST" onsubmit="return confirm('¿Deseas simular y ejecutar el siguiente corte quincenal? Se procesarán los vales y abonos, se aplicarán las multas moratorias por vale y se avanzará el ciclo 15 días (+15d).');">
                     @csrf
                     <button type="submit" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-xs font-black shadow-md shadow-orange-950/30 transition flex items-center gap-1.5">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -226,7 +226,7 @@
                             <!-- Panel desplegable de confirmación y motivo -->
                             <tr x-show="openMorosidadDistId === '{{ $distM->id }}'" class="bg-slate-950/60" style="display: none;" x-transition>
                                 <td colspan="6" class="px-6 py-4">
-                                    <form method="POST" action="{{ route('gerente.distribuidores.decidir-morosidad', $distM) }}" class="space-y-3">
+                                    <form novalidate method="POST" action="{{ route('gerente.distribuidores.decidir-morosidad', $distM) }}" class="space-y-3">
                                         @csrf
                                         <input type="hidden" name="accion" value="{{ $distM->esMorosa() ? 'desmarcar' : 'marcar' }}">
                                         
@@ -317,7 +317,7 @@
 
                         <!-- Panel desplegable de decisión -->
                         <div x-show="openDecisionCoordId === '{{ $tc->id }}'" class="p-4 bg-slate-950/70 border border-slate-850 rounded-xl space-y-3" style="display: none;" x-transition>
-                            <form method="POST" action="{{ route('gerente-general.coordinadores.traspaso.decidir-final', $tc) }}" class="space-y-3">
+                            <form novalidate method="POST" action="{{ route('gerente-general.coordinadores.traspaso.decidir-final', $tc) }}" class="space-y-3">
                                 @csrf
                                 <input type="hidden" name="accion" id="dec_coord_gg_{{ $tc->id }}">
                                 <div>
@@ -526,7 +526,7 @@
                         <button type="button" @click="showAccountModal = false" class="text-slate-400 hover:text-white text-lg font-bold leading-none">&times;</button>
                     </div>
                     
-                    <form :action="`/solicitudes-distribuidor/${selSolId}/crear-cuenta`" method="POST" class="mt-4 space-y-4">
+                    <form novalidate :action="`/solicitudes-distribuidor/${selSolId}/crear-cuenta`" method="POST" class="mt-4 space-y-4">
                         @csrf
                         <div>
                             <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Distribuidora</label>
@@ -596,14 +596,14 @@
 
                         @if(!Auth::user()->esAdministrador())
                             <div class="flex items-center gap-2 pt-2 border-t border-slate-800/80">
-                                <form action="{{ route('gerente.conciliaciones.decidir', $cg) }}" method="POST" class="inline-flex gap-2">
+                                <form novalidate action="{{ route('gerente.conciliaciones.decidir', $cg) }}" method="POST" class="inline-flex gap-2">
                                     @csrf
                                     <input type="hidden" name="accion" value="aceptar">
                                     <button type="submit" onclick="return confirm('¿Aprobar esta conciliación manual?')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow">
                                         Aprobar Conciliación
                                     </button>
                                 </form>
-                                <form action="{{ route('gerente.conciliaciones.decidir', $cg) }}" method="POST" class="inline-flex gap-2">
+                                <form novalidate action="{{ route('gerente.conciliaciones.decidir', $cg) }}" method="POST" class="inline-flex gap-2">
                                     @csrf
                                     <input type="hidden" name="accion" value="rechazar">
                                     <button type="submit" onclick="return confirm('¿Rechazar esta conciliación manual?')" class="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition">

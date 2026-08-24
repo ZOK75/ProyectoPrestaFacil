@@ -364,7 +364,7 @@
                 </div>
             </div>
 
-            <form action="{{ route('gerente.solicitudes.decidir-con-cuenta', $solicitud->id) }}" method="POST" class="space-y-6">
+            <form novalidate action="{{ route('gerente.solicitudes.decidir-con-cuenta', $solicitud->id) }}" method="POST" class="space-y-6">
                 @csrf
                 <input type="hidden" name="accion" :value="decision">
 

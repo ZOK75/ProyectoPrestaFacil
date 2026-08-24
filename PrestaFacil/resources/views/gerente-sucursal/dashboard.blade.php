@@ -149,7 +149,7 @@
                             <!-- Panel desplegable de confirmación y motivo -->
                             <tr x-show="openMorosidadDistId === '{{ $distM->id }}'" class="bg-slate-950/60" style="display: none;" x-transition>
                                 <td colspan="6" class="px-6 py-4">
-                                    <form method="POST" action="{{ route('gerente.distribuidores.decidir-morosidad', $distM) }}" class="space-y-3">
+                                    <form novalidate method="POST" action="{{ route('gerente.distribuidores.decidir-morosidad', $distM) }}" class="space-y-3">
                                         @csrf
                                         <input type="hidden" name="accion" value="{{ $distM->esMorosa() ? 'desmarcar' : 'marcar' }}">
                                         
@@ -395,7 +395,7 @@
                             <!-- Fila de respuesta/comentario -->
                             <tr x-show="openCommentId === {{ $sol->id }}" class="bg-slate-950/40" style="display: none;">
                                 <td colspan="6" class="px-6 py-4">
-                                    <form method="POST" action="{{ route('solicitudes-credito.procesar', $sol->id) }}" class="space-y-3">
+                                    <form novalidate method="POST" action="{{ route('solicitudes-credito.procesar', $sol->id) }}" class="space-y-3">
                                         @csrf
                                         <input type="hidden" name="accion" id="accion_sucursal_{{ $sol->id }}">
                                         
@@ -569,7 +569,7 @@
                     </div>
                     
                     <!-- Body -->
-                    <form :action="`/solicitudes-distribuidor/${selSolId}/crear-cuenta`" method="POST" class="mt-4 space-y-4">
+                    <form novalidate :action="`/solicitudes-distribuidor/${selSolId}/crear-cuenta`" method="POST" class="mt-4 space-y-4">
                         @csrf
                         <div>
                             <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Distribuidora</label>
@@ -773,7 +773,7 @@
 
                         <!-- Panel desplegable de decisión -->
                         <div x-show="openDecisionCoordId === '{{ $tcr->id }}'" class="p-4 bg-slate-950/70 border border-slate-850 rounded-xl space-y-3" style="display: none;" x-transition>
-                            <form method="POST" action="{{ route('gerente-sucursal.coordinadores.traspaso.decidir', $tcr) }}" class="space-y-3">
+                            <form novalidate method="POST" action="{{ route('gerente-sucursal.coordinadores.traspaso.decidir', $tcr) }}" class="space-y-3">
                                 @csrf
                                 <input type="hidden" name="accion" id="dec_coord_gs_{{ $tcr->id }}">
                                 <div>
@@ -834,14 +834,14 @@
                         </div>
 
                         <div class="flex items-center gap-2 pt-2 border-t border-slate-800/80">
-                            <form action="{{ route('gerente.conciliaciones.decidir', $cg) }}" method="POST" class="inline-flex gap-2">
+                            <form novalidate action="{{ route('gerente.conciliaciones.decidir', $cg) }}" method="POST" class="inline-flex gap-2">
                                 @csrf
                                 <input type="hidden" name="accion" value="aceptar">
                                 <button type="submit" onclick="return confirm('¿Aprobar esta conciliación manual?')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow">
                                     Aprobar Conciliación
                                 </button>
                             </form>
-                            <form action="{{ route('gerente.conciliaciones.decidir', $cg) }}" method="POST" class="inline-flex gap-2">
+                            <form novalidate action="{{ route('gerente.conciliaciones.decidir', $cg) }}" method="POST" class="inline-flex gap-2">
                                 @csrf
                                 <input type="hidden" name="accion" value="rechazar">
                                 <button type="submit" onclick="return confirm('¿Rechazar esta conciliación manual?')" class="px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
@@ -869,7 +869,7 @@
                 <button @click="showTraspasoCoordModal = false" class="text-slate-400 hover:text-white">&times;</button>
             </div>
 
-            <form action="{{ route('gerente-sucursal.coordinadores.traspasar') }}" method="POST" class="space-y-4">
+            <form novalidate action="{{ route('gerente-sucursal.coordinadores.traspasar') }}" method="POST" class="space-y-4">
                 @csrf
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Coordinador a Transferir *</label>

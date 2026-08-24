@@ -18,7 +18,7 @@
         </div>
 
         @if($notificaciones->where('leida', false)->count() > 0)
-            <form action="{{ route('notificaciones.marcar-todas') }}" method="POST">
+            <form novalidate action="{{ route('notificaciones.marcar-todas') }}" method="POST">
                 @csrf
                 <button type="submit" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition flex items-center gap-1.5">
                     <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -116,7 +116,7 @@
                             @endif
 
                             @if(!$notif->leida)
-                                <form action="{{ route('notificaciones.leer', $notif) }}" method="POST">
+                                <form novalidate action="{{ route('notificaciones.leer', $notif) }}" method="POST">
                                     @csrf
                                     <button type="submit" class="text-[10px] text-slate-400 hover:text-slate-200 transition">
                                         Marcar leída

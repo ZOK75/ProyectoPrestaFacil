@@ -10,7 +10,7 @@
     </div>
 
     <!-- Formulario para confirmar el primer código y activar el 2FA -->
-    <form method="POST" action="{{ route('2fa.activar') }}">
+    <form novalidate method="POST" action="{{ route('2fa.activar') }}">
         @csrf
         <label class="block text-sm font-medium text-gray-700 mb-1">
             Ingresa el código de 6 dígitos de la app para confirmar:

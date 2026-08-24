@@ -27,7 +27,7 @@
 
 
 
-            <form method="POST" action="{{ route('login') }}" class="space-y-5">
+            <form novalidate method="POST" action="{{ route('login') }}" class="space-y-5">
                 @csrf
 
 

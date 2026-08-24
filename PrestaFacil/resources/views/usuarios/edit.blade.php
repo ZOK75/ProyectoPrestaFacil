@@ -14,7 +14,7 @@
     </div>
 
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-        <form action="{{ route('usuarios.update', $usuario) }}" method="POST" class="space-y-5">
+        <form novalidate action="{{ route('usuarios.update', $usuario) }}" method="POST" class="space-y-5">
             @csrf
             @method('PUT')
 

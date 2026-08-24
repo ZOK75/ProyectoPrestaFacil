@@ -19,7 +19,7 @@
             <p class="text-xs text-slate-400">Selecciona el cliente y el vale activo a otorgar.</p>
         </div>
 
-        <form action="{{ route('prestamos.store') }}" method="POST" class="space-y-4">
+        <form novalidate action="{{ route('prestamos.store') }}" method="POST" class="space-y-4">
             @csrf
 
             <!-- 1. Selección de Cliente -->

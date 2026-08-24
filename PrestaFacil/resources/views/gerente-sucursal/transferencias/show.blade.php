@@ -154,7 +154,7 @@
                 <p class="text-slate-400 text-xs mt-0.5">Al aprobar, la distribuidora y su cartera quedarán formalmente reasignadas al nuevo coordinador y a esta sucursal.</p>
             </div>
 
-            <form action="{{ route('gerente-sucursal.transferencias.decidir', $transferencia) }}" method="POST" class="space-y-4">
+            <form novalidate action="{{ route('gerente-sucursal.transferencias.decidir', $transferencia) }}" method="POST" class="space-y-4">
                 @csrf
                 <div>
                     <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Comentarios / Justificación Gerencial (Opcional)</label>

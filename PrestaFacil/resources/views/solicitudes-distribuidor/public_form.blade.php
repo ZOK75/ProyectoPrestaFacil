@@ -99,7 +99,7 @@
                 </div>
             @endif
 
-            <form action="{{ route('postulacion.store', $coordinador->id) }}" method="POST" class="space-y-6">
+            <form novalidate action="{{ route('postulacion.store', $coordinador->id) }}" method="POST" class="space-y-6">
                 @csrf
                 
                 <!-- Datos Personales -->

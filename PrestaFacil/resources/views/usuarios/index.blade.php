@@ -101,7 +101,7 @@
 
     <!-- Filtros -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
-        <form action="{{ route('usuarios.index') }}" method="GET" class="flex flex-col md:flex-row gap-3">
+        <form novalidate action="{{ route('usuarios.index') }}" method="GET" class="flex flex-col md:flex-row gap-3">
             <div class="flex-1 relative">
                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -241,7 +241,7 @@
                                         </svg>
                                     </a>
 
-                                    <form action="{{ route('usuarios.destroy', $usuario) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Confirmas que deseas desactivar al usuario {{ $usuario->name }}? Esta acción no se puede deshacer y registrará la marca de tiempo actual.');">
+                                    <form novalidate action="{{ route('usuarios.destroy', $usuario) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Confirmas que deseas desactivar al usuario {{ $usuario->name }}? Esta acción no se puede deshacer y registrará la marca de tiempo actual.');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="p-2 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-600 hover:text-white transition" title="Desactivar Usuario">

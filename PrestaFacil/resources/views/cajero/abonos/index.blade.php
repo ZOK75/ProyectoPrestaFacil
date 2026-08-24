@@ -21,7 +21,7 @@
 
     <!-- Buscador de Distribuidoras y Vales -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
-        <form action="{{ route('cajero.abonos.index') }}" method="GET">
+        <form novalidate action="{{ route('cajero.abonos.index') }}" method="GET">
             <label class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Buscar Distribuidora, Cliente o Folio de Vale</label>
             <div class="relative">
                 <input type="text" name="buscar" value="{{ request('buscar') }}" placeholder="Referencia (REF-DIST-..., VAL-...), Distribuidora o Cliente..."
@@ -188,7 +188,7 @@
                 </div>
             </div>
 
-            <form :action="'{{ url('cajero/abonos') }}/' + valeSeleccionado?.id" method="POST" class="p-4 space-y-3.5">
+            <form novalidate :action="'{{ url('cajero/abonos') }}/' + valeSeleccionado?.id" method="POST" class="p-4 space-y-3.5">
                 @csrf
                 
                 <div class="bg-slate-950 rounded-xl p-3 border border-slate-800 text-xs space-y-1.5">
@@ -254,7 +254,7 @@
                 <p class="text-indigo-200 text-[11px] font-mono" x-text="'Ref Oficial: ' + distSeleccionada?.ref"></p>
             </div>
 
-            <form :action="'{{ url('cajero/abonos/distribuidora') }}/' + distSeleccionada?.id" method="POST" class="p-4 space-y-3.5">
+            <form novalidate :action="'{{ url('cajero/abonos/distribuidora') }}/' + distSeleccionada?.id" method="POST" class="p-4 space-y-3.5">
                 @csrf
                 
                 <div class="bg-slate-950 rounded-xl p-3 border border-slate-800 text-xs space-y-1">

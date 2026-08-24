@@ -264,7 +264,7 @@
                                 Ver Ficha
                             </a>
 
-                            <form action="{{ route('prestamos.destroy', $prestamo) }}" method="POST" onsubmit="return confirm('¿Estás seguro de desactivar y cancelar este vale pendiente? Se liberará la línea de crédito de inmediato.');">
+                            <form novalidate action="{{ route('prestamos.destroy', $prestamo) }}" method="POST" onsubmit="return confirm('¿Estás seguro de desactivar y cancelar este vale pendiente? Se liberará la línea de crédito de inmediato.');">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-[11px] font-bold transition flex items-center gap-1">

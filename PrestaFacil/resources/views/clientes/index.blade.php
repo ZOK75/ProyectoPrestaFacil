@@ -72,7 +72,7 @@
                     <p class="text-[11px] text-slate-400 italic">"{{ $tcr->motivo }}"</p>
 
                     <div x-show="openDecisionTraspasoId === '{{ $tcr->id }}'" class="pt-2 border-t border-slate-800 space-y-2" style="display: none;" x-transition>
-                        <form action="{{ route('clientes.traspasos.decidir-receptor', $tcr) }}" method="POST" class="space-y-2">
+                        <form novalidate action="{{ route('clientes.traspasos.decidir-receptor', $tcr) }}" method="POST" class="space-y-2">
                             @csrf
                             <input type="hidden" name="accion" id="dec_rec_{{ $tcr->id }}">
                             <textarea name="observaciones" placeholder="Comentarios..." class="w-full bg-slate-900 border border-slate-800 rounded-lg text-white p-2 text-[11px]"></textarea>
@@ -89,7 +89,7 @@
 
     <!-- Buscador Móvil -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-md">
-        <form action="{{ route('clientes.index') }}" method="GET" class="space-y-2">
+        <form novalidate action="{{ route('clientes.index') }}" method="GET" class="space-y-2">
             <div class="relative">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -229,7 +229,7 @@
                                 ? "¿Enviar solicitud a Gerencia para desactivar al cliente {$cliente->nombre}?"
                                 : "¿Desactivar al cliente {$cliente->nombre}?";
                         @endphp
-                        <form action="{{ route('clientes.destroy', $cliente) }}" method="POST" class="inline-block" onsubmit="return confirm('{{ $mensajeConfirmacion }}');">
+                        <form novalidate action="{{ route('clientes.destroy', $cliente) }}" method="POST" class="inline-block" onsubmit="return confirm('{{ $mensajeConfirmacion }}');">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="px-3 py-2 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-600 hover:text-white text-xs font-semibold transition" title="Desactivar">
@@ -279,7 +279,7 @@
                 Cliente a transferir: <strong class="text-white font-bold" x-text="clienteTraspaso.nombre"></strong>
             </p>
 
-            <form :action="`/clientes/${clienteTraspaso.id}/traspasar`" method="POST" class="space-y-4">
+            <form novalidate :action="`/clientes/${clienteTraspaso.id}/traspasar`" method="POST" class="space-y-4">
                 @csrf
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Distribuidora Destino *</label>

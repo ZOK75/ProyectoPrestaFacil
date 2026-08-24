@@ -280,7 +280,7 @@
                                 Mi Perfil
                             </a>
 
-                            <form method="POST" action="{{ route('logout') }}">
+                            <form novalidate method="POST" action="{{ route('logout') }}">
                                 @csrf
                                 <button type="submit" class="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-xs text-rose-400 hover:bg-slate-800 hover:text-rose-300 transition border-t border-slate-800/60 mt-1">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -595,7 +595,7 @@
 
             <!-- Botón de Cerrar Sesión al Fondo del Drawer -->
             <div class="p-3 border-t border-slate-800 bg-slate-950/40">
-                <form method="POST" action="{{ route('logout') }}">
+                <form novalidate method="POST" action="{{ route('logout') }}">
                     @csrf
                     <button type="submit" class="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

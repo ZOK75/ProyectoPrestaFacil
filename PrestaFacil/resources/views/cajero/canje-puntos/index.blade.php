@@ -20,7 +20,7 @@
             Canje de Puntos a Dinero
         </h2>
         
-        <form action="{{ route('cajero.canje-puntos.index') }}" method="GET">
+        <form novalidate action="{{ route('cajero.canje-puntos.index') }}" method="GET">
             <div class="relative">
                 <select name="distribuidora_id" onchange="this.form.submit()" required class="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-4 pr-10 text-white text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all appearance-none">
                     <option value="">Seleccione una distribuidora...</option>
@@ -82,7 +82,7 @@
                     <h3 class="text-white font-black text-lg">Canjear Puntos</h3>
                 </div>
 
-                <form action="{{ route('cajero.canje-puntos.store') }}" method="POST" class="p-5 space-y-4 text-center">
+                <form novalidate action="{{ route('cajero.canje-puntos.store') }}" method="POST" class="p-5 space-y-4 text-center">
                     @csrf
                     <input type="hidden" name="distribuidora_id" value="{{ $distribuidora->id }}">
                     

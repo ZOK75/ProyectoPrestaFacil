@@ -47,7 +47,7 @@
 
     <!-- Buscador de Conciliaciones -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
-        <form action="{{ route('cajero.conciliaciones.index') }}" method="GET">
+        <form novalidate action="{{ route('cajero.conciliaciones.index') }}" method="GET">
             <label class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Buscar en Conciliaciones</label>
             <div class="relative">
                 <input type="text" name="buscar" value="{{ request('buscar') }}" placeholder="Referencia, Distribuidora o Motivo..."
@@ -163,7 +163,7 @@
                 </template>
             </div>
 
-            <form action="{{ route('cajero.conciliaciones.store') }}" method="POST" enctype="multipart/form-data" class="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
+            <form novalidate action="{{ route('cajero.conciliaciones.store') }}" method="POST" enctype="multipart/form-data" class="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
                 @csrf
                 <input type="hidden" name="prestamo_id" x-ref="prestamoIdInput">
                 <input type="hidden" name="pago_prestamo_id" x-ref="pagoIdInput">

@@ -187,7 +187,7 @@
                 <p class="text-slate-400 text-xs mt-0.5">Si aceptas, se enviará la solicitud al Gerente de Sucursal para la autorización final del cambio.</p>
             </div>
 
-            <form action="{{ route('coordinador.transferencias.decidir', $transferencia) }}" method="POST" class="space-y-4">
+            <form novalidate action="{{ route('coordinador.transferencias.decidir', $transferencia) }}" method="POST" class="space-y-4">
                 @csrf
                 <div>
                     <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Comentarios u Observaciones (Opcional)</label>

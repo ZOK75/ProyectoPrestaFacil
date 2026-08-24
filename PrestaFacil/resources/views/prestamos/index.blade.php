@@ -147,7 +147,7 @@
 
     <!-- Buscador y Filtros Móviles -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-md">
-        <form action="{{ route('prestamos.index') }}" method="GET" class="space-y-2">
+        <form novalidate action="{{ route('prestamos.index') }}" method="GET" class="space-y-2">
             <div class="relative">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -272,7 +272,7 @@
                     </a>
 
                     @if($prestamo->puedeDesactivarsePorDistribuidor() && Auth::check() && (Auth::user()->esDistribuidor() || Auth::user()->id === $prestamo->created_by_user_id))
-                        <form action="{{ route('prestamos.destroy', $prestamo) }}" method="POST" class="flex-1" onsubmit="return confirm('¿Estás seguro de desactivar y cancelar este vale pendiente? Se liberará la línea de crédito de inmediato.');">
+                        <form novalidate action="{{ route('prestamos.destroy', $prestamo) }}" method="POST" class="flex-1" onsubmit="return confirm('¿Estás seguro de desactivar y cancelar este vale pendiente? Se liberará la línea de crédito de inmediato.');">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="w-full py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold text-center transition flex items-center justify-center gap-1">

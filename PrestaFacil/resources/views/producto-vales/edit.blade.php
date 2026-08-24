@@ -73,7 +73,7 @@
 
         <!-- Formulario para Desactivar -->
         @if($productoVale->activo)
-            <form action="{{ route('producto-vales.update', $productoVale) }}" method="POST" class="pt-2 flex items-center justify-end gap-3">
+            <form novalidate action="{{ route('producto-vales.update', $productoVale) }}" method="POST" class="pt-2 flex items-center justify-end gap-3">
                 @csrf
                 @method('PUT')
                 

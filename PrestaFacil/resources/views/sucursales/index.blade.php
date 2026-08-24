@@ -96,7 +96,7 @@
                                 Editar
                             </button>
 
-                            <form action="{{ route('sucursales.toggle-status', $sucursal->id) }}" method="POST" class="inline">
+                            <form novalidate action="{{ route('sucursales.toggle-status', $sucursal->id) }}" method="POST" class="inline">
                                 @csrf
                                 @method('PATCH')
                                 <button type="submit" 
@@ -120,7 +120,7 @@
                 <h3 class="text-base font-bold text-white">Crear Nueva Sucursal</h3>
                 <button @click="showCreateModal = false" class="text-slate-400 hover:text-white">&times;</button>
             </div>
-            <form action="{{ route('sucursales.store') }}" method="POST" class="space-y-4">
+            <form novalidate action="{{ route('sucursales.store') }}" method="POST" class="space-y-4">
                 @csrf
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Nombre de la Sucursal *</label>
@@ -150,7 +150,7 @@
                 <h3 class="text-base font-bold text-white">Editar Sucursal</h3>
                 <button @click="showEditModal = false" class="text-slate-400 hover:text-white">&times;</button>
             </div>
-            <form :action="`/sucursales/${editSucursal.id}`" method="POST" class="space-y-4">
+            <form novalidate :action="`/sucursales/${editSucursal.id}`" method="POST" class="space-y-4">
                 @csrf
                 @method('PUT')
                 <div>
@@ -195,7 +195,7 @@
                 <span>Al mover un Gerente a otra sucursal, <strong>todos sus Coordinadores</strong> y <strong>sus Distribuidoras asociadas</strong> se transferirán automáticamente a la nueva sucursal.</span>
             </div>
 
-            <form action="{{ route('gerente-general.reasignar-gerente') }}" method="POST" class="space-y-4">
+            <form novalidate action="{{ route('gerente-general.reasignar-gerente') }}" method="POST" class="space-y-4">
                 @csrf
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Seleccionar Gerente de Sucursal *</label>

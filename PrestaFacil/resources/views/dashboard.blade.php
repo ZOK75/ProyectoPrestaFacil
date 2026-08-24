@@ -19,7 +19,7 @@
                         </svg>
                         Editar Perfil
                     </a>
-                    <form method="POST" action="{{ route('logout') }}">
+                    <form novalidate method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 text-sm font-semibold hover:bg-rose-500/20 transition flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

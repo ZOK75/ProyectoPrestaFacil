@@ -63,7 +63,7 @@
 
     <!-- Filtros de Búsqueda y Distribuidora -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm">
-        <form method="GET" action="{{ route('coordinador.prestamos') }}" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+        <form novalidate method="GET" action="{{ route('coordinador.prestamos') }}" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
             <!-- Selector de Distribuidora -->
             <div class="sm:col-span-5">
                 <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Filtrar por Distribuidora</label>

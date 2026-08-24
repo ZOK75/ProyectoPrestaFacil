@@ -13,7 +13,7 @@
 
     <!-- Buscador -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
-        <form action="{{ route('cajero.buscar-folio') }}" method="GET">
+        <form novalidate action="{{ route('cajero.buscar-folio') }}" method="GET">
             <label class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Buscar por Referencia de Vale</label>
             <div class="relative">
                 <input type="text" name="referencia" value="{{ $referencia ?? '' }}" placeholder="Ej: REF-PREVALE-..." required autofocus

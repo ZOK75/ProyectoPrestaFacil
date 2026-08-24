@@ -13,7 +13,7 @@
             <p class="text-sm text-slate-500 mt-1">Regístrate para gestionar tus vales y préstamos</p>
         </div>
 
-        <form method="POST" action="{{ route('register') }}" class="space-y-4">
+        <form novalidate method="POST" action="{{ route('register') }}" class="space-y-4">
             @csrf
 
             <!-- Nombre completo -->

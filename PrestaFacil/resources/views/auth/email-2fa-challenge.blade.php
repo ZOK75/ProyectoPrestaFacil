@@ -26,7 +26,7 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('auth.email-2fa.verify') }}" class="space-y-4">
+        <form novalidate method="POST" action="{{ route('auth.email-2fa.verify') }}" class="space-y-4">
             @csrf
 
             <div>
@@ -44,7 +44,7 @@
             </button>
         </form>
 
-        <form method="POST" action="{{ route('auth.email-2fa.resend') }}" class="mt-4">
+        <form novalidate method="POST" action="{{ route('auth.email-2fa.resend') }}" class="mt-4">
             @csrf
             <button type="submit" class="text-xs text-emerald-600 hover:underline bg-transparent border-0 cursor-pointer">
                 ¿No recibiste el código? Reenviar

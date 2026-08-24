@@ -27,7 +27,7 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('2fa.verify') }}" class="space-y-6">
+            <form novalidate method="POST" action="{{ route('2fa.verify') }}" class="space-y-6">
                 @csrf
 
                 <!-- Campo del código -->

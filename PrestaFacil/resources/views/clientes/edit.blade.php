@@ -32,7 +32,7 @@
             @endif
         </div>
 
-        <form action="{{ route('clientes.update', $cliente) }}" method="POST" enctype="multipart/form-data" class="space-y-5">
+        <form novalidate action="{{ route('clientes.update', $cliente) }}" method="POST" enctype="multipart/form-data" class="space-y-5">
             @csrf
             @method('PUT')
 

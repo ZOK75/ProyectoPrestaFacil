@@ -33,7 +33,7 @@
                     Editar
                 </a>
 
-                <form action="{{ route('usuarios.destroy', $usuario) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Confirmas que deseas desactivar al usuario {{ $usuario->name }}? Esta acción no se puede deshacer y registrará la marca de tiempo actual.');">
+                <form novalidate action="{{ route('usuarios.destroy', $usuario) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Confirmas que deseas desactivar al usuario {{ $usuario->name }}? Esta acción no se puede deshacer y registrará la marca de tiempo actual.');">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm shadow-md transition flex items-center gap-1.5">

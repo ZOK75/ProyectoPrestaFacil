@@ -19,7 +19,7 @@
             <p class="text-xs text-slate-400">Completa los datos y carga los expedientes PDF.</p>
         </div>
 
-        <form action="{{ route('clientes.store') }}" method="POST" enctype="multipart/form-data" class="space-y-5">
+        <form novalidate action="{{ route('clientes.store') }}" method="POST" enctype="multipart/form-data" class="space-y-5">
             @csrf
 
             <!-- 1. Datos Personales -->

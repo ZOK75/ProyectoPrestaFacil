@@ -21,7 +21,7 @@
         <p class="text-xs text-slate-400">Corrige los datos del cliente según sus documentos físicos. Esta solicitud pasará a autorización antes de poder entregar el vale.</p>
     </div>
 
-    <form action="{{ route('cajero.solicitar-modificacion', $prestamo) }}" method="POST" class="space-y-4">
+    <form novalidate action="{{ route('cajero.solicitar-modificacion', $prestamo) }}" method="POST" class="space-y-4">
         @csrf
         
         <!-- Comparador -->

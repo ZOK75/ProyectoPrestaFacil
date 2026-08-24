@@ -53,7 +53,7 @@
         
         <!-- Filtros de Auditoría -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
-            <form action="{{ route('logs.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <form novalidate action="{{ route('logs.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <input type="hidden" name="tab" value="auditoria">
 
                 <!-- Búsqueda General -->
@@ -161,7 +161,7 @@
         
         <!-- Filtros de Logs del Sistema -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
-            <form action="{{ route('logs.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <form novalidate action="{{ route('logs.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <input type="hidden" name="tab" value="sistema">
 
                 <!-- Búsqueda en texto del log -->

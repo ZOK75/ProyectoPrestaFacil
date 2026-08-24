@@ -65,7 +65,7 @@
 
     <!-- Card Formulario -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-        <form action="{{ route('configuracion-general.update') }}" method="POST" class="space-y-6">
+        <form novalidate action="{{ route('configuracion-general.update') }}" method="POST" class="space-y-6">
             @csrf
             @method('PUT')
 
@@ -358,7 +358,7 @@
             </div>
 
             @if($puedeEditar)
-                <form action="{{ route('configuracion-general.simular-corte') }}" method="POST" onsubmit="return confirm('¿Deseas simular y ejecutar el siguiente corte quincenal? Se procesarán los vales y abonos, se aplicarán las multas moratorias por vale y se avanzará el ciclo 15 días (+15d).');">
+                <form novalidate action="{{ route('configuracion-general.simular-corte') }}" method="POST" onsubmit="return confirm('¿Deseas simular y ejecutar el siguiente corte quincenal? Se procesarán los vales y abonos, se aplicarán las multas moratorias por vale y se avanzará el ciclo 15 días (+15d).');">
                     @csrf
                     <button type="submit" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-xs font-black shadow-lg shadow-orange-950/30 transition flex items-center justify-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

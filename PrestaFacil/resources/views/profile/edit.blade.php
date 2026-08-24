@@ -78,7 +78,7 @@
                                 Tu cuenta cuenta con la verificación en dos pasos activa. Se te solicitará un código cada vez que inicies sesión.
                             </p>
 
-                            <form method="POST" action="{{ route('profile.2fa.desactivar') }}" class="pt-2">
+                            <form novalidate method="POST" action="{{ route('profile.2fa.desactivar') }}" class="pt-2">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="px-4 py-2.5 bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/30 font-medium rounded-xl text-sm transition-all duration-200">
@@ -100,7 +100,7 @@
                                 </div>
                             </div>
 
-                            <form method="POST" action="{{ route('profile.2fa.activar') }}" class="space-y-4">
+                            <form novalidate method="POST" action="{{ route('profile.2fa.activar') }}" class="space-y-4">
                                 @csrf
                                 <div>
                                     <label for="one_time_password" class="block text-sm font-medium text-slate-300 mb-2">

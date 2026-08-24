@@ -165,7 +165,7 @@
                     Editar Datos
                 </a>
 
-                <form action="{{ route('clientes.destroy', $cliente) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Desactivar cliente {{ $cliente->nombre }}?');">
+                <form novalidate action="{{ route('clientes.destroy', $cliente) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Desactivar cliente {{ $cliente->nombre }}?');">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="px-4 py-2.5 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-600 hover:text-white text-xs font-bold transition">

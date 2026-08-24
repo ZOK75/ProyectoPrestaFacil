@@ -68,7 +68,7 @@
                                         Ver Detalle
                                     </a>
                                     @if($solicitud->estado === 'en espera')
-                                        <form action="{{ route('coordinador.solicitudes.enviar-verificacion', $solicitud) }}" method="POST" class="inline">
+                                        <form novalidate action="{{ route('coordinador.solicitudes.enviar-verificacion', $solicitud) }}" method="POST" class="inline">
                                             @csrf
                                             <button type="submit" 
                                                 x-data="{ clicked: false }" 

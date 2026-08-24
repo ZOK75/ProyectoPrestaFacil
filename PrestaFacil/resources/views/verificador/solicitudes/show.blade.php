@@ -56,7 +56,7 @@
         </div>
     @endif
 
-    <form action="{{ route('verificador.solicitudes.procesar', $solicitud->id) }}" method="POST" class="space-y-6" novalidate>
+    <form novalidate action="{{ route('verificador.solicitudes.procesar', $solicitud->id) }}" method="POST" class="space-y-6" novalidate>
         @csrf
 
         <!-- 1. Datos Personales -->

@@ -67,7 +67,7 @@
 
     <!-- Buscador Móvil -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-md">
-        <form action="{{ route('producto-vales.index') }}" method="GET" class="flex gap-2">
+        <form novalidate action="{{ route('producto-vales.index') }}" method="GET" class="flex gap-2">
             <div class="relative flex-1">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

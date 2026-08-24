@@ -105,7 +105,7 @@
                 <p class="text-[11px] text-slate-400 leading-tight">
                     Este vale aún no ha sido entregado por el cajero. Puedes desactivarlo y cancelar la referencia para liberar tu saldo de crédito.
                 </p>
-                <form action="{{ route('prestamos.destroy', $prestamo) }}" method="POST" onsubmit="return confirm('¿Estás seguro de desactivar y cancelar este vale pendiente? Se liberará la línea de crédito de inmediato.');">
+                <form novalidate action="{{ route('prestamos.destroy', $prestamo) }}" method="POST" onsubmit="return confirm('¿Estás seguro de desactivar y cancelar este vale pendiente? Se liberará la línea de crédito de inmediato.');">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="w-full py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition flex items-center justify-center gap-1.5">

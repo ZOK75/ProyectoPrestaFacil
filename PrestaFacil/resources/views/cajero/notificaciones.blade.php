@@ -47,7 +47,7 @@
                         @endif
 
                         @if(!$n->leida)
-                            <form action="{{ route('cajero.notificaciones.leer', $n->id) }}" method="POST">
+                            <form novalidate action="{{ route('cajero.notificaciones.leer', $n->id) }}" method="POST">
                                 @csrf
                                 <button type="submit" class="text-[10px] font-bold text-slate-500 hover:text-slate-300 bg-slate-800 px-2 py-1 rounded-md">
                                     Marcar leída

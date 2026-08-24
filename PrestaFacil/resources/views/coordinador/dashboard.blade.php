@@ -164,14 +164,14 @@
                         </div>
 
                         <div class="flex items-center gap-2 pt-2 border-t border-slate-800/80">
-                            <form action="{{ route('coordinador.conciliaciones.decidir', $conc) }}" method="POST" class="inline-flex gap-2">
+                            <form novalidate action="{{ route('coordinador.conciliaciones.decidir', $conc) }}" method="POST" class="inline-flex gap-2">
                                 @csrf
                                 <input type="hidden" name="accion" value="aceptar">
                                 <button type="submit" onclick="return confirm('¿Deseas pre-aprobar esta conciliación y enviarla a Gerencia?')" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow">
                                     Pre-Aprobar y Enviar a Gerencia
                                 </button>
                             </form>
-                            <form action="{{ route('coordinador.conciliaciones.decidir', $conc) }}" method="POST" class="inline-flex gap-2">
+                            <form novalidate action="{{ route('coordinador.conciliaciones.decidir', $conc) }}" method="POST" class="inline-flex gap-2">
                                 @csrf
                                 <input type="hidden" name="accion" value="rechazar">
                                 <button type="submit" onclick="return confirm('¿Deseas rechazar esta conciliación?')" class="px-3.5 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
@@ -302,7 +302,7 @@
 
                                 <!-- Formulario Desplegable de Decisión -->
                                 <div x-show="openDecisionClienteId === '{{ $tcp->id }}'" class="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3" style="display: none;" x-transition>
-                                    <form method="POST" action="{{ route('clientes.traspasos.decidir-coordinador', $tcp) }}" class="space-y-3">
+                                    <form novalidate method="POST" action="{{ route('clientes.traspasos.decidir-coordinador', $tcp) }}" class="space-y-3">
                                         @csrf
                                         <input type="hidden" name="accion" id="dec_cli_coord_{{ $tcp->id }}">
                                         <div>
@@ -558,7 +558,7 @@
                     <button type="button" @click="showCreditModal = false" class="text-slate-400 hover:text-white text-lg font-bold leading-none">&times;</button>
                 </div>
                 
-                <form :action="`/coordinador/distribuidores/${selectedDistId}/solicitar-credito`" method="POST" class="mt-4 space-y-4">
+                <form novalidate :action="`/coordinador/distribuidores/${selectedDistId}/solicitar-credito`" method="POST" class="mt-4 space-y-4">
                     @csrf
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Distribuidora</label>
@@ -616,7 +616,7 @@
                     <button type="button" @click="showTransferModal = false" class="text-slate-400 hover:text-white text-lg font-bold leading-none">&times;</button>
                 </div>
                 
-                <form :action="`/coordinador/distribuidores/${transferDistId}/solicitar-transferencia`" method="POST" class="mt-4 space-y-4">
+                <form novalidate :action="`/coordinador/distribuidores/${transferDistId}/solicitar-transferencia`" method="POST" class="mt-4 space-y-4">
                     @csrf
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Distribuidora a Traspasar</label>

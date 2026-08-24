@@ -34,7 +34,7 @@
             </div>
         </div>
 
-        <form action="{{ route('prestamos.pago.store', $prestamo) }}" method="POST" class="space-y-4">
+        <form novalidate action="{{ route('prestamos.pago.store', $prestamo) }}" method="POST" class="space-y-4">
             @csrf
 
             <!-- Monto Abonado -->

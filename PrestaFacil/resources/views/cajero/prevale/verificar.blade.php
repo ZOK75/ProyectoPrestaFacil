@@ -139,7 +139,7 @@
     <!-- Acciones -->
     <div class="space-y-3 pt-2">
         @if(empty($erroresNegocio))
-            <form action="{{ route('cajero.prevale.entregar', $prestamo) }}" method="POST" x-show="ineCoincide && comprobanteCoincide" x-transition>
+            <form novalidate action="{{ route('cajero.prevale.entregar', $prestamo) }}" method="POST" x-show="ineCoincide && comprobanteCoincide" x-transition>
                 @csrf
                 <div class="bg-emerald-900/20 border border-emerald-500/30 rounded-2xl p-4 space-y-4">
                     <h3 class="text-xs font-bold text-emerald-400 uppercase">Confirmar Transferencia</h3>

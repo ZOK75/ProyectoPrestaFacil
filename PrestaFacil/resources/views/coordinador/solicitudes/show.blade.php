@@ -55,7 +55,7 @@
 
                 @if($solicitud->estado === 'en espera')
                     <div class="pt-4 border-t border-slate-800">
-                        <form action="{{ route('coordinador.solicitudes.enviar-verificacion', $solicitud) }}" method="POST">
+                        <form novalidate action="{{ route('coordinador.solicitudes.enviar-verificacion', $solicitud) }}" method="POST">
                             @csrf
                             <button type="submit" class="w-full px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-sky-950/20 transition"
                                     onclick="return confirm('¿Confirmas que los datos ingresados son correctos y deseas turnar la solicitud al verificador?')">

@@ -32,7 +32,7 @@
                 {!! $qrImage !!}
             </div>
 
-            <form method="POST" action="{{ route('2fa.setup.confirm') }}" class="space-y-4">
+            <form novalidate method="POST" action="{{ route('2fa.setup.confirm') }}" class="space-y-4">
                 @csrf
 
                 <!-- Campo del código -->

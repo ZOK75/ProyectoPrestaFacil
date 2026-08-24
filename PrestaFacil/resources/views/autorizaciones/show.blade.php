@@ -126,7 +126,7 @@
     <div x-show="rechazarModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" style="display: none;">
         <div class="bg-slate-900 border border-rose-900/50 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden" @click.away="rechazarModalOpen = false">
             <div class="bg-rose-600 p-4"><h3 class="text-white font-black text-lg">Rechazar Solicitud</h3></div>
-            <form action="{{ route('autorizaciones.rechazar', $solicitud) }}" method="POST" class="p-4 space-y-4">
+            <form novalidate action="{{ route('autorizaciones.rechazar', $solicitud) }}" method="POST" class="p-4 space-y-4">
                 @csrf
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Motivo del Rechazo (Obligatorio)</label>
@@ -144,7 +144,7 @@
     <div x-show="aprobarModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" style="display: none;">
         <div class="bg-slate-900 border border-emerald-900/50 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden" @click.away="aprobarModalOpen = false">
             <div class="bg-emerald-600 p-4"><h3 class="text-white font-black text-lg">Aprobar Solicitud</h3></div>
-            <form action="{{ route('autorizaciones.aprobar', $solicitud) }}" method="POST" class="p-4 space-y-4">
+            <form novalidate action="{{ route('autorizaciones.aprobar', $solicitud) }}" method="POST" class="p-4 space-y-4">
                 @csrf
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Observaciones (Opcional)</label>

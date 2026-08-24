@@ -208,7 +208,7 @@
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <!-- Formulario de Aprobación -->
-                <form method="POST" action="{{ route('solicitudes-clientes.aprobar', $solicitud) }}" class="space-y-4 bg-emerald-950/10 border border-emerald-900/30 rounded-xl p-5">
+                <form novalidate method="POST" action="{{ route('solicitudes-clientes.aprobar', $solicitud) }}" class="space-y-4 bg-emerald-950/10 border border-emerald-900/30 rounded-xl p-5">
                     @csrf
                     <div>
                         <h4 class="text-sm font-bold text-emerald-300 mb-1">Aprobar Solicitud</h4>
@@ -225,7 +225,7 @@
                 </form>
 
                 <!-- Formulario de Rechazo -->
-                <form method="POST" action="{{ route('solicitudes-clientes.rechazar', $solicitud) }}" class="space-y-4 bg-rose-950/10 border border-rose-900/30 rounded-xl p-5">
+                <form novalidate method="POST" action="{{ route('solicitudes-clientes.rechazar', $solicitud) }}" class="space-y-4 bg-rose-950/10 border border-rose-900/30 rounded-xl p-5">
                     @csrf
                     <div>
                         <h4 class="text-sm font-bold text-rose-300 mb-1">Rechazar Solicitud</h4>

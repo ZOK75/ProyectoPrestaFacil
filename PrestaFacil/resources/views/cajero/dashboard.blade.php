@@ -41,7 +41,7 @@
             Búsqueda de Vales
         </h2>
         
-        <form action="{{ route('cajero.buscar-folio') }}" method="GET">
+        <form novalidate action="{{ route('cajero.buscar-folio') }}" method="GET">
             <div class="relative">
                 <input type="text" name="referencia" placeholder="Ej: REF-PREVALE-..." required
                     class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-4 pr-12 text-white font-mono text-sm uppercase focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">

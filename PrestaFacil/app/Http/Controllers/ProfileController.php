@@ -24,8 +24,8 @@ class ProfileController extends Controller
         $user = $request->user();
         $qrImage = null;
 
-        // Generamos el QR solo si el usuario NO tiene activado el 2FA todavía
-        if (!$user->google2fa_enabled && class_exists(Google2FA::class)) {
+        // Generamos el QR solo si el usuario NO tiene activado el 2FA todavía y NO es verificador
+        if (!$user->google2fa_enabled && class_exists(Google2FA::class) && !$user->esVerificador()) {
             $google2fa = new Google2FA();
 
             if (!$user->google2fa_secret) {

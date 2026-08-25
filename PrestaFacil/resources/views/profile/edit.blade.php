@@ -31,6 +31,7 @@
                 </div>
             </div>
 
+            @if(!Auth::user()->esVerificador())
             <!-- Autenticación en Dos Pasos (2FA) -->
             <div class="bg-slate-900 border border-slate-800 shadow-xl sm:rounded-2xl overflow-hidden p-6 sm:p-8">
                 <div class="max-w-xl">
@@ -126,6 +127,7 @@
                     @endif
                 </div>
             </div>
+            @endif
         </div>
 
         <div class="space-y-8">

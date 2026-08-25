@@ -125,7 +125,19 @@ class ConfiguracionController extends Controller
         // Ejecutar verificación de corte inmediatamente con los nuevos parámetros
         $corteService->verificarYProcesarCortesYVencimientos();
 
-        abort(403, 'Acceso denegado: Únicamente el Gerente General tiene autorización para simular cortes.');
+        return redirect()->route('configuracion-general.edit')
+            ->with('success', 'Configuración general actualizada y ciclo recalculado correctamente.');
+    }
+
+    /**
+     * Simulación manual del siguiente corte quincenal (Solo Gerente General).
+     */
+    public function simularCorte(CorteCobranzaService $corteService)
+    {
+        $operador = $this->operador();
+
+        if (!$operador || !$operador->esGerenteGeneral()) {
+            abort(403, 'Acceso denegado: Únicamente el Gerente General tiene autorización para simular cortes.');
         }
 
         $resultados = $corteService->simularSiguienteCorte();

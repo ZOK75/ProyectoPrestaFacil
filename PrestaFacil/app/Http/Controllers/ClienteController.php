@@ -171,15 +171,161 @@ class ClienteController extends Controller
             ]
         );
 
-        abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede editar clientes.');
+        return redirect()->route('clientes.show', $cliente)
+            ->with('success', "Cliente '{$cliente->nombre}' (CURP: {$cliente->curp}) registrado exitosamente.");
+    }
+
+    /**
+     * Ficha técnica del expediente digital del cliente.
+     */
+    public function show(Cliente $cliente)
+    {
+        if ($redirect = $this->verificarAcceso()) {
+            return $redirect;
+        }
+
+        $operador = $this->operador();
+
+        if ($operador->esDistribuidor() && $cliente->created_by_user_id !== $operador->id) {
+            abort(403, 'Acceso denegado: Este cliente no pertenece a tu cartera asignada.');
+        }
+
+        $cliente->load(['createdBy', 'desactivadoPor', 'prestamos.productoVale', 'prestamos.pagos', 'solicitudes']);
+
+        return view('clientes.show', compact('cliente', 'operador'));
+    }
+
+    /**
+     * Formulario para editar datos del cliente.
+     */
+    public function edit(Cliente $cliente)
+    {
+        if ($redirect = $this->verificarAcceso()) {
+            return $redirect;
+        }
+
+        $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
+            abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede editar clientes.');
+        }
+
+        if ($operador->esDistribuidor() && $cliente->created_by_user_id !== $operador->id) {
+            abort(403, 'Acceso denegado: Este cliente no pertenece a tu cartera asignada.');
         }
 
         if (!$cliente->activo) {
+            return redirect()->route('clientes.index')
+                ->with('error', "No se puede editar al cliente '{$cliente->nombre}' porque se encuentra inactivo.");
+        }
+
+        return view('clientes.edit', compact('cliente', 'operador'));
+    }
+
+    /**
+     * Actualizar datos del cliente.
+     */
+    public function update(UpdateClienteRequest $request, Cliente $cliente)
+    {
+        if ($redirect = $this->verificarAcceso()) {
+            return $redirect;
+        }
+
+        $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
             abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede modificar clientes.');
         }
 
+        if ($operador->esDistribuidor() && $cliente->created_by_user_id !== $operador->id) {
+            abort(403, 'Acceso denegado: Este cliente no pertenece a tu cartera asignada.');
+        }
+
         if (!$cliente->activo) {
+            return redirect()->route('clientes.index')
+                ->with('error', "No se puede modificar al cliente '{$cliente->nombre}' porque se encuentra inactivo.");
+        }
+
+        $data = $request->validated();
+
+        if ($request->hasFile('pdf_ine')) {
+            $pathIne = $request->file('pdf_ine')->store('expedientes_clientes/ine', 'public');
+            $data['path_ine_pdf'] = $pathIne;
+        }
+
+        if ($request->hasFile('pdf_comprobante')) {
+            $pathComprobante = $request->file('pdf_comprobante')->store('expedientes_clientes/comprobantes', 'public');
+            $data['path_comprobante_pdf'] = $pathComprobante;
+        }
+
+        // Si es distribuidor, envía solicitud de modificación
+        if ($operador->esDistribuidor()) {
+            $solicitud = SolicitudCliente::create([
+                'tipo' => 'modificacion',
+                'estado' => 'pendiente',
+                'cliente_id' => $cliente->id,
+                'distribuidor_id' => $operador->id,
+                'sucursal_id' => $operador->sucursal_id,
+                'datos_originales' => $cliente->toArray(),
+                'datos_propuestos' => $data,
+                'motivo' => $request->input('motivo_modificacion') ?? 'Modificación de datos por distribuidor.',
+            ]);
+
+            AuditService::registrar(
+                'SOLICITUD_MODIFICACION_CLIENTE',
+                "Solicitud de modificación enviada para cliente '{$cliente->nombre}' por {$operador->name}",
+                [
+                    'entidad_tipo' => 'solicitudes_cliente',
+                    'entidad_id' => $solicitud->id,
+                    'user_id' => $operador->id,
+                    'user_rol' => $operador->rol?->nombre,
+                    'sucursal_id' => $operador->sucursal_id,
+                ]
+            );
+
+            return redirect()->route('clientes.index')
+                ->with('success', "Se ha enviado la solicitud de modificación para '{$cliente->nombre}'.");
+        }
+
+        // Modificación directa por Administrador o Gerente
+        $datosAntes = $cliente->toArray();
+        $cliente->update($data);
+
+        AuditService::registrar(
+            'ACTUALIZACION_CLIENTE',
+            "Cliente '{$cliente->nombre}' actualizado por " . ($operador?->name ?? 'Usuario'),
+            [
+                'entidad_tipo' => 'clientes',
+                'entidad_id' => $cliente->id,
+                'user_id' => Auth::id() ?? $operador?->id,
+                'user_rol' => $operador?->rol?->nombre,
+                'sucursal_id' => $operador?->sucursal_id,
+                'antes' => $datosAntes,
+                'despues' => $cliente->fresh()->toArray(),
+            ]
+        );
+
+        return redirect()->route('clientes.show', $cliente)
+            ->with('success', "Los datos del cliente '{$cliente->nombre}' fueron actualizados correctamente.");
+    }
+
+    /**
+     * Desactivar un cliente.
+     */
+    public function destroy(Request $request, Cliente $cliente)
+    {
+        if ($redirect = $this->verificarAcceso()) {
+            return $redirect;
+        }
+
+        $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
             abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede desactivar clientes.');
+        }
+
+        if ($operador->esDistribuidor() && $cliente->created_by_user_id !== $operador->id) {
+            abort(403, 'No tienes permiso para desactivar este cliente.');
         }
 
         if (!$cliente->activo) {

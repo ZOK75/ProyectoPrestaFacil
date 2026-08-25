@@ -198,6 +198,24 @@ class UserController extends Controller
         }
 
         if (!$usuario->activo) {
+            return redirect()->route('usuarios.index')
+                ->with('error', "No se puede editar al usuario '{$usuario->name}' porque se encuentra inactivo.");
+        }
+
+        $rolesPermitidos = $operador->rolesPermitidos();
+        $sucursalesPermitidas = $operador->sucursalesPermitidas();
+
+        return view('usuarios.edit', compact('usuario', 'operador', 'rolesPermitidos', 'sucursalesPermitidas'));
+    }
+
+    /**
+     * Actualizar datos del usuario.
+     */
+    public function update(UpdateUserRequest $request, User $usuario)
+    {
+        $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
             abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede modificar usuarios.');
         }
 
@@ -206,6 +224,51 @@ class UserController extends Controller
         }
 
         if (!$usuario->activo) {
+            return redirect()->route('usuarios.index')
+                ->with('error', "No se puede modificar al usuario '{$usuario->name}' porque se encuentra inactivo.");
+        }
+
+        $data = $request->validated();
+
+        if ($operador->esGerenteSucursal()) {
+            $data['sucursal_id'] = $operador->sucursal_id;
+        }
+
+        if (!empty($data['password'])) {
+            $data['password'] = Hash::make($data['password']);
+        } else {
+            unset($data['password']);
+        }
+
+        $datosAntes = $usuario->makeHidden('password')->toArray();
+        $usuario->update($data);
+
+        AuditService::registrar(
+            'ACTUALIZACION_USUARIO',
+            "Usuario '{$usuario->name}' actualizado por " . ($operador->name ?? 'Usuario'),
+            [
+                'entidad_tipo' => 'users',
+                'entidad_id' => $usuario->id,
+                'user_id' => Auth::id() ?? $operador->id,
+                'user_rol' => $operador->rol?->nombre,
+                'sucursal_id' => $usuario->sucursal_id,
+                'antes' => $datosAntes,
+                'despues' => $usuario->fresh()->makeHidden('password')->toArray(),
+            ]
+        );
+
+        return redirect()->route('usuarios.index')
+            ->with('success', "Usuario '{$usuario->name}' actualizado correctamente.");
+    }
+
+    /**
+     * Desactivar un usuario.
+     */
+    public function destroy(User $usuario)
+    {
+        $operador = $this->operador();
+
+        if ($operador->esAdministrador()) {
             abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede desactivar usuarios.');
         }
 
@@ -216,6 +279,11 @@ class UserController extends Controller
         if (!$usuario->activo) {
             return redirect()->route('usuarios.index')
                 ->with('info', "El usuario '{$usuario->name}' ya se encuentra desactivado.");
+        }
+
+        if ($usuario->id === Auth::id()) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'No puedes desactivar tu propia cuenta de usuario.');
         }
 
         $datosAntes = $usuario->makeHidden('password')->toArray();

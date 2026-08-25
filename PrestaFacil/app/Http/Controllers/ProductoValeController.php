@@ -125,7 +125,20 @@ class ProductoValeController extends Controller
             ]
         );
 
-        abort(403, 'Acceso denegado: Los Verificadores no tienen acceso al catálogo de vales.');
+        return redirect()->route('producto-vales.index')
+            ->with('success', "Vale de préstamo '{$productoVale->nombre}' ({$productoVale->clave}) registrado con éxito.");
+    }
+
+    /**
+     * Muestra la ficha técnica y tabla de amortización de un producto de vale.
+     */
+    public function show(ProductoVale $productoVale)
+    {
+        $operador = $this->operador();
+
+        // Bloquear acceso al Verificador
+        if ($operador && $operador->esVerificador()) {
+            abort(403, 'Acceso denegado: Los Verificadores no tienen acceso al catálogo de vales.');
         }
 
         $esGerenteGeneral = $operador ? $operador->esGerenteGeneral() : false;
@@ -189,10 +202,6 @@ class ProductoValeController extends Controller
     {
         $operador = $this->operador();
         if (!$operador || !$operador->esGerenteGeneral()) {
-            abort(403, 'Acceso denegado: Únicamente el Gerente General tiene autorización para desactivar vales.');
-        }
-
-        if (!$productoVale->activo) {
             abort(403, 'Acceso denegado: Únicamente el Gerente General tiene autorización para desactivar vales.');
         }
 

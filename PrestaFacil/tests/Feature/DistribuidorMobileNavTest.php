@@ -94,10 +94,10 @@ class DistribuidorMobileNavTest extends TestCase
         $this->assertTrue($prestamo->esPendiente());
         $this->assertFalse($prestamo->esActivo());
 
-        // REGLA: Mientras el vale está pendiente, el límite de crédito NO cambia (creditoUtilizado = 0, creditoDisponible = 30000)
+        // REGLA: Al asignar el vale (aunque esté pendiente de cobro en caja), se descuenta de inmediato del crédito disponible
         $distribuidor->refresh();
-        $this->assertEquals(0.00, $distribuidor->creditoUtilizado());
-        $this->assertEquals(30000.00, $distribuidor->creditoDisponible());
+        $this->assertEquals(5000.00, $distribuidor->creditoUtilizado());
+        $this->assertEquals(25000.00, $distribuidor->creditoDisponible());
 
         // No permite crear otro vale al mismo cliente mientras tenga uno pendiente
         $responseSegundo = $this->actingAs($distribuidor)->post(route('prestamos.store'), [
@@ -152,6 +152,11 @@ class DistribuidorMobileNavTest extends TestCase
         $prestamo = \App\Models\Prestamo::where('cliente_id', $cliente->id)->first();
         $this->assertEquals('pendiente', $prestamo->estado);
 
+        // Al asignar el vale pendiente, se descuenta de inmediato del crédito
+        $distribuidor->refresh();
+        $this->assertEquals(4000.00, $distribuidor->creditoUtilizado());
+        $this->assertEquals(16000.00, $distribuidor->creditoDisponible());
+
         // Desactivar vale pendiente
         $responseDelete = $this->actingAs($distribuidor)->delete(route('prestamos.destroy', $prestamo));
         $responseDelete->assertRedirect(route('prestamos.index'));
@@ -162,7 +167,7 @@ class DistribuidorMobileNavTest extends TestCase
         $this->assertEquals('cancelado', $prestamo->estado_entrega);
         $this->assertFalse($prestamo->activo);
 
-        // El crédito se mantiene limpio y disponible
+        // El crédito se libera de inmediato
         $distribuidor->refresh();
         $this->assertEquals(0.0, $distribuidor->creditoUtilizado());
         $this->assertEquals(20000.00, $distribuidor->creditoDisponible());
@@ -221,10 +226,10 @@ class DistribuidorMobileNavTest extends TestCase
         $prestamo = \App\Models\Prestamo::where('cliente_id', $cliente->id)->first();
         $this->assertEquals('pendiente', $prestamo->estado);
 
-        // Antes de la entrega, el crédito aún no ha cambiado
+        // Al asignar el vale, ya se encuentra descontado del crédito disponible
         $distribuidor->refresh();
-        $this->assertEquals(0.00, $distribuidor->creditoUtilizado());
-        $this->assertEquals(20000.00, $distribuidor->creditoDisponible());
+        $this->assertEquals(3000.00, $distribuidor->creditoUtilizado());
+        $this->assertEquals(17000.00, $distribuidor->creditoDisponible());
 
         // Cajero entrega el prevale
         $responseEntrega = $this->actingAs($cajero)->post(route('cajero.prevale.entregar', $prestamo), [
@@ -239,7 +244,7 @@ class DistribuidorMobileNavTest extends TestCase
         $this->assertTrue($prestamo->esActivo());
         $this->assertFalse($prestamo->esPendiente());
 
-        // REGLA: Ahora que está activo, el límite de crédito SÍ cambia
+        // Sigue ocupando el crédito mientras esté activo
         $distribuidor->refresh();
         $this->assertEquals(3000.00, $distribuidor->creditoUtilizado());
         $this->assertEquals(17000.00, $distribuidor->creditoDisponible());

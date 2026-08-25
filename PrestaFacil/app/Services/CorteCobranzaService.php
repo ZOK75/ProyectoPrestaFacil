@@ -33,7 +33,7 @@ class CorteCobranzaService
 
         // Obtener todas las distribuidoras activas
         $distribuidoras = User::where('activo', true)
-            ->whereHas('rol', fn ($q) => $q->whereIn('nombre', ['Distribuidor', 'Distribuidora']))
+            ->whereHas('rol', fn ($q) => $q->whereIn('nombre', ['Distribuidor', 'distribuidor', 'Distribuidora', 'distribuidora']))
             ->get();
 
         if ($distribuidoras->isEmpty()) {
@@ -229,7 +229,8 @@ class CorteCobranzaService
                     $total15nalExigible = $totalQuincenal + $multasDistribuidora;
 
                     $relacion = RelacionCobranza::where('distribuidora_id', $dist->id)
-                        ->where('fecha_corte', $config->fecha_corte)
+                        ->whereDate('fecha_corte', $config->fecha_corte->toDateString())
+                        ->orderBy('fecha_corte', 'desc')
                         ->first();
 
                     $montoPagado = $relacion ? floatval($relacion->monto_pagado) : 0.0;

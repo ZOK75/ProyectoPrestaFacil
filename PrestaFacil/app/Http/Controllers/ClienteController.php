@@ -34,13 +34,7 @@ class ClienteController extends Controller
     {
         $operador = $this->operador();
         if (!$operador) {
-            return redirect()->route('login');
-        }
-
-        if ($operador->esGerenteGeneral() || $operador->esGerenteSucursal()) {
-            $ruta = $operador->esGerenteGeneral() ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
-            return redirect()->route($ruta)
-                ->with('error', 'Acceso denegado: El rol gerencial no tiene permisos para acceder al módulo de clientes.');
+            abort(403, 'Acceso denegado: El rol gerencial no tiene permisos para acceder al módulo de clientes.');
         }
 
         return null;
@@ -123,8 +117,7 @@ class ClienteController extends Controller
         $operador = $this->operador();
 
         if ($operador->esAdministrador()) {
-            return redirect()->route('clientes.index')
-                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar clientes.');
+            abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar clientes.');
         }
 
         return view('clientes.create', compact('operador'));
@@ -142,8 +135,7 @@ class ClienteController extends Controller
         $operador = $this->operador();
 
         if ($operador->esAdministrador()) {
-            return redirect()->route('clientes.index')
-                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar clientes.');
+            abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar clientes.');
         }
 
         $data = $request->validated();
@@ -179,181 +171,15 @@ class ClienteController extends Controller
             ]
         );
 
-        return redirect()->route('clientes.index')
-            ->with('success', "El cliente '{$cliente->nombre}' (CURP: {$cliente->curp}) fue registrado exitosamente.");
-    }
-
-    /**
-     * Ficha técnica del cliente y visualización/descarga de expedientes PDF.
-     */
-    public function show(Cliente $cliente)
-    {
-        if ($redirect = $this->verificarAcceso()) {
-            return $redirect;
-        }
-
-        $cliente->load(['createdBy', 'desactivadoPor', 'solicitudes.aprobadoPor', 'solicitudes.distribuidor']);
-        $operador = $this->operador();
-
-        return view('clientes.show', compact('cliente', 'operador'));
-    }
-
-    /**
-     * Formulario de edición de cliente.
-     */
-    public function edit(Cliente $cliente)
-    {
-        if ($redirect = $this->verificarAcceso()) {
-            return $redirect;
-        }
-
-        $operador = $this->operador();
-
-        if ($operador->esAdministrador()) {
-            return redirect()->route('clientes.index')
-                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede editar clientes.');
+        abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede editar clientes.');
         }
 
         if (!$cliente->activo) {
-            return redirect()->route('clientes.index')
-                ->with('info', "El cliente '{$cliente->nombre}' está desactivado y no puede ser modificado.");
-        }
-
-        if ($cliente->tieneSolicitudPendiente()) {
-            return redirect()->route('clientes.index')
-                ->with('warning', "El cliente '{$cliente->nombre}' ya tiene una solicitud pendiente de autorización.");
-        }
-
-        $cliente->load(['createdBy', 'desactivadoPor']);
-
-        return view('clientes.edit', compact('cliente', 'operador'));
-    }
-
-    /**
-     * Actualizar datos del cliente.
-     */
-    public function update(UpdateClienteRequest $request, Cliente $cliente)
-    {
-        if ($redirect = $this->verificarAcceso()) {
-            return $redirect;
-        }
-
-        $operador = $this->operador();
-
-        if ($operador->esAdministrador()) {
-            return redirect()->route('clientes.index')
-                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede modificar clientes.');
+            abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede modificar clientes.');
         }
 
         if (!$cliente->activo) {
-            return redirect()->route('clientes.index')
-                ->with('info', "El cliente '{$cliente->nombre}' está desactivado y no puede ser modificado.");
-        }
-
-        if ($cliente->tieneSolicitudPendiente()) {
-            return redirect()->route('clientes.index')
-                ->with('warning', "El cliente '{$cliente->nombre}' ya tiene una solicitud pendiente de autorización.");
-        }
-
-        $data = $request->validated();
-
-        // FLUJO DISTRIBUIDOR: Envía solicitud de actualización
-        if ($operador->esDistribuidor()) {
-            $pdfIneNuevo = null;
-            $pdfComprobanteNuevo = null;
-
-            if ($request->hasFile('pdf_ine')) {
-                $pdfIneNuevo = $request->file('pdf_ine')->store('expedientes_clientes/solicitudes_temp', 'public');
-            }
-
-            if ($request->hasFile('pdf_comprobante')) {
-                $pdfComprobanteNuevo = $request->file('pdf_comprobante')->store('expedientes_clientes/solicitudes_temp', 'public');
-            }
-
-            $solicitud = SolicitudCliente::create([
-                'tipo' => 'actualizacion',
-                'estado' => 'pendiente',
-                'cliente_id' => $cliente->id,
-                'distribuidor_id' => $operador->id,
-                'sucursal_id' => $operador->sucursal_id,
-                'datos_originales' => $cliente->only([
-                    'nombre', 'curp', 'rfc', 'fecha_nacimiento', 'lugar_nacimiento',
-                    'calle', 'colonia', 'codigo_postal', 'ciudad', 'estado',
-                    'path_ine_pdf', 'path_comprobante_pdf'
-                ]),
-                'datos_solicitados' => $data,
-                'motivo' => $request->input('motivo_solicitud') ?? 'Actualización de datos generales del cliente por Distribuidor.',
-                'pdf_ine_nuevo' => $pdfIneNuevo,
-                'pdf_comprobante_nuevo' => $pdfComprobanteNuevo,
-            ]);
-
-            AuditService::registrar(
-                'SOLICITUD_ACTUALIZACION_CLIENTE',
-                "Solicitud de actualización enviada para cliente '{$cliente->nombre}' por " . ($operador?->name ?? 'Distribuidor'),
-                [
-                    'entidad_tipo' => 'solicitudes_cliente',
-                    'entidad_id' => $solicitud->id,
-                    'user_id' => $operador->id,
-                    'user_rol' => $operador?->rol?->nombre,
-                    'sucursal_id' => $operador?->sucursal_id,
-                    'antes' => $solicitud->datos_originales,
-                    'despues' => $solicitud->datos_solicitados,
-                ]
-            );
-
-            return redirect()->route('clientes.index')
-                ->with('success', "Se ha enviado la Solicitud de Actualización para '{$cliente->nombre}'.");
-        }
-
-        if ($request->hasFile('pdf_ine')) {
-            if ($cliente->path_ine_pdf && Storage::disk('public')->exists($cliente->path_ine_pdf)) {
-                Storage::disk('public')->delete($cliente->path_ine_pdf);
-            }
-            $data['path_ine_pdf'] = $request->file('pdf_ine')->store('expedientes_clientes/ine', 'public');
-        }
-
-        if ($request->hasFile('pdf_comprobante')) {
-            if ($cliente->path_comprobante_pdf && Storage::disk('public')->exists($cliente->path_comprobante_pdf)) {
-                Storage::disk('public')->delete($cliente->path_comprobante_pdf);
-            }
-            $data['path_comprobante_pdf'] = $request->file('pdf_comprobante')->store('expedientes_clientes/comprobantes', 'public');
-        }
-
-        $datosAntes = $cliente->toArray();
-        $cliente->update($data);
-
-        AuditService::registrar(
-            'ACTUALIZACION_CLIENTE',
-            "Datos del cliente '{$cliente->nombre}' actualizados por " . ($operador?->name ?? 'Usuario'),
-            [
-                'entidad_tipo' => 'clientes',
-                'entidad_id' => $cliente->id,
-                'user_id' => Auth::id() ?? $operador?->id,
-                'user_rol' => $operador?->rol?->nombre,
-                'sucursal_id' => $operador?->sucursal_id,
-                'antes' => $datosAntes,
-                'despues' => $cliente->fresh()->toArray(),
-            ]
-        );
-
-        return redirect()->route('clientes.index')
-            ->with('success', "Los datos del cliente '{$cliente->nombre}' fueron actualizados correctamente.");
-    }
-
-    /**
-     * Desactivar cliente.
-     */
-    public function destroy(Request $request, Cliente $cliente)
-    {
-        if ($redirect = $this->verificarAcceso()) {
-            return $redirect;
-        }
-
-        $operador = $this->operador();
-
-        if ($operador->esAdministrador()) {
-            return redirect()->route('clientes.index')
-                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede desactivar clientes.');
+            abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede desactivar clientes.');
         }
 
         if (!$cliente->activo) {

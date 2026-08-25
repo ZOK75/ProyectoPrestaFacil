@@ -20,8 +20,7 @@ class LogViewerController extends Controller
         $operador = Auth::user();
         if (!$operador || !$operador->esAdministrador()) {
             $ruta = ($operador && $operador->esGerenteSucursal()) ? 'gerente-sucursal.dashboard' : 'gerente-general.dashboard';
-            return redirect()->route($ruta)
-                ->with('error', 'Acceso denegado: El Centro de Logs es exclusivo para el rol de Administrador.');
+            abort(403, 'Acceso denegado: El Centro de Logs es exclusivo para el rol de Administrador.');
         }
 
         $tab = $request->input('tab', 'auditoria');

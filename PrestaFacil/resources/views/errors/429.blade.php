@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PrestaFácil - Error del Servidor</title>
+    <title>PrestaFácil - Demasiadas Peticiones</title>
     <link rel="icon" type="image/jpeg" href="{{ asset('img/Prestamo.jpg') }}">
     <link rel="shortcut icon" href="{{ asset('img/Prestamo.jpg') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -12,23 +12,23 @@
     <div class="max-w-lg w-full text-center space-y-6 bg-slate-900 border border-slate-800 p-8 sm:p-10 rounded-3xl shadow-2xl relative overflow-hidden">
         
         <!-- Glows decorativos de fondo -->
-        <div class="absolute -top-24 -left-24 w-56 h-56 bg-rose-500/15 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="absolute -bottom-24 -right-24 w-56 h-56 bg-fuchsia-500/15 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -top-24 -left-24 w-56 h-56 bg-orange-500/15 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-24 -right-24 w-56 h-56 bg-rose-500/15 rounded-full blur-3xl pointer-events-none"></div>
 
         <!-- Badge de Estado -->
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/30">
-            <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-            Error 500 • Error Interno del Servidor
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-orange-500/10 text-orange-400 border border-orange-500/30">
+            <span class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
+            Error 429 • Demasiadas Peticiones
         </div>
 
-        <!-- Icono de Advertencia -->
+        <!-- Icono de Tráfico -->
         <div class="relative w-20 h-20 mx-auto flex items-center justify-center">
-            <div class="w-20 h-20 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-center text-rose-400 shadow-inner">
+            <div class="w-20 h-20 bg-orange-500/10 border border-orange-500/30 rounded-2xl flex items-center justify-center text-orange-400 shadow-inner">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-10 h-10">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
             </div>
-            <div class="absolute -bottom-1 -right-1 w-7 h-7 bg-slate-900 text-rose-400 font-black rounded-full flex items-center justify-center shadow-lg border-2 border-rose-500/30 text-sm">
+            <div class="absolute -bottom-1 -right-1 w-7 h-7 bg-slate-900 text-orange-400 font-black rounded-full flex items-center justify-center shadow-lg border-2 border-orange-500/30 text-sm">
                 !
             </div>
         </div>
@@ -36,23 +36,11 @@
         <!-- Título y Mensaje Informativo -->
         <div class="space-y-2.5">
             <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                ¡Ops! Algo salió mal
+                Cálmate, vas muy rápido
             </h1>
             <p class="text-sm text-slate-300 leading-relaxed max-w-md mx-auto">
-                Ha ocurrido un problema inesperado de nuestro lado al procesar tu solicitud. Nuestro equipo técnico ha sido notificado.
+                {{ $exception->getMessage() ?: 'Has realizado demasiadas solicitudes en muy poco tiempo. Por favor, espera un minuto antes de continuar.' }}
             </p>
-        </div>
-
-        <!-- Tarjeta de Causas y Recomendaciones -->
-        <div class="bg-slate-950/70 border border-slate-800/90 rounded-2xl p-4 text-left space-y-2 text-xs text-slate-400">
-            <span class="font-bold text-slate-200 uppercase tracking-wider block text-[11px]">
-                Posibles causas:
-            </span>
-            <ul class="space-y-1.5 list-disc list-inside text-slate-400">
-                <li>El sistema está experimentando una carga alta de solicitudes.</li>
-                <li>Se ejecutó una acción inesperada que causó un fallo en el código.</li>
-                <li>Hay un problema de configuración interno en el servidor.</li>
-            </ul>
         </div>
 
         <!-- Botones de Acción -->
@@ -70,18 +58,6 @@
                 Ir al Inicio
             </a>
         </div>
-        
-        @if(config('app.debug') && isset($exception))
-            <details class="text-left pt-2 border-t border-slate-800/80">
-                <summary class="text-[11px] font-mono text-amber-400 cursor-pointer hover:underline">
-                    Ver detalle técnico del error (Debug)
-                </summary>
-                <div class="mt-2 p-3 rounded-xl bg-black/60 border border-slate-800 text-[11px] font-mono text-rose-300 break-all space-y-1">
-                    <p><strong>Clase:</strong> {{ get_class($exception) }}</p>
-                    <p><strong>Mensaje:</strong> {{ $exception->getMessage() }}</p>
-                </div>
-            </details>
-        @endif
     </div>
 </body>
 </html>

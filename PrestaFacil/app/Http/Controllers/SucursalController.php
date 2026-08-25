@@ -44,7 +44,7 @@ class SucursalController extends Controller
     {
         $operador = Auth::user();
         if (!$operador->esGerenteGeneral()) {
-            return back()->with('error', 'Acceso denegado. Únicamente el Gerente General puede crear sucursales.');
+            abort(403, 'Acceso denegado. Únicamente el Gerente General puede crear sucursales.');
         }
 
         $request->validate([
@@ -83,7 +83,7 @@ class SucursalController extends Controller
     {
         $operador = Auth::user();
         if (!$operador->esGerenteGeneral()) {
-            return back()->with('error', 'Acceso denegado. Únicamente el Gerente General puede modificar sucursales.');
+            abort(403, 'Acceso denegado. Únicamente el Gerente General puede modificar sucursales.');
         }
 
         $request->validate([
@@ -123,7 +123,7 @@ class SucursalController extends Controller
     {
         $operador = Auth::user();
         if (!$operador->esGerenteGeneral()) {
-            return back()->with('error', 'Acceso denegado. Únicamente el Gerente General puede cambiar el estado de una sucursal.');
+            abort(403, 'Acceso denegado. Únicamente el Gerente General puede cambiar el estado de una sucursal.');
         }
 
         $nuevoEstado = !$sucursal->activo;
@@ -157,7 +157,7 @@ class SucursalController extends Controller
     {
         $operador = Auth::user();
         if (!$operador->esGerenteGeneral()) {
-            return back()->with('error', 'Acceso denegado. Únicamente el Gerente General puede mover gerentes de sucursal.');
+            abort(403, 'Acceso denegado. Únicamente el Gerente General puede mover gerentes de sucursal.');
         }
 
         $request->validate([

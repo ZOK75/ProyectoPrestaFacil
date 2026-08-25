@@ -111,18 +111,15 @@ class UserController extends Controller
         $operador = $this->operador();
 
         if ($operador->esAdministrador()) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar usuarios.');
+            abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar usuarios.');
         }
 
         if ($operador->esGerenteSucursal()) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'Acceso denegado: El rol de Gerente de Sucursal no tiene permisos para registrar usuarios nuevos.');
+            abort(403, 'Acceso denegado: El rol de Gerente de Sucursal no tiene permisos para registrar usuarios nuevos.');
         }
 
         if ($operador->esDistribuidor()) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
+            abort(403, 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
         }
 
         $rolesPermitidos = $operador->rolesPermitidos();
@@ -139,18 +136,15 @@ class UserController extends Controller
         $operador = $this->operador();
 
         if ($operador->esAdministrador()) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar usuarios.');
+            abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar usuarios.');
         }
 
         if ($operador->esGerenteSucursal()) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'Acceso denegado: El rol de Gerente de Sucursal no tiene permisos para registrar usuarios nuevos.');
+            abort(403, 'Acceso denegado: El rol de Gerente de Sucursal no tiene permisos para registrar usuarios nuevos.');
         }
 
         if ($operador->esDistribuidor()) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
+            abort(403, 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
         }
 
         $data = $request->validated();
@@ -158,57 +152,7 @@ class UserController extends Controller
         // Validación de permisos de rol
         $rolesPermitidosIds = $operador->rolesPermitidos()->pluck('id')->toArray();
         if (!in_array($data['rol_id'], $rolesPermitidosIds)) {
-            return back()->withErrors(['rol_id' => 'No tienes permiso para asignar este rol.'])->withInput();
-        }
-
-        // Validación de permisos de sucursal
-        $sucursalesPermitidasIds = $operador->sucursalesPermitidas()->pluck('id')->toArray();
-        if (!in_array($data['sucursal_id'], $sucursalesPermitidasIds)) {
-            return back()->withErrors(['sucursal_id' => 'No tienes permiso para asignar usuarios a esta sucursal.'])->withInput();
-        }
-
-        // Validación estricta: Ningún gerente puede crear usuarios con el rol Distribuidor manualmente
-        $rolSeleccionado = Rol::find($data['rol_id']);
-        if ($rolSeleccionado && in_array(strtolower($rolSeleccionado->nombre), ['distribuidor', 'distribuidora'])) {
-            return back()->withErrors(['rol_id' => 'Las cuentas con rol de Distribuidora solo pueden darse de alta a través del proceso de solicitud, verificación presencial y aprobación de expediente.'])->withInput();
-        }
-
-        $data['categoria_distribuidor'] = null;
-        $data['password'] = Hash::make($data['password']);
-        $data['activo'] = true;
-        $data['desactivado_at'] = null;
-        $data['desactivado_by_user_id'] = null;
-
-        $user = User::create($data);
-
-        AuditService::registrar(
-            'CREACION_USUARIO',
-            "Usuario '{$user->name}' ({$user->email}, Rol: {$rolSeleccionado?->nombre}) registrado por " . ($operador->name ?? 'Usuario'),
-            [
-                'entidad_tipo' => 'users',
-                'entidad_id' => $user->id,
-                'user_id' => Auth::id() ?? $operador->id,
-                'user_rol' => $operador->rol?->nombre,
-                'sucursal_id' => $operador->sucursal_id,
-                'despues' => $user->makeHidden('password')->toArray(),
-            ]
-        );
-
-        return redirect()->route('usuarios.index')
-            ->with('success', "El usuario '{$user->name}' fue registrado exitosamente.");
-    }
-
-    /**
-     * Detalle de un usuario.
-     */
-    public function show(User $usuario)
-    {
-        $usuario->load(['rol', 'sucursal', 'desactivadoPor']);
-        $operador = $this->operador();
-
-        if ($operador->esDistribuidor() && !$usuario->activo) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'Acceso denegado: Tu rol de Distribuidor solo puede visualizar usuarios activos.');
+            abort(403, 'Acceso denegado: Tu rol de Distribuidor solo puede visualizar usuarios activos.');
         }
 
         return view('usuarios.show', compact('usuario', 'operador'));
@@ -222,121 +166,27 @@ class UserController extends Controller
         $operador = $this->operador();
 
         if ($operador->esAdministrador()) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede modificar usuarios.');
+            abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede modificar usuarios.');
         }
 
         if ($operador->esDistribuidor()) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
+            abort(403, 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
         }
 
         if (!$usuario->activo) {
-            return redirect()->route('usuarios.index')
-                ->with('info', "El usuario '{$usuario->name}' está desactivado y no puede ser modificado ni reactivado.");
-        }
-
-        $usuario->load(['rol', 'sucursal']);
-        $rolesPermitidos = $operador->rolesPermitidos();
-        $sucursalesPermitidas = $operador->sucursalesPermitidas();
-
-        return view('usuarios.edit', compact('usuario', 'operador', 'rolesPermitidos', 'sucursalesPermitidas'));
-    }
-
-    /**
-     * Actualizar datos de un usuario (aquí sí se puede cambiar la categoría del distribuidor).
-     */
-    public function update(UpdateUserRequest $request, User $usuario)
-    {
-        $operador = $this->operador();
-
-        if ($operador->esAdministrador()) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede modificar usuarios.');
+            abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede modificar usuarios.');
         }
 
         if ($operador->esDistribuidor()) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
+            abort(403, 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
         }
 
         if (!$usuario->activo) {
-            return redirect()->route('usuarios.index')
-                ->with('info', "El usuario '{$usuario->name}' está desactivado y no puede ser modificado ni reactivado.");
-        }
-
-        $data = $request->validated();
-
-        // Validación de permisos de rol
-        $rolesPermitidosIds = $operador->rolesPermitidos()->pluck('id')->toArray();
-        if (!in_array($data['rol_id'], $rolesPermitidosIds)) {
-            return back()->withErrors(['rol_id' => 'No tienes permiso para asignar este rol.'])->withInput();
-        }
-
-        // Validación de permisos de sucursal
-        $sucursalesPermitidasIds = $operador->sucursalesPermitidas()->pluck('id')->toArray();
-        if (!in_array($data['sucursal_id'], $sucursalesPermitidasIds)) {
-            return back()->withErrors(['sucursal_id' => 'No tienes permiso para asignar usuarios a esta sucursal.'])->withInput();
-        }
-
-        // Ajuste de categoría en la edición
-        $rolSeleccionado = Rol::find($data['rol_id']);
-        if ($rolSeleccionado && in_array(strtolower($rolSeleccionado->nombre), ['distribuidor', 'distribuidora'])) {
-            $data['categoria_distribuidor'] = $data['categoria_distribuidor'] ?? $usuario->categoria_distribuidor ?? 'cobre';
-        } else {
-            $data['categoria_distribuidor'] = null;
-        }
-
-        // Si no se envía contraseña, no se modifica
-        $passwordChanged = false;
-        if (!empty($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-            $passwordChanged = true;
-        } else {
-            unset($data['password']);
-        }
-
-        $datosAntes = $usuario->makeHidden('password')->toArray();
-        $usuario->update($data);
-
-        AuditService::registrar(
-            'ACTUALIZACION_USUARIO',
-            "Usuario '{$usuario->name}' actualizado por " . ($operador->name ?? 'Usuario'),
-            [
-                'entidad_tipo' => 'users',
-                'entidad_id' => $usuario->id,
-                'user_id' => Auth::id() ?? $operador->id,
-                'user_rol' => $operador->rol?->nombre,
-                'sucursal_id' => $operador->sucursal_id,
-                'antes' => $datosAntes,
-                'despues' => $usuario->fresh()->makeHidden('password')->toArray(),
-            ]
-        );
-
-        // Prevenir cierre de sesión si el usuario editó su propia contraseña
-        if ($passwordChanged && Auth::id() === $usuario->id) {
-            Auth::login($usuario);
-        }
-
-        return redirect()->route('usuarios.index')
-            ->with('success', "El usuario '{$usuario->name}' fue actualizado correctamente.");
-    }
-
-    /**
-     * Desactivar un usuario (sin eliminar registros de la BD). No permitido para Distribuidor ni Administrador.
-     */
-    public function destroy(User $usuario)
-    {
-        $operador = $this->operador();
-
-        if ($operador->esAdministrador()) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede desactivar usuarios.');
+            abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede desactivar usuarios.');
         }
 
         if ($operador->esDistribuidor()) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
+            abort(403, 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
         }
 
         if (!$usuario->activo) {

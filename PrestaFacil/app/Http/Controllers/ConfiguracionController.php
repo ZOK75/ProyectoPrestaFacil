@@ -51,8 +51,7 @@ class ConfiguracionController extends Controller
 
         // Restricción: Solo el Gerente General puede modificar la configuración
         if (!$operador || !$operador->esGerenteGeneral()) {
-            return redirect()->route('configuracion-general.edit')
-                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para modificar la configuración general.');
+            abort(403, 'Acceso denegado: Únicamente el Gerente General tiene autorización para modificar la configuración general.');
         }
 
         $configuracion = Configuracion::actual();
@@ -126,22 +125,7 @@ class ConfiguracionController extends Controller
         // Ejecutar verificación de corte inmediatamente con los nuevos parámetros
         $corteService->verificarYProcesarCortesYVencimientos();
 
-        return redirect()->route('configuracion-general.edit')
-            ->with('success', 'La configuración periódica de corte (Día ' . $validated['dia_corte'] . ' ' . $validated['hora_corte'] . ') y fecha límite (Día ' . $validated['dia_limite_pago'] . ' ' . $validated['hora_limite_pago'] . ') fueron actualizadas con éxito.');
-    }
-
-    /**
-     * Simula la ejecución de un corte quincenal completo:
-     * - Aplica y ACUMULA las multas moratorias individuales a cada vale activo con adeudo pendiente.
-     * - Cada vez que se presione el botón, se suman nuevos cargos moratorios a los vales no liquidados.
-     * - Avanza automáticamente 15 días (+15d) el ciclo periódico.
-     */
-    public function simularCorte(CorteCobranzaService $corteService)
-    {
-        $operador = $this->operador();
-        if (!$operador || !$operador->esGerenteGeneral()) {
-            return redirect()->route('configuracion-general.edit')
-                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para simular cortes.');
+        abort(403, 'Acceso denegado: Únicamente el Gerente General tiene autorización para simular cortes.');
         }
 
         $resultados = $corteService->simularSiguienteCorte();

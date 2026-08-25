@@ -33,8 +33,7 @@ class ProductoValeController extends Controller
         
         // Bloquear acceso al Verificador
         if ($operador && $operador->esVerificador()) {
-            return redirect()->route('verificador.dashboard')
-                ->with('error', 'Acceso denegado: Los Verificadores no tienen acceso al catálogo de vales.');
+            abort(403, 'Acceso denegado: Los Verificadores no tienen acceso al catálogo de vales.');
         }
 
         $esGerenteGeneral = $operador ? $operador->esGerenteGeneral() : false;
@@ -90,8 +89,7 @@ class ProductoValeController extends Controller
     {
         $operador = $this->operador();
         if (!$operador || !$operador->esGerenteGeneral()) {
-            return redirect()->route('producto-vales.index')
-                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para agregar nuevos vales.');
+            abort(403, 'Acceso denegado: Únicamente el Gerente General tiene autorización para agregar nuevos vales.');
         }
 
         return view('producto-vales.create');
@@ -104,8 +102,7 @@ class ProductoValeController extends Controller
     {
         $operador = $this->operador();
         if (!$operador || !$operador->esGerenteGeneral()) {
-            return redirect()->route('producto-vales.index')
-                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para agregar nuevos vales.');
+            abort(403, 'Acceso denegado: Únicamente el Gerente General tiene autorización para agregar nuevos vales.');
         }
 
         $data = $request->validated();
@@ -128,22 +125,7 @@ class ProductoValeController extends Controller
             ]
         );
 
-        return redirect()->route('producto-vales.index')
-            ->with('success', "El vale de préstamo '{$productoVale->nombre}' ({$productoVale->clave}) ha sido registrado exitosamente.");
-    }
-
-    /**
-     * Ficha técnica y tabla de amortización quincenal.
-     */
-    public function show(ProductoVale $productoVale)
-    {
-        $productoVale->load(['createdBy', 'updatedBy']);
-        $operador = $this->operador();
-
-        // Bloquear acceso al Verificador
-        if ($operador && $operador->esVerificador()) {
-            return redirect()->route('verificador.dashboard')
-                ->with('error', 'Acceso denegado: Los Verificadores no tienen acceso al catálogo de vales.');
+        abort(403, 'Acceso denegado: Los Verificadores no tienen acceso al catálogo de vales.');
         }
 
         $esGerenteGeneral = $operador ? $operador->esGerenteGeneral() : false;
@@ -151,8 +133,7 @@ class ProductoValeController extends Controller
 
         // Si es distribuidor y el vale está desactivado, denegar acceso
         if ($esDistribuidor && !$productoVale->activo) {
-            return redirect()->route('producto-vales.index')
-                ->with('error', 'Acceso denegado: Como Distribuidor solo puedes visualizar vales activos.');
+            abort(403, 'Acceso denegado: Como Distribuidor solo puedes visualizar vales activos.');
         }
 
         $amortizacion = [];
@@ -193,8 +174,7 @@ class ProductoValeController extends Controller
     {
         $operador = $this->operador();
         if (!$operador || !$operador->esGerenteGeneral()) {
-            return redirect()->route('producto-vales.index')
-                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para desactivar vales.');
+            abort(403, 'Acceso denegado: Únicamente el Gerente General tiene autorización para desactivar vales.');
         }
 
         $productoVale->load(['createdBy', 'updatedBy']);
@@ -209,46 +189,11 @@ class ProductoValeController extends Controller
     {
         $operador = $this->operador();
         if (!$operador || !$operador->esGerenteGeneral()) {
-            return redirect()->route('producto-vales.index')
-                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para desactivar vales.');
+            abort(403, 'Acceso denegado: Únicamente el Gerente General tiene autorización para desactivar vales.');
         }
 
         if (!$productoVale->activo) {
-            return redirect()->route('producto-vales.index')
-                ->with('info', "El vale '{$productoVale->nombre}' ya se encuentra desactivado.");
-        }
-
-        $productoVale->update([
-            'activo' => false,
-            'desactivado_at' => now(),
-            'updated_by_user_id' => Auth::id() ?? $operador->id,
-        ]);
-
-        AuditService::registrar(
-            'DESACTIVACION_PRODUCTO_VALE',
-            "Vale de préstamo '{$productoVale->nombre}' ({$productoVale->clave}) desactivado por {$operador->name}",
-            [
-                'entidad_tipo' => 'producto_vales',
-                'entidad_id' => $productoVale->id,
-                'user_id' => Auth::id() ?? $operador->id,
-                'user_rol' => $operador->rol?->nombre,
-                'sucursal_id' => $operador->sucursal_id,
-            ]
-        );
-
-        return redirect()->route('producto-vales.index')
-            ->with('success', "El vale '{$productoVale->nombre}' ({$productoVale->clave}) fue desactivado correctamente el " . now()->format('d/m/Y H:i') . ".");
-    }
-
-    /**
-     * Desactivación de un vale (sin borrar de BD). Solo permitido para Gerente General.
-     */
-    public function destroy(ProductoVale $productoVale)
-    {
-        $operador = $this->operador();
-        if (!$operador || !$operador->esGerenteGeneral()) {
-            return redirect()->route('producto-vales.index')
-                ->with('error', 'Acceso denegado: Únicamente el Gerente General tiene autorización para desactivar vales.');
+            abort(403, 'Acceso denegado: Únicamente el Gerente General tiene autorización para desactivar vales.');
         }
 
         if (!$productoVale->activo) {

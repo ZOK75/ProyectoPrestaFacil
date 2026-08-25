@@ -21,8 +21,7 @@ class AutorizacionController extends Controller
     {
         if ($user->esGerenteGeneral() || $user->esGerenteSucursal()) {
             $ruta = $user->esGerenteGeneral() ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
-            return redirect()->route($ruta)
-                ->with('error', 'Acceso denegado: El rol gerencial no tiene permisos para acceder al módulo de autorizaciones.');
+            abort(403, 'Acceso denegado: El rol gerencial no tiene permisos para acceder al módulo de autorizaciones.');
         }
 
         return null;
@@ -209,7 +208,7 @@ class AutorizacionController extends Controller
         }
 
         if ($user->esAdministrador() || !$user->puedeAutorizar($solicitud->tipo, $solicitud->sucursal_id)) {
-            return back()->with('error', 'Acceso denegado: No tienes permisos para aprobar solicitudes.');
+            abort(403, 'Acceso denegado: No tienes permisos para aprobar solicitudes.');
         }
 
         DB::transaction(function () use ($request, $solicitud, $user) {
@@ -263,7 +262,7 @@ class AutorizacionController extends Controller
         }
 
         if ($user->esAdministrador() || !$user->puedeAutorizar($solicitud->tipo, $solicitud->sucursal_id)) {
-            return back()->with('error', 'Acceso denegado: No tienes permisos para rechazar solicitudes.');
+            abort(403, 'Acceso denegado: No tienes permisos para rechazar solicitudes.');
         }
 
         DB::transaction(function () use ($request, $solicitud, $user) {

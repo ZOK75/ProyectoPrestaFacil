@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PrestaFácil - Acceso Denegado</title>
+    <title>PrestaFácil - Página no Encontrada</title>
     <link rel="icon" type="image/jpeg" href="{{ asset('img/Prestamo.jpg') }}">
     <link rel="shortcut icon" href="{{ asset('img/Prestamo.jpg') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -12,35 +12,47 @@
     <div class="max-w-lg w-full text-center space-y-6 bg-slate-900 border border-slate-800 p-8 sm:p-10 rounded-3xl shadow-2xl relative overflow-hidden">
         
         <!-- Glows decorativos de fondo -->
-        <div class="absolute -top-24 -left-24 w-56 h-56 bg-amber-500/15 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="absolute -bottom-24 -right-24 w-56 h-56 bg-orange-500/15 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -top-24 -left-24 w-56 h-56 bg-purple-500/15 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-24 -right-24 w-56 h-56 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none"></div>
 
         <!-- Badge de Estado -->
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30">
-            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-            Error 403 • Acceso Denegado
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/30">
+            <span class="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
+            Error 404 • Recurso No Encontrado
         </div>
 
-        <!-- Icono de Seguridad/Candado -->
+        <!-- Icono de Búsqueda Fallida -->
         <div class="relative w-20 h-20 mx-auto flex items-center justify-center">
-            <div class="w-20 h-20 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center text-amber-400 shadow-inner">
+            <div class="w-20 h-20 bg-purple-500/10 border border-purple-500/30 rounded-2xl flex items-center justify-center text-purple-400 shadow-inner">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-10 h-10">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75l-2.489-2.489m0 0a3.375 3.375 0 10-4.773-4.773 3.375 3.375 0 004.774 4.774zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
             </div>
-            <div class="absolute -bottom-1 -right-1 w-7 h-7 bg-slate-900 text-amber-400 font-black rounded-full flex items-center justify-center shadow-lg border-2 border-amber-500/30 text-sm">
-                !
+            <div class="absolute -bottom-1 -right-1 w-7 h-7 bg-slate-900 text-purple-400 font-black rounded-full flex items-center justify-center shadow-lg border-2 border-purple-500/30 text-sm">
+                ?
             </div>
         </div>
 
         <!-- Título y Mensaje Informativo -->
         <div class="space-y-2.5">
             <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                Permisos Insuficientes
+                Página no Encontrada
             </h1>
             <p class="text-sm text-slate-300 leading-relaxed max-w-md mx-auto">
-                {{ $exception->getMessage() ?: 'No cuentas con los permisos necesarios para acceder a esta sección o realizar esta acción.' }}
+                {{ $exception->getMessage() ?: 'Lo sentimos, no pudimos encontrar la página o registro que estás buscando.' }}
             </p>
+        </div>
+
+        <!-- Tarjeta de Causas y Recomendaciones -->
+        <div class="bg-slate-950/70 border border-slate-800/90 rounded-2xl p-4 text-left space-y-2 text-xs text-slate-400">
+            <span class="font-bold text-slate-200 uppercase tracking-wider block text-[11px]">
+                Posibles causas:
+            </span>
+            <ul class="space-y-1.5 list-disc list-inside text-slate-400">
+                <li>La dirección URL está mal escrita. Verifica que no haya errores de tipeo.</li>
+                <li>El recurso o registro fue eliminado o movido a otra sección.</li>
+                <li>Hiciste clic en un enlace obsoleto o caducado.</li>
+            </ul>
         </div>
 
         <!-- Botones de Acción -->

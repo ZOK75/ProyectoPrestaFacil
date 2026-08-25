@@ -28,13 +28,11 @@ class SolicitudClienteController extends Controller
 
         if ($operador->esGerenteGeneral() || $operador->esGerenteSucursal()) {
             $ruta = $operador->esGerenteGeneral() ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
-            return redirect()->route($ruta)
-                ->with('error', 'Acceso denegado: El rol gerencial no tiene permisos para acceder al módulo de solicitudes.');
+            abort(403, 'Acceso denegado: El rol gerencial no tiene permisos para acceder al módulo de solicitudes.');
         }
 
         if (!$operador->esAdministrador()) {
-            return redirect()->route('producto-vales.index')
-                ->with('error', 'Acceso denegado: Este módulo es exclusivo para Administradores de auditoría.');
+            abort(403, 'Acceso denegado: Este módulo es exclusivo para Administradores de auditoría.');
         }
 
         return null;
@@ -217,8 +215,7 @@ class SolicitudClienteController extends Controller
 
         if ($operador->esGerenteGeneral() || $operador->esGerenteSucursal()) {
             $ruta = $operador->esGerenteGeneral() ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
-            return redirect()->route($ruta)
-                ->with('error', 'Acceso denegado: El rol gerencial no tiene permisos para acceder al módulo de solicitudes.');
+            abort(403, 'Acceso denegado: El rol gerencial no tiene permisos para acceder al módulo de solicitudes.');
         }
 
         if ($operador->esDistribuidor() && $solicitud->distribuidor_id != $operador->id) {
@@ -241,7 +238,7 @@ class SolicitudClienteController extends Controller
             return $redirect;
         }
 
-        return back()->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
+        abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
     }
 
     /**
@@ -254,6 +251,6 @@ class SolicitudClienteController extends Controller
             return $redirect;
         }
 
-        return back()->with('error', 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
+        abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría).');
     }
 }

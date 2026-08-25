@@ -114,7 +114,7 @@ class GerenteGeneralController extends Controller
     {
         $operador = Auth::user();
         if (!$operador->esGerenteGeneral()) {
-            return back()->with('error', 'Acceso denegado. Únicamente la Gerencia General puede emitir el dictamen final.');
+            abort(403, 'Acceso denegado. Únicamente la Gerencia General puede emitir el dictamen final.');
         }
 
         if ($transferencia->estado !== 'pendiente_gerente_general') {

@@ -3,7 +3,7 @@
 @section('title', 'Notificaciones - PrestaFácil')
 
 @section('content')
-<div class="max-w-3xl mx-auto space-y-4">
+<div class="w-full max-w-full space-y-4">
 
     <!-- Encabezado -->
     <div class="flex items-center justify-between gap-4">

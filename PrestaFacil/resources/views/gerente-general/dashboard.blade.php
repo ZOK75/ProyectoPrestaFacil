@@ -642,7 +642,7 @@
                             <span class="text-[11px] text-emerald-400 font-mono font-bold">Monto Periodo: ${{ number_format($corte->monto_total_periodo, 2) }}</span>
                         </div>
                         <div>
-                            <a href="{{ route('prestamos.relacion-pdf') }}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
+                            <a href="{{ route('prestamos.relacion-pdf', ['corte_id' => $corte->id]) }}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 Descargar PDF
                             </a>

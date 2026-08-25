@@ -436,26 +436,39 @@ class PrestamoController extends Controller
     /**
      * Genera la Relación de Cobranza del Distribuidor en formato PDF.
      */
-    public function relacionCobranza()
+    public function relacionCobranza(Request $request)
     {
         $operador = $this->operador();
 
         $this->corteService->verificarYProcesarCortesYVencimientos();
         $configuracion = Configuracion::actual();
 
-        // Cargar todos los préstamos activos de los clientes de este distribuidor
-        $prestamosQuery = Prestamo::with(['cliente', 'productoVale', 'pagos'])
-            ->where('estado', 'activo');
+        $relacion = null;
+        $distribuidoraId = null;
 
-        if ($operador && $operador->esDistribuidor()) {
-            $prestamosQuery->where('created_by_user_id', $operador->id);
+        if ($request->filled('corte_id')) {
+            $relacion = RelacionCobranza::with('distribuidora')->find($request->corte_id);
+            if ($relacion) {
+                $distribuidoraId = $relacion->distribuidora_id;
+            }
+        } elseif ($request->filled('distribuidora_id')) {
+            $distribuidoraId = $request->distribuidora_id;
+        } elseif ($operador && $operador->esDistribuidor()) {
+            $distribuidoraId = $operador->id;
         }
 
+        // Cargar los préstamos correspondientes
+        $prestamosQuery = Prestamo::with(['cliente', 'productoVale', 'pagos']);
+
+        if ($distribuidoraId) {
+            $prestamosQuery->where('created_by_user_id', $distribuidoraId);
+        }
+
+        // Si es una relación específica de un corte pasado, se obtienen los préstamos existentes en ese momento o activos
         $prestamos = $prestamosQuery->orderBy('created_at', 'desc')->get();
 
-        $relacion = null;
-        if ($operador && $operador->esDistribuidor()) {
-            $relacion = RelacionCobranza::where('distribuidora_id', $operador->id)
+        if (!$relacion && $distribuidoraId) {
+            $relacion = RelacionCobranza::where('distribuidora_id', $distribuidoraId)
                 ->where('fecha_corte', $configuracion->fecha_corte)
                 ->first();
         }

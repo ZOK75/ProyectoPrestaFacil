@@ -51,10 +51,16 @@ class UserController extends Controller
             }
         }
 
-        // Un gerente de sucursal solo ve los usuarios de su propia sucursal y ciertos roles
+        // Restricción por Sucursal: Usuarios que no son Gerente General ni Administrador sólo ven usuarios de su sucursal
+        if (!$operador->esGerenteGeneral() && !$operador->esAdministrador()) {
+            if ($operador->sucursal_id) {
+                $query->where('sucursal_id', $operador->sucursal_id);
+            }
+        }
+
+        // Un gerente de sucursal solo ve ciertos roles de su propia sucursal
         if ($operador->esGerenteSucursal()) {
-            $query->where('sucursal_id', $operador->sucursal_id)
-                  ->whereHas('rol', fn($q) => $q->whereIn('nombre', ['Coordinador', 'Cajero', 'Distribuidor', 'Distribuidora', 'coordinador', 'cajero', 'distribuidor', 'distribuidora']));
+            $query->whereHas('rol', fn($q) => $q->whereIn('nombre', ['Coordinador', 'Cajero', 'Distribuidor', 'Distribuidora', 'coordinador', 'cajero', 'distribuidor', 'distribuidora', 'Verificador', 'verificador']));
         }
 
         // Filtro por texto
@@ -78,12 +84,17 @@ class UserController extends Controller
 
         $usuarios = $query->orderBy('name')->paginate(12)->withQueryString();
 
+        $statsQuery = User::query();
+        if (!$operador->esGerenteGeneral() && !$operador->esAdministrador() && $operador->sucursal_id) {
+            $statsQuery->where('sucursal_id', $operador->sucursal_id);
+        }
+
         $stats = [
-            'total' => $operador->esDistribuidor() ? User::where('activo', true)->count() : User::count(),
-            'activos' => User::where('activo', true)->count(),
-            'inactivos' => User::where('activo', false)->count(),
-            'con_rol' => User::whereNotNull('rol_id')->count(),
-            'sin_sucursal' => User::whereNull('sucursal_id')->count(),
+            'total' => $operador->esDistribuidor() ? (clone $statsQuery)->where('activo', true)->count() : (clone $statsQuery)->count(),
+            'activos' => (clone $statsQuery)->where('activo', true)->count(),
+            'inactivos' => (clone $statsQuery)->where('activo', false)->count(),
+            'con_rol' => (clone $statsQuery)->whereNotNull('rol_id')->count(),
+            'sin_sucursal' => (clone $statsQuery)->whereNull('sucursal_id')->count(),
         ];
 
         $roles = Rol::orderBy('nombre')->get();

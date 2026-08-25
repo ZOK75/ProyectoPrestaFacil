@@ -69,14 +69,21 @@ class CajeroController extends Controller
      */
     public function buscarFolio(Request $request)
     {
+        $cajera = $this->cajera();
         $referencia = $request->input('referencia');
         $prestamo = null;
 
         if ($referencia) {
-            $prestamo = Prestamo::with(['cliente', 'productoVale', 'createdBy'])->where('referencia', $referencia)->first();
+            $query = Prestamo::with(['cliente', 'productoVale', 'createdBy'])->where('referencia', $referencia);
+
+            if ($cajera->sucursal_id) {
+                $query->whereHas('createdBy', fn($q) => $q->where('sucursal_id', $cajera->sucursal_id));
+            }
+
+            $prestamo = $query->first();
             
             if (!$prestamo) {
-                return back()->with('error', 'Referencia no encontrada.');
+                return back()->with('error', 'Referencia no encontrada o no pertenece a tu sucursal.');
             }
         }
 
@@ -293,13 +300,20 @@ class CajeroController extends Controller
      */
     public function indexAbonos(Request $request)
     {
+        $cajera = $this->cajera();
+
         $query = User::whereHas('rol', function($q) {
                 $q->whereIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']);
             })
-            ->where('activo', true)
-            ->with(['sucursal', 'prestamos' => function($qp) {
-                $qp->where('estado', 'activo')->with(['cliente', 'productoVale']);
-            }]);
+            ->where('activo', true);
+
+        if ($cajera->sucursal_id) {
+            $query->where('sucursal_id', $cajera->sucursal_id);
+        }
+
+        $query->with(['sucursal', 'prestamos' => function($qp) {
+            $qp->where('estado', 'activo')->with(['cliente', 'productoVale']);
+        }]);
             
         if ($request->filled('buscar')) {
             $busqueda = $request->buscar;
@@ -503,9 +517,13 @@ class CajeroController extends Controller
     public function indexConciliaciones(Request $request)
     {
         $cajera = $this->cajera();
-        
-        $query = Conciliacion::with(['prestamo.cliente', 'distribuidora', 'autorizador', 'conciliadoPor'])
+
+        $query = Conciliacion::with(['solicitante', 'distribuidora', 'prestamo.cliente', 'conciliadoPor', 'autorizador'])
             ->orderBy('created_at', 'desc');
+
+        if ($cajera->sucursal_id) {
+            $query->whereHas('solicitante', fn($q) => $q->where('sucursal_id', $cajera->sucursal_id));
+        }
 
         if ($request->filled('buscar')) {
             $b = $request->buscar;
@@ -519,8 +537,16 @@ class CajeroController extends Controller
 
         $conciliaciones = $query->paginate(15)->withQueryString();
 
-        $prestamosActivos = Prestamo::where('estado', 'activo')->with('cliente')->get();
-        $distribuidoras = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']))->where('activo', true)->get();
+        $prestamosQuery = Prestamo::where('estado', 'activo')->with('cliente');
+        $distQuery = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']))->where('activo', true);
+
+        if ($cajera->sucursal_id) {
+            $prestamosQuery->whereHas('createdBy', fn($q) => $q->where('sucursal_id', $cajera->sucursal_id));
+            $distQuery->where('sucursal_id', $cajera->sucursal_id);
+        }
+
+        $prestamosActivos = $prestamosQuery->get();
+        $distribuidoras = $distQuery->get();
 
         return view('cajero.conciliaciones.index', compact('conciliaciones', 'prestamosActivos', 'distribuidoras'));
     }
@@ -656,15 +682,23 @@ class CajeroController extends Controller
      */
     public function indexCanje(Request $request)
     {
+        $cajera = $this->cajera();
+
         $distribuidora = null;
         if ($request->filled('distribuidora_id')) {
             $distribuidora = User::find($request->distribuidora_id);
         }
         
-        // Obtener distribuidores para el select
-        $distribuidoras = User::whereHas('rol', function($q) {
-            $q->whereIn('nombre', ['Distribuidor', 'Distribuidora']);
-        })->where('activo', true)->get();
+        // Obtener distribuidores de la misma sucursal para el select
+        $distQuery = User::whereHas('rol', function($q) {
+            $q->whereIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']);
+        })->where('activo', true);
+
+        if ($cajera->sucursal_id) {
+            $distQuery->where('sucursal_id', $cajera->sucursal_id);
+        }
+
+        $distribuidoras = $distQuery->get();
 
         $config = Configuracion::actual();
 

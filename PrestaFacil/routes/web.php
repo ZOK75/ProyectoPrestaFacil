@@ -149,7 +149,6 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:gerente_de_sucursal,gerente_general,administrador'])->group(function () {
         // Morosidad de Distribuidoras (Decisión de Gerencia)
         Route::post('distribuidores/{distribuidor}/decidir-morosidad', [GerenteSucursalController::class, 'decidirMorosidad'])
-            ->middleware('require.vpn')
             ->name('gerente.distribuidores.decidir-morosidad');
 
         // Vista comparativa y decisión directa

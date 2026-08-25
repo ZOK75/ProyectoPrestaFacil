@@ -22,7 +22,7 @@
         <div class="space-y-2">
             <h1 class="text-2xl font-black tracking-tight text-white">Servicio Temporalmente No Disponible</h1>
             <p class="text-sm text-slate-400 leading-relaxed">
-                {{ $exception->getMessage() ?: 'El sistema se encuentra temporalmente en mantenimiento o el servidor externo está inaccesible. Por favor, reintenta en unos instantes.' }}
+                El sistema se encuentra temporalmente en mantenimiento o el servidor externo no está disponible. Por favor, reintenta en unos instantes.
             </p>
         </div>
 

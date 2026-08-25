@@ -106,14 +106,20 @@ return Application::configure(basePath: dirname(__DIR__))
         // Manejador global de excepciones (error 500 genérico seguro sin exponer datos)
         $exceptions->render(function (\Throwable $e, $request) {
             if ($request->expectsJson()) {
+                $mensaje = ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface && !empty(trim($e->getMessage())))
+                    ? $e->getMessage()
+                    : '¡Ops! Algo salió mal, por favor inténtalo más tarde.';
+
                 return response()->json([
                     'error' => 'Error del servidor',
-                    'message' => '¡Ops! Algo salió mal, por favor inténtalo más tarde.',
+                    'message' => $mensaje,
                 ], 500);
             }
 
             if (!app()->environment('testing') && !config('app.debug')) {
-                return response()->view('errors.500', [], 500);
+                return response()->view('errors.500', [
+                    'exception' => $e,
+                ], 500);
             }
         });
     })->create();

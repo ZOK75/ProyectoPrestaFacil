@@ -59,7 +59,7 @@ class ConfiguracionController extends Controller
         $validated = $request->validated();
         $userId = Auth::id() ?? $operador->id;
 
-        DB::transaction(function () use ($configuracion, $validated, $userId) {
+        DB::transaction(function () use ($configuracion, $validated, $userId, $operador) {
             // Asignar los campos temporales para calcular las fechas
             $configuracion->dia_corte = $validated['dia_corte'];
             $configuracion->hora_corte = $validated['hora_corte'];

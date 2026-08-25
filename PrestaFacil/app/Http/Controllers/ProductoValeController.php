@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreProductoValeRequest;
 use App\Models\ProductoVale;
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -114,6 +115,19 @@ class ProductoValeController extends Controller
 
         $productoVale = ProductoVale::create($data);
 
+        AuditService::registrar(
+            'CREACION_PRODUCTO_VALE',
+            "Vale de préstamo '{$productoVale->nombre}' ({$productoVale->clave}) registrado por {$operador->name}",
+            [
+                'entidad_tipo' => 'producto_vales',
+                'entidad_id' => $productoVale->id,
+                'user_id' => $data['created_by_user_id'],
+                'user_rol' => $operador->rol?->nombre,
+                'sucursal_id' => $operador->sucursal_id,
+                'despues' => $productoVale->toArray(),
+            ]
+        );
+
         return redirect()->route('producto-vales.index')
             ->with('success', "El vale de préstamo '{$productoVale->nombre}' ({$productoVale->clave}) ha sido registrado exitosamente.");
     }
@@ -210,6 +224,18 @@ class ProductoValeController extends Controller
             'updated_by_user_id' => Auth::id() ?? $operador->id,
         ]);
 
+        AuditService::registrar(
+            'DESACTIVACION_PRODUCTO_VALE',
+            "Vale de préstamo '{$productoVale->nombre}' ({$productoVale->clave}) desactivado por {$operador->name}",
+            [
+                'entidad_tipo' => 'producto_vales',
+                'entidad_id' => $productoVale->id,
+                'user_id' => Auth::id() ?? $operador->id,
+                'user_rol' => $operador->rol?->nombre,
+                'sucursal_id' => $operador->sucursal_id,
+            ]
+        );
+
         return redirect()->route('producto-vales.index')
             ->with('success', "El vale '{$productoVale->nombre}' ({$productoVale->clave}) fue desactivado correctamente el " . now()->format('d/m/Y H:i') . ".");
     }
@@ -235,6 +261,18 @@ class ProductoValeController extends Controller
             'desactivado_at' => now(),
             'updated_by_user_id' => Auth::id() ?? $operador->id,
         ]);
+
+        AuditService::registrar(
+            'DESACTIVACION_PRODUCTO_VALE',
+            "Vale de préstamo '{$productoVale->nombre}' ({$productoVale->clave}) desactivado por {$operador->name}",
+            [
+                'entidad_tipo' => 'producto_vales',
+                'entidad_id' => $productoVale->id,
+                'user_id' => Auth::id() ?? $operador->id,
+                'user_rol' => $operador->rol?->nombre,
+                'sucursal_id' => $operador->sucursal_id,
+            ]
+        );
 
         return redirect()->route('producto-vales.index')
             ->with('success', "El vale '{$productoVale->nombre}' ({$productoVale->clave}) fue desactivado correctamente el " . now()->format('d/m/Y H:i') . ".");

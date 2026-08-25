@@ -11,6 +11,7 @@ use App\Models\Prestamo;
 use App\Models\ProductoVale;
 use App\Models\RelacionCobranza;
 use App\Models\User;
+use App\Services\AuditService;
 use App\Services\CorteCobranzaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -261,6 +262,20 @@ class PrestamoController extends Controller
         ]);
 
         $tipoTexto = strtoupper($tipo);
+
+        AuditService::registrar(
+            'ASIGNACION_VALE',
+            "Asignación de {$tipoTexto} {$referencia} (\${$vale->monto_prestamo}) para {$cliente->nombre} por " . ($operador?->name ?? 'Distribuidor'),
+            [
+                'entidad_tipo' => 'prestamos',
+                'entidad_id' => $prestamo->id,
+                'user_id' => $prestamo->created_by_user_id,
+                'user_rol' => $operador?->rol?->nombre,
+                'sucursal_id' => $operador?->sucursal_id,
+                'despues' => $prestamo->toArray(),
+            ]
+        );
+
         return redirect()->route('prestamos.show', $prestamo)
             ->with('success', "¡Asignación exitosa! Se generó el {$tipoTexto} con Referencia {$referencia} para {$cliente->nombre}. El préstamo se encuentra PENDIENTE hasta que el cajero realice la entrega en ventanilla.");
     }
@@ -298,6 +313,18 @@ class PrestamoController extends Controller
             'desactivado_at' => now(),
             'desactivado_by_user_id' => Auth::id() ?? $operador?->id,
         ]);
+
+        AuditService::registrar(
+            'CANCELACION_PRESTAMO',
+            "Vale/Préstamo con Referencia {$prestamo->referencia} cancelado/desactivado por " . ($operador?->name ?? 'Usuario'),
+            [
+                'entidad_tipo' => 'prestamos',
+                'entidad_id' => $prestamo->id,
+                'user_id' => Auth::id() ?? $operador?->id,
+                'user_rol' => $operador?->rol?->nombre,
+                'sucursal_id' => $operador?->sucursal_id,
+            ]
+        );
 
         return redirect()->route('prestamos.index')
             ->with('success', "El vale con Referencia {$prestamo->referencia} ha sido desactivado y cancelado exitosamente. La línea de crédito fue liberada.");
@@ -409,6 +436,19 @@ class PrestamoController extends Controller
             'adeudo_pendiente' => $nuevoAdeudo,
             'estado' => $nuevoEstado,
         ]);
+
+        AuditService::registrar(
+            'REGISTRO_ABONO',
+            "Abono de \${$montoAbonado} registrado a Vale {$prestamo->referencia} (Quincena #{$quincenaNum})" . ($montoMulta > 0 ? " [Multa: \${$montoMulta}]" : ""),
+            [
+                'entidad_tipo' => 'pago_prestamos',
+                'entidad_id' => $pago->id,
+                'user_id' => $pago->registrado_por_user_id,
+                'user_rol' => $operador?->rol?->nombre,
+                'sucursal_id' => $operador?->sucursal_id,
+                'despues' => $pago->toArray(),
+            ]
+        );
 
         $mensaje = "Pago de $" . number_format($montoAbonado, 2) . " registrado con éxito para la Referencia {$prestamo->referencia}.";
         if ($montoMulta > 0) {

@@ -47,20 +47,35 @@ class AuditLog extends Model
         string $descripcion, 
         array $opciones = []
     ): self {
+        $userId = $opciones['user_id'] ?? auth()->id();
+        $user = null;
+        if ($userId) {
+            $user = ($userId === auth()->id()) ? auth()->user() : \App\Models\User::with('rol')->find($userId);
+        }
+
+        $userRol = $opciones['user_rol'] 
+            ?? $user?->rol?->nombre 
+            ?? auth()->user()?->rol?->nombre 
+            ?? 'Sistema';
+
+        $sucursalId = $opciones['sucursal_id'] 
+            ?? $user?->sucursal_id 
+            ?? auth()->user()?->sucursal_id;
+
         return self::create([
             'tipo_operacion' => $tipo,
             'descripcion' => $descripcion,
             'datos_antes' => $opciones['antes'] ?? null,
             'datos_despues' => $opciones['despues'] ?? null,
-            'user_id' => $opciones['user_id'] ?? auth()->id(),
-            'user_rol' => $opciones['user_rol'] ?? auth()->user()?->rol?->nombre ?? 'Sistema',
+            'user_id' => $userId,
+            'user_rol' => $userRol,
             'autorizador_id' => $opciones['autorizador_id'] ?? null,
             'autorizador_rol' => $opciones['autorizador_rol'] ?? null,
-            'sucursal_id' => $opciones['sucursal_id'] ?? auth()->user()?->sucursal_id,
+            'sucursal_id' => $sucursalId,
             'entidad_tipo' => $opciones['entidad_tipo'] ?? null,
             'entidad_id' => $opciones['entidad_id'] ?? null,
             'evidencia_path' => $opciones['evidencia_path'] ?? null,
-            'ip_address' => request()->ip(),
+            'ip_address' => request()->ip() ?? '127.0.0.1',
             'created_at' => now(),
         ]);
     }

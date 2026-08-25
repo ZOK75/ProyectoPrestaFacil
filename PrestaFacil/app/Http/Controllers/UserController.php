@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateUserRequest;
 use App\Models\Rol;
 use App\Models\Sucursal;
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -169,6 +170,19 @@ class UserController extends Controller
 
         $user = User::create($data);
 
+        AuditService::registrar(
+            'CREACION_USUARIO',
+            "Usuario '{$user->name}' ({$user->email}, Rol: {$rolSeleccionado?->nombre}) registrado por " . ($operador->name ?? 'Usuario'),
+            [
+                'entidad_tipo' => 'users',
+                'entidad_id' => $user->id,
+                'user_id' => Auth::id() ?? $operador->id,
+                'user_rol' => $operador->rol?->nombre,
+                'sucursal_id' => $operador->sucursal_id,
+                'despues' => $user->makeHidden('password')->toArray(),
+            ]
+        );
+
         return redirect()->route('usuarios.index')
             ->with('success', "El usuario '{$user->name}' fue registrado exitosamente.");
     }
@@ -271,7 +285,22 @@ class UserController extends Controller
             unset($data['password']);
         }
 
+        $datosAntes = $usuario->makeHidden('password')->toArray();
         $usuario->update($data);
+
+        AuditService::registrar(
+            'ACTUALIZACION_USUARIO',
+            "Usuario '{$usuario->name}' actualizado por " . ($operador->name ?? 'Usuario'),
+            [
+                'entidad_tipo' => 'users',
+                'entidad_id' => $usuario->id,
+                'user_id' => Auth::id() ?? $operador->id,
+                'user_rol' => $operador->rol?->nombre,
+                'sucursal_id' => $operador->sucursal_id,
+                'antes' => $datosAntes,
+                'despues' => $usuario->fresh()->makeHidden('password')->toArray(),
+            ]
+        );
 
         // Prevenir cierre de sesión si el usuario editó su propia contraseña
         if ($passwordChanged && Auth::id() === $usuario->id) {
@@ -304,11 +333,26 @@ class UserController extends Controller
                 ->with('info', "El usuario '{$usuario->name}' ya se encuentra desactivado.");
         }
 
+        $datosAntes = $usuario->makeHidden('password')->toArray();
         $usuario->update([
             'activo' => false,
             'desactivado_at' => now(),
             'desactivado_by_user_id' => Auth::id() ?? $operador->id,
         ]);
+
+        AuditService::registrar(
+            'DESACTIVACION_USUARIO',
+            "Usuario '{$usuario->name}' desactivado por " . ($operador->name ?? 'Usuario'),
+            [
+                'entidad_tipo' => 'users',
+                'entidad_id' => $usuario->id,
+                'user_id' => Auth::id() ?? $operador->id,
+                'user_rol' => $operador->rol?->nombre,
+                'sucursal_id' => $operador->sucursal_id,
+                'antes' => $datosAntes,
+                'despues' => $usuario->fresh()->makeHidden('password')->toArray(),
+            ]
+        );
 
         return redirect()->route('usuarios.index')
             ->with('success', "El usuario '{$usuario->name}' fue desactivado correctamente el " . now()->format('d/m/Y H:i') . ".");

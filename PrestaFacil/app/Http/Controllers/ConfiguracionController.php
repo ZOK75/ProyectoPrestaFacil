@@ -6,6 +6,7 @@ use App\Http\Requests\UpdateConfiguracionRequest;
 use App\Models\Configuracion;
 use App\Models\ConfiguracionLog;
 use App\Models\User;
+use App\Services\AuditService;
 use App\Services\CorteCobranzaService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -105,6 +106,19 @@ class ConfiguracionController extends Controller
             }
 
             $configuracion->update($data);
+
+            AuditService::registrar(
+                'ACTUALIZACION_CONFIGURACION',
+                "Configuración general del sistema actualizada por " . ($operador?->name ?? 'Gerente General'),
+                [
+                    'entidad_tipo' => 'configuraciones',
+                    'entidad_id' => $configuracion->id,
+                    'user_id' => $userId,
+                    'user_rol' => $operador?->rol?->nombre,
+                    'sucursal_id' => $operador?->sucursal_id,
+                    'despues' => $data,
+                ]
+            );
         });
 
         // Ejecutar verificación de corte inmediatamente con los nuevos parámetros
@@ -130,6 +144,17 @@ class ConfiguracionController extends Controller
 
         $resultados = $corteService->simularSiguienteCorte();
         $config = Configuracion::actual();
+
+        AuditService::registrar(
+            'SIMULACION_CORTE',
+            "Simulación de corte quincenal ejecutada por {$operador->name} ({$resultados['multas_aplicadas']} multas aplicadas)",
+            [
+                'entidad_tipo' => 'configuraciones',
+                'user_id' => $operador->id,
+                'user_rol' => $operador->rol?->nombre,
+                'sucursal_id' => $operador->sucursal_id,
+            ]
+        );
 
         return back()->with('success', "⚡ Corte quincenal simulado con éxito: Se acumularon las multas de los vales vencidos ({$resultados['multas_aplicadas']} multas aplicadas) y se avanzó el ciclo quincenal +15 días (Próximo corte: Día {$config->dia_corte} a las " . substr($config->hora_corte, 0, 5) . " hrs).");
     }

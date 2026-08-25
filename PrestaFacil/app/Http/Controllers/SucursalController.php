@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\NotificacionCajero;
 use App\Models\Sucursal;
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -52,12 +53,25 @@ class SucursalController extends Controller
             'telefono' => 'nullable|string|max:50',
         ]);
 
-        Sucursal::create([
+        $sucursal = Sucursal::create([
             'nombre' => trim($request->nombre),
             'direccion' => $request->direccion,
             'telefono' => $request->telefono,
             'activo' => true,
         ]);
+
+        AuditService::registrar(
+            'CREACION_SUCURSAL',
+            "Sucursal '{$request->nombre}' creada por {$operador->name}",
+            [
+                'entidad_tipo' => 'sucursales',
+                'entidad_id' => $sucursal->id,
+                'user_id' => $operador->id,
+                'user_rol' => $operador->rol?->nombre,
+                'sucursal_id' => $sucursal->id,
+                'despues' => $sucursal->toArray(),
+            ]
+        );
 
         return back()->with('success', "Sucursal '{$request->nombre}' creada exitosamente.");
     }
@@ -78,11 +92,26 @@ class SucursalController extends Controller
             'telefono' => 'nullable|string|max:50',
         ]);
 
+        $datosAntes = $sucursal->toArray();
         $sucursal->update([
             'nombre' => trim($request->nombre),
             'direccion' => $request->direccion,
             'telefono' => $request->telefono,
         ]);
+
+        AuditService::registrar(
+            'ACTUALIZACION_SUCURSAL',
+            "Sucursal '{$sucursal->nombre}' actualizada por {$operador->name}",
+            [
+                'entidad_tipo' => 'sucursales',
+                'entidad_id' => $sucursal->id,
+                'user_id' => $operador->id,
+                'user_rol' => $operador->rol?->nombre,
+                'sucursal_id' => $sucursal->id,
+                'antes' => $datosAntes,
+                'despues' => $sucursal->fresh()->toArray(),
+            ]
+        );
 
         return back()->with('success', "Sucursal '{$sucursal->nombre}' actualizada exitosamente.");
     }
@@ -101,6 +130,20 @@ class SucursalController extends Controller
         $sucursal->update(['activo' => $nuevoEstado]);
 
         $estadoTexto = $nuevoEstado ? 'activada' : 'desactivada';
+
+        AuditService::registrar(
+            'CAMBIO_ESTADO_SUCURSAL',
+            "Sucursal '{$sucursal->nombre}' {$estadoTexto} por {$operador->name}",
+            [
+                'entidad_tipo' => 'sucursales',
+                'entidad_id' => $sucursal->id,
+                'user_id' => $operador->id,
+                'user_rol' => $operador->rol?->nombre,
+                'sucursal_id' => $sucursal->id,
+                'despues' => $sucursal->fresh()->toArray(),
+            ]
+        );
+
         return back()->with('success', "La sucursal '{$sucursal->nombre}' ha sido {$estadoTexto}.");
     }
 
@@ -137,7 +180,7 @@ class SucursalController extends Controller
 
         $antiguaSucursalNombre = $gerente->sucursal?->nombre ?? 'Sin Asignar';
 
-        DB::transaction(function () use ($gerente, $antiguaSucursalId, $nuevaSucursal) {
+        DB::transaction(function () use ($gerente, $antiguaSucursalId, $nuevaSucursal, $operador) {
             // 1. Mover al Gerente
             $gerente->update(['sucursal_id' => $nuevaSucursal->id]);
 
@@ -169,6 +212,18 @@ class SucursalController extends Controller
                 'informativa',
                 'Cambio de Sucursal Asignada',
                 "Has sido reasignado oficialmente a la sucursal '{$nuevaSucursal->nombre}' por la Gerencia General. Toda tu estructura de Coordinadores y Distribuidoras ha sido transferida."
+            );
+
+            AuditService::registrar(
+                'REASIGNACION_GERENTE_SUCURSAL',
+                "Gerente '{$gerente->name}' reasignado a sucursal '{$nuevaSucursal->nombre}' por {$operador->name}",
+                [
+                    'entidad_tipo' => 'users',
+                    'entidad_id' => $gerente->id,
+                    'user_id' => $operador->id,
+                    'user_rol' => $operador->rol?->nombre,
+                    'sucursal_id' => $nuevaSucursal->id,
+                ]
             );
         });
 

@@ -107,9 +107,9 @@
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap">
                                     <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase
-                                        @if(str_contains($log->tipo_operacion, 'DELETE') || str_contains($log->tipo_operacion, 'DESACTIVACION')) bg-rose-500/10 text-rose-400 border border-rose-500/20
-                                        @elseif(str_contains($log->tipo_operacion, 'ENTREGA') || str_contains($log->tipo_operacion, 'PAGO') || str_contains($log->tipo_operacion, 'ABONO')) bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
-                                        @elseif(str_contains($log->tipo_operacion, 'CONFIGURACION')) bg-amber-500/10 text-amber-400 border border-amber-500/20
+                                        @if(str_contains($log->tipo_operacion, 'DELETE') || str_contains($log->tipo_operacion, 'DESACTIVACION') || str_contains($log->tipo_operacion, 'RECHAZO') || str_contains($log->tipo_operacion, 'CANCELACION')) bg-rose-500/10 text-rose-400 border border-rose-500/20
+                                        @elseif(str_contains($log->tipo_operacion, 'CREACION') || str_contains($log->tipo_operacion, 'REGISTRO') || str_contains($log->tipo_operacion, 'ENTREGA') || str_contains($log->tipo_operacion, 'PAGO') || str_contains($log->tipo_operacion, 'ABONO') || str_contains($log->tipo_operacion, 'APROBAC') || str_contains($log->tipo_operacion, 'ACEPTAC') || str_contains($log->tipo_operacion, 'ASIGNACION')) bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
+                                        @elseif(str_contains($log->tipo_operacion, 'CONFIGURACION') || str_contains($log->tipo_operacion, 'ACTUALIZACION') || str_contains($log->tipo_operacion, 'MODIFICACION') || str_contains($log->tipo_operacion, 'TRASPASO') || str_contains($log->tipo_operacion, 'REASIGNACION') || str_contains($log->tipo_operacion, 'SIMULACION')) bg-amber-500/10 text-amber-400 border border-amber-500/20
                                         @else bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 @endif">
                                         {{ $log->tipo_operacion }}
                                     </span>

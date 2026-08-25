@@ -37,6 +37,7 @@ class LogViewerController extends Controller
             $buscar = $request->input('buscar_auditoria');
             $auditQuery->where(function ($q) use ($buscar) {
                 $q->where('descripcion', 'like', "%{$buscar}%")
+                  ->orWhere('tipo_operacion', 'like', "%{$buscar}%")
                   ->orWhere('user_rol', 'like', "%{$buscar}%")
                   ->orWhere('ip_address', 'like', "%{$buscar}%")
                   ->orWhere('entidad_tipo', 'like', "%{$buscar}%");

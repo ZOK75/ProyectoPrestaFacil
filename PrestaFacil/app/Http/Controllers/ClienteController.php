@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateClienteRequest;
 use App\Models\Cliente;
 use App\Models\SolicitudCliente;
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -165,6 +166,19 @@ class ClienteController extends Controller
 
         $cliente = Cliente::create($data);
 
+        AuditService::registrar(
+            'CREACION_CLIENTE',
+            "Cliente '{$cliente->nombre}' (CURP: {$cliente->curp}) registrado exitosamente por " . ($operador?->name ?? 'Usuario'),
+            [
+                'entidad_tipo' => 'clientes',
+                'entidad_id' => $cliente->id,
+                'user_id' => $data['created_by_user_id'],
+                'user_rol' => $operador?->rol?->nombre,
+                'sucursal_id' => $operador?->sucursal_id,
+                'despues' => $cliente->toArray(),
+            ]
+        );
+
         return redirect()->route('clientes.index')
             ->with('success', "El cliente '{$cliente->nombre}' (CURP: {$cliente->curp}) fue registrado exitosamente.");
     }
@@ -256,7 +270,7 @@ class ClienteController extends Controller
                 $pdfComprobanteNuevo = $request->file('pdf_comprobante')->store('expedientes_clientes/solicitudes_temp', 'public');
             }
 
-            SolicitudCliente::create([
+            $solicitud = SolicitudCliente::create([
                 'tipo' => 'actualizacion',
                 'estado' => 'pendiente',
                 'cliente_id' => $cliente->id,
@@ -272,6 +286,20 @@ class ClienteController extends Controller
                 'pdf_ine_nuevo' => $pdfIneNuevo,
                 'pdf_comprobante_nuevo' => $pdfComprobanteNuevo,
             ]);
+
+            AuditService::registrar(
+                'SOLICITUD_ACTUALIZACION_CLIENTE',
+                "Solicitud de actualización enviada para cliente '{$cliente->nombre}' por " . ($operador?->name ?? 'Distribuidor'),
+                [
+                    'entidad_tipo' => 'solicitudes_cliente',
+                    'entidad_id' => $solicitud->id,
+                    'user_id' => $operador->id,
+                    'user_rol' => $operador?->rol?->nombre,
+                    'sucursal_id' => $operador?->sucursal_id,
+                    'antes' => $solicitud->datos_originales,
+                    'despues' => $solicitud->datos_solicitados,
+                ]
+            );
 
             return redirect()->route('clientes.index')
                 ->with('success', "Se ha enviado la Solicitud de Actualización para '{$cliente->nombre}'.");
@@ -291,7 +319,22 @@ class ClienteController extends Controller
             $data['path_comprobante_pdf'] = $request->file('pdf_comprobante')->store('expedientes_clientes/comprobantes', 'public');
         }
 
+        $datosAntes = $cliente->toArray();
         $cliente->update($data);
+
+        AuditService::registrar(
+            'ACTUALIZACION_CLIENTE',
+            "Datos del cliente '{$cliente->nombre}' actualizados por " . ($operador?->name ?? 'Usuario'),
+            [
+                'entidad_tipo' => 'clientes',
+                'entidad_id' => $cliente->id,
+                'user_id' => Auth::id() ?? $operador?->id,
+                'user_rol' => $operador?->rol?->nombre,
+                'sucursal_id' => $operador?->sucursal_id,
+                'antes' => $datosAntes,
+                'despues' => $cliente->fresh()->toArray(),
+            ]
+        );
 
         return redirect()->route('clientes.index')
             ->with('success', "Los datos del cliente '{$cliente->nombre}' fueron actualizados correctamente.");
@@ -325,7 +368,7 @@ class ClienteController extends Controller
 
         // FLUJO DISTRIBUIDOR: Envía solicitud de desactivación
         if ($operador->esDistribuidor()) {
-            SolicitudCliente::create([
+            $solicitud = SolicitudCliente::create([
                 'tipo' => 'desactivacion',
                 'estado' => 'pendiente',
                 'cliente_id' => $cliente->id,
@@ -335,16 +378,43 @@ class ClienteController extends Controller
                 'motivo' => $request->input('motivo_desactivacion') ?? 'Solicitud de baja/desactivación iniciada por Distribuidor.',
             ]);
 
+            AuditService::registrar(
+                'SOLICITUD_DESACTIVACION_CLIENTE',
+                "Solicitud de desactivación enviada para cliente '{$cliente->nombre}' por " . ($operador?->name ?? 'Distribuidor'),
+                [
+                    'entidad_tipo' => 'solicitudes_cliente',
+                    'entidad_id' => $solicitud->id,
+                    'user_id' => $operador->id,
+                    'user_rol' => $operador?->rol?->nombre,
+                    'sucursal_id' => $operador?->sucursal_id,
+                ]
+            );
+
             return redirect()->route('clientes.index')
                 ->with('success', "Se ha enviado la Solicitud de Desactivación para '{$cliente->nombre}'.");
         }
 
         // Desactivación inmediata
+        $datosAntes = $cliente->toArray();
         $cliente->update([
             'activo' => false,
             'desactivado_at' => now(),
             'desactivado_by_user_id' => Auth::id() ?? $operador?->id,
         ]);
+
+        AuditService::registrar(
+            'DESACTIVACION_CLIENTE',
+            "Cliente '{$cliente->nombre}' (CURP: {$cliente->curp}) desactivado por " . ($operador?->name ?? 'Usuario'),
+            [
+                'entidad_tipo' => 'clientes',
+                'entidad_id' => $cliente->id,
+                'user_id' => Auth::id() ?? $operador?->id,
+                'user_rol' => $operador?->rol?->nombre,
+                'sucursal_id' => $operador?->sucursal_id,
+                'antes' => $datosAntes,
+                'despues' => $cliente->fresh()->toArray(),
+            ]
+        );
 
         return redirect()->route('clientes.index')
             ->with('success', "El cliente '{$cliente->nombre}' (CURP: {$cliente->curp}) fue desactivado correctamente.");
@@ -408,6 +478,18 @@ class ClienteController extends Controller
             ['traspaso_id' => $traspaso->id]
         );
 
+        AuditService::registrar(
+            'SOLICITUD_TRASPASO_CLIENTE',
+            "Solicitud de traspaso del cliente '{$cliente->nombre}' iniciada por {$distribuidorEmisor->name} hacia {$distribuidorReceptor->name}",
+            [
+                'entidad_tipo' => 'solicitudes_traspaso_cliente',
+                'entidad_id' => $traspaso->id,
+                'user_id' => $distribuidorEmisor->id,
+                'user_rol' => $distribuidorEmisor->rol?->nombre,
+                'sucursal_id' => $distribuidorEmisor->sucursal_id,
+            ]
+        );
+
         return back()->with('success', "Se ha enviado la solicitud de traspaso del cliente '{$cliente->nombre}' a la distribuidora {$distribuidorReceptor->name}.");
     }
 
@@ -448,6 +530,18 @@ class ClienteController extends Controller
                 "La distribuidora {$distribuidorReceptor->name} ha rechazado el traspaso del cliente '{$cliente->nombre}'." . ($request->observaciones ? " Motivo: {$request->observaciones}" : "")
             );
 
+            AuditService::registrar(
+                'RECHAZO_TRASPASO_CLIENTE',
+                "Traspaso del cliente '{$cliente->nombre}' rechazado por {$distribuidorReceptor->name}",
+                [
+                    'entidad_tipo' => 'solicitudes_traspaso_cliente',
+                    'entidad_id' => $traspaso->id,
+                    'user_id' => $distribuidorReceptor->id,
+                    'user_rol' => $distribuidorReceptor->rol?->nombre,
+                    'sucursal_id' => $distribuidorReceptor->sucursal_id,
+                ]
+            );
+
             return back()->with('info', "Has rechazado el traspaso del cliente '{$cliente->nombre}'.");
         }
 
@@ -477,6 +571,18 @@ class ClienteController extends Controller
                 "Las distribuidoras {$distribuidorEmisor->name} y {$distribuidorReceptor->name} acordaron el traspaso del cliente '{$cliente->nombre}'. Requiere tu visto bueno final."
             );
         }
+
+        AuditService::registrar(
+            'ACEPTACION_TRASPASO_CLIENTE',
+            "Traspaso del cliente '{$cliente->nombre}' aceptado por {$distribuidorReceptor->name} (Turnado a Coordinación)",
+            [
+                'entidad_tipo' => 'solicitudes_traspaso_cliente',
+                'entidad_id' => $traspaso->id,
+                'user_id' => $distribuidorReceptor->id,
+                'user_rol' => $distribuidorReceptor->rol?->nombre,
+                'sucursal_id' => $distribuidorReceptor->sucursal_id,
+            ]
+        );
 
         return back()->with('success', "Has aceptado el traspaso del cliente '{$cliente->nombre}'. Fue enviado al Coordinador para su autorización final.");
     }
@@ -527,6 +633,18 @@ class ClienteController extends Controller
                 "El Coordinador no ha autorizado la incorporación del cliente '{$cliente->nombre}' a tu cartera."
             );
 
+            AuditService::registrar(
+                'RECHAZO_TRASPASO_COORDINADOR',
+                "Traspaso del cliente '{$cliente->nombre}' a {$distribuidorReceptor->name} rechazado por Coordinador {$coordinador->name}",
+                [
+                    'entidad_tipo' => 'solicitudes_traspaso_cliente',
+                    'entidad_id' => $traspaso->id,
+                    'user_id' => $coordinador->id,
+                    'user_rol' => $coordinador->rol?->nombre,
+                    'sucursal_id' => $coordinador->sucursal_id,
+                ]
+            );
+
             return back()->with('info', "Has rechazado la transferencia del cliente '{$cliente->nombre}'.");
         }
 
@@ -542,6 +660,18 @@ class ClienteController extends Controller
             $cliente->update([
                 'created_by_user_id' => $distribuidorReceptor->id,
             ]);
+
+            AuditService::registrar(
+                'APROBACION_TRASPASO_CLIENTE',
+                "Traspaso del cliente '{$cliente->nombre}' a {$distribuidorReceptor->name} aprobado formalmente por {$coordinador->name}",
+                [
+                    'entidad_tipo' => 'solicitudes_traspaso_cliente',
+                    'entidad_id' => $traspaso->id,
+                    'user_id' => $coordinador->id,
+                    'user_rol' => $coordinador->rol?->nombre,
+                    'sucursal_id' => $coordinador->sucursal_id,
+                ]
+            );
         });
 
         // Notificaciones finales a todas las partes afectadas

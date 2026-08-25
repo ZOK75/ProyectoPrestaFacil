@@ -436,43 +436,55 @@ class PrestamoController extends Controller
     /**
      * Genera la Relación de Cobranza del Distribuidor en formato PDF.
      */
-    public function relacionCobranza(Request $request)
+    public function relacionCobranza(Request $request, $corte_id = null)
     {
         $operador = $this->operador();
-
-        $this->corteService->verificarYProcesarCortesYVencimientos();
         $configuracion = Configuracion::actual();
 
         $relacion = null;
         $distribuidoraId = null;
+        $distribuidora = null;
+        
+        $corte_id = $corte_id ?? $request->corte_id;
 
-        if ($request->filled('corte_id')) {
-            $relacion = RelacionCobranza::with('distribuidora')->find($request->corte_id);
+        if ($corte_id) {
+            $relacion = RelacionCobranza::with('distribuidora')->find($corte_id);
             if ($relacion) {
                 $distribuidoraId = $relacion->distribuidora_id;
+                $distribuidora = $relacion->distribuidora;
             }
         } elseif ($request->filled('distribuidora_id')) {
             $distribuidoraId = $request->distribuidora_id;
+            $distribuidora = User::find($distribuidoraId);
         } elseif ($operador && $operador->esDistribuidor()) {
             $distribuidoraId = $operador->id;
+            $distribuidora = $operador;
         }
 
-        // Cargar los préstamos correspondientes
-        $prestamosQuery = Prestamo::with(['cliente', 'productoVale', 'pagos']);
-
-        if ($distribuidoraId) {
-            $prestamosQuery->where('created_by_user_id', $distribuidoraId);
+        if (!$distribuidora) {
+            return back()->with('error', 'No se especificó un corte o distribuidora para visualizar.');
         }
 
-        // Si es una relación específica de un corte pasado, se obtienen los préstamos existentes en ese momento o activos
-        $prestamos = $prestamosQuery->orderBy('created_at', 'desc')->get();
-
-        if (!$relacion && $distribuidoraId) {
+        if (!$relacion) {
+            $this->corteService->verificarYProcesarCortesYVencimientos();
             $relacion = RelacionCobranza::where('distribuidora_id', $distribuidoraId)
                 ->where('fecha_corte', $configuracion->fecha_corte)
                 ->first();
         }
 
-        return view('prestamos.relacion_pdf', compact('operador', 'configuracion', 'prestamos', 'relacion'));
+        $fechaCorteRef = $relacion ? $relacion->fecha_corte : $configuracion->fecha_corte;
+
+        // Cargar todos los préstamos activos en la fecha de corte
+        $prestamosQuery = Prestamo::with(['cliente', 'productoVale', 'pagos'])
+            ->where('created_by_user_id', $distribuidoraId)
+            ->where('created_at', '<=', $fechaCorteRef)
+            ->where(function($query) use ($fechaCorteRef) {
+                $query->where('estado', 'activo')
+                      ->orWhere('updated_at', '>', $fechaCorteRef);
+            });
+
+        $prestamos = $prestamosQuery->orderBy('created_at', 'desc')->get();
+
+        return view('prestamos.relacion_pdf', compact('operador', 'distribuidora', 'configuracion', 'prestamos', 'relacion'));
     }
 }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relación de Cobranza - {{ $operador->name }}</title>
+    <title>Relación de Cobranza - {{ $distribuidora->name }}</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -53,25 +53,25 @@
             <!-- Derecha: Datos de la Distribuidora -->
             <div class="text-right text-xs space-y-1">
                 <div class="font-bold text-slate-900">
-                    Número Distribuidora: <span class="font-mono text-slate-700">DIST-{{ str_pad($operador->id, 8, '0', STR_PAD_LEFT) }}</span>
+                    Número Distribuidora: <span class="font-mono text-slate-700">DIST-{{ str_pad($distribuidora->id, 8, '0', STR_PAD_LEFT) }}</span>
                 </div>
                 <div class="font-bold text-slate-900">
-                    Nombre: <span class="font-semibold text-slate-800">{{ $operador->name }}</span>
+                    Nombre: <span class="font-semibold text-slate-800">{{ $distribuidora->name }}</span>
                 </div>
                 <div class="text-slate-600 font-medium">
-                    Domicilio: {{ $operador->sucursal?->direccion ?? 'Calle las Cruces, Fracc. Villa Jardín #239' }}, {{ $operador->sucursal?->nombre ?? 'Torreón Coahuila' }}
+                    Domicilio: {{ $distribuidora->sucursal?->direccion ?? 'Calle las Cruces, Fracc. Villa Jardín #239' }}, {{ $distribuidora->sucursal?->nombre ?? 'Torreón Coahuila' }}
                 </div>
                 <div class="font-bold text-slate-900">
-                    Límite de crédito: <span class="font-bold text-slate-900">${{ number_format($operador->limite_credito ?? 20000, 0) }}</span>
+                    Límite de crédito: <span class="font-bold text-slate-900">${{ number_format($distribuidora->limite_credito ?? 20000, 0) }}</span>
                 </div>
                 <div class="font-bold text-slate-900">
-                    Crédito disponible: <span class="font-bold text-emerald-700">${{ number_format($operador->creditoDisponible(), 0) }}</span>
+                    Crédito disponible: <span class="font-bold text-emerald-700">${{ number_format($distribuidora->creditoDisponible(), 0) }}</span>
                 </div>
                 <div class="font-bold text-slate-900">
-                    Puntos: <span class="font-bold text-indigo-700">{{ $operador->puntos ?? $operador->puntosAcumulados() }}</span>
+                    Puntos: <span class="font-bold text-indigo-700">{{ $distribuidora->puntos ?? $distribuidora->puntosAcumulados() }}</span>
                 </div>
                 <div class="font-bold text-slate-900 pt-1">
-                    Referencia de Pago: <span class="font-mono text-slate-900 font-extrabold">{{ $operador->referenciaPago() }}</span>
+                    Referencia de Pago: <span class="font-mono text-slate-900 font-extrabold">{{ $distribuidora->referenciaPago() }}</span>
                 </div>
             </div>
         </div>
@@ -82,13 +82,13 @@
                 <div>
                     <span class="font-bold text-slate-900">Fecha límite de pago:</span>
                     <span class="font-semibold text-slate-800 ml-1">
-                        {{ $configuracion->fecha_limite_pago ? $configuracion->fecha_limite_pago->format('d \d\e F Y H:i') : now()->addDays(15)->format('d \d\e F Y') }}
+                        {{ ($relacion ? $relacion->fecha_limite_pago : $configuracion->fecha_limite_pago) ? ($relacion ? $relacion->fecha_limite_pago : $configuracion->fecha_limite_pago)->format('d \d\e F Y H:i') : now()->addDays(15)->format('d \d\e F Y') }}
                     </span>
                 </div>
                 <div>
                     <span class="font-bold text-slate-900">Fecha de corte:</span>
                     <span class="text-slate-700 ml-1">
-                        {{ $configuracion->fecha_corte ? $configuracion->fecha_corte->format('d \d\e F Y H:i') : '13 de febrero 2026' }}
+                        {{ ($relacion ? $relacion->fecha_corte : $configuracion->fecha_corte) ? ($relacion ? $relacion->fecha_corte : $configuracion->fecha_corte)->format('d \d\e F Y H:i') : '13 de febrero 2026' }}
                     </span>
                 </div>
                 @if(isset($relacion) && $relacion->estado_pago !== 'pendiente')
@@ -112,7 +112,7 @@
             </div>
 
             @php
-                $porcentajeComision = $operador->obtenerPorcentajeGanancia();
+                $porcentajeComision = $distribuidora->obtenerPorcentajeGanancia();
                 $totalComisionesSum = 0;
                 $totalPagosSum = 0;
                 $totalRecargosSum = 0;
@@ -147,7 +147,7 @@
 
             <div class="text-left sm:text-right border-t sm:border-t-0 sm:border-l border-slate-300 pt-2 sm:pt-0 sm:pl-4 space-y-0.5">
                 <span class="text-[11px] uppercase font-bold text-slate-500 block">Subtotal Pagos (Cuotas - Comisiones): ${{ number_format($totalPagosSum, 2) }}</span>
-                <span class="text-[11px] uppercase font-bold text-indigo-600 block">Total Comisiones (Cat. {{ ucfirst($operador->categoria_distribuidor ?? 'Cobre') }} {{ $porcentajeComision }}%): ${{ number_format($totalComisionesSum, 2) }}</span>
+                <span class="text-[11px] uppercase font-bold text-indigo-600 block">Total Comisiones (Cat. {{ ucfirst($distribuidora->categoria_distribuidor ?? 'Cobre') }} {{ $porcentajeComision }}%): ${{ number_format($totalComisionesSum, 2) }}</span>
                 @if($totalRecargosSum > 0)
                     <span class="text-[11px] uppercase font-bold text-rose-600 block">Recargos por Retraso (Multa + Pagos Anteriores + Comisiones): +${{ number_format($totalRecargosSum, 2) }}</span>
                 @endif

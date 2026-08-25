@@ -128,10 +128,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('configuracion-general', [ConfiguracionController::class, 'edit'])->name('configuracion-general.edit');
         Route::put('configuracion-general', [ConfiguracionController::class, 'update'])->middleware('require.vpn')->name('configuracion-general.update');
         Route::post('configuracion-general/simular-corte', [ConfiguracionController::class, 'simularCorte'])->middleware('require.vpn')->name('configuracion-general.simular-corte');
-         // Morosidad de Distribuidoras (Decisión de Gerencia)
-        Route::post('distribuidores/{distribuidor}/decidir-morosidad', [GerenteSucursalController::class, 'decidirMorosidad'])
-            ->middleware('require.vpn')
-            ->name('gerente.distribuidores.decidir-morosidad');
     });
 
     // ──────────────────────────────────────────
@@ -151,6 +147,10 @@ Route::middleware(['auth'])->group(function () {
 
     // Comparación, Dictamen y Transferencias (Gerente de Sucursal o Gerente General / Administrador)
     Route::middleware(['role:gerente_de_sucursal,gerente_general,administrador'])->group(function () {
+        // Morosidad de Distribuidoras (Decisión de Gerencia)
+        Route::post('distribuidores/{distribuidor}/decidir-morosidad', [GerenteSucursalController::class, 'decidirMorosidad'])
+            ->name('gerente.distribuidores.decidir-morosidad');
+
         // Vista comparativa y decisión directa
         Route::get('/solicitudes-distribuidoras/{solicitud}/comparar', [GerenteSucursalController::class, 'compararSolicitudDistribuidor'])
             ->name('gerente.solicitudes.comparar');

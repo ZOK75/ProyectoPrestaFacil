@@ -57,6 +57,52 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
+        // Manejador para fallos de conexión con Servidor de Base de Datos Remoto
+        $exceptions->render(function (\PDOException $e, $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'error' => 'Error de conexión a la base de datos',
+                    'message' => 'El servidor de la base de datos no responde o no está disponible temporalmente. Inténtalo de nuevo más tarde.',
+                ], 503);
+            }
+
+            return response()->view('errors.database', [
+                'exception' => $e,
+            ], 503);
+        });
+
+        $exceptions->render(function (\Illuminate\Database\QueryException $e, $request) {
+            $prev = $e->getPrevious();
+            $msg = strtolower($e->getMessage() . ($prev ? ' ' . $prev->getMessage() : ''));
+            $isConnectionFailure = $prev instanceof \PDOException || (
+                str_contains($msg, 'connection refused') ||
+                str_contains($msg, 'timed out') ||
+                str_contains($msg, 'timeout') ||
+                str_contains($msg, 'no route to host') ||
+                str_contains($msg, 'network is unreachable') ||
+                str_contains($msg, 'server has gone away') ||
+                str_contains($msg, 'could not connect') ||
+                str_contains($msg, 'target machine actively refused') ||
+                str_contains($msg, 'getaddrinfo failed') ||
+                str_contains($msg, '[2002]') ||
+                str_contains($msg, 'access denied') ||
+                str_contains($msg, 'lost connection')
+            );
+
+            if ($isConnectionFailure) {
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'error' => 'Error de conexión a la base de datos',
+                        'message' => 'El servidor de la base de datos no responde o no está disponible temporalmente. Inténtalo de nuevo más tarde.',
+                    ], 503);
+                }
+
+                return response()->view('errors.database', [
+                    'exception' => $e,
+                ], 503);
+            }
+        });
+
         // Manejador global de excepciones (error 500 genérico seguro sin exponer datos)
         $exceptions->render(function (\Throwable $e, $request) {
             if ($request->expectsJson()) {

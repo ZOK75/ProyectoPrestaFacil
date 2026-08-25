@@ -27,6 +27,7 @@ class CobranzaValesIndividualesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-25 12:00:00'));
 
         $rolGG = Rol::firstOrCreate(['nombre' => 'Gerente General']);
         $rolCajero = Rol::firstOrCreate(['nombre' => 'Cajero']);
@@ -73,6 +74,12 @@ class CobranzaValesIndividualesTest extends TestCase
             'activo' => true,
             'created_by_user_id' => $this->distribuidor->id,
         ]);
+    }
+
+    protected function tearDown(): void
+    {
+        \Carbon\Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_gerente_general_can_create_producto_vale_with_multa(): void
@@ -131,12 +138,13 @@ class CobranzaValesIndividualesTest extends TestCase
         ]);
 
         $config = Configuracion::actual();
-        $diaCorteInicial = now()->day;
+        $cortePasado = now()->subHours(2);
+        $limitePasado = now()->subHour();
         $config->update([
-            'dia_corte' => $diaCorteInicial,
-            'hora_corte' => now()->subMinutes(30)->format('H:i:s'),
-            'dia_limite_pago' => $diaCorteInicial,
-            'hora_limite_pago' => now()->subMinute()->format('H:i:s'),
+            'dia_corte' => $cortePasado->day,
+            'hora_corte' => $cortePasado->format('H:i:s'),
+            'dia_limite_pago' => $limitePasado->day,
+            'hora_limite_pago' => $limitePasado->format('H:i:s'),
         ]);
 
         $corteService = app(CorteCobranzaService::class);
@@ -153,7 +161,7 @@ class CobranzaValesIndividualesTest extends TestCase
 
         // 3. Verificar que el ciclo se avanzó 15 días automáticamente
         $config->refresh();
-        $fechaEsperadaCorte = now()->setDay($diaCorteInicial)->addDays(15);
+        $fechaEsperadaCorte = $cortePasado->copy()->addDays(15);
         $this->assertEquals($fechaEsperadaCorte->day, $config->dia_corte);
     }
 
@@ -379,10 +387,12 @@ class CobranzaValesIndividualesTest extends TestCase
         ]);
 
         // Gerente de Sucursal decide marcar como morosa
-        $response = $this->actingAs($gerenteSucursal)->post(route('gerente.distribuidores.decidir-morosidad', $this->distribuidor), [
-            'accion' => 'marcar',
-            'motivo' => 'Acumuló 3 retrasos de corte sin abono',
-        ]);
+        $response = $this->actingAs($gerenteSucursal)
+            ->from(route('gerente-sucursal.dashboard'))
+            ->post(route('gerente.distribuidores.decidir-morosidad', $this->distribuidor), [
+                'accion' => 'marcar',
+                'motivo' => 'Acumuló 3 retrasos de corte sin abono',
+            ]);
 
         $response->assertSessionHas('warning');
 

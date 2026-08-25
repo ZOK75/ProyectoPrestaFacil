@@ -28,11 +28,18 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-25 12:00:00'));
 
         $this->rolDistribuidor = Rol::firstOrCreate(['nombre' => 'Distribuidor']);
         $this->rolCajero = Rol::firstOrCreate(['nombre' => 'Cajero']);
         $this->rolCoordinador = Rol::firstOrCreate(['nombre' => 'Coordinador']);
         $this->sucursal = Sucursal::firstOrCreate(['nombre' => 'Sucursal Central'], ['activo' => true]);
+    }
+
+    protected function tearDown(): void
+    {
+        \Carbon\Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_new_distribuidor_ignores_past_cuts_and_zero_balance_is_taken_as_paid()
@@ -75,12 +82,14 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
             'tipo' => 'multa_adeudo_aplicada',
         ]);
 
-        // 2. Ahora simulamos un corte con fecha de hoy, pero con saldo 0.00
+        // 2. Ahora simulamos un corte que ocurre después del alta del distribuidor, con saldo 0.00
+        $corteHoy = now()->subMinutes(10);
+        $limiteFuturo = now()->addDays(3);
         $config->update([
-            'dia_corte' => now()->day,
-            'hora_corte' => now()->subMinute()->format('H:i:s'),
-            'dia_limite_pago' => now()->addDays(3)->day,
-            'hora_limite_pago' => '23:59:00',
+            'dia_corte' => $corteHoy->day,
+            'hora_corte' => $corteHoy->format('H:i:s'),
+            'dia_limite_pago' => $limiteFuturo->day,
+            'hora_limite_pago' => $limiteFuturo->format('H:i:s'),
         ]);
 
         $service->verificarYProcesarCortesYVencimientos();
@@ -151,11 +160,13 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
             'dias_limite_pago' => 5,
             'multa_adeudo' => 300.00,
         ]);
+        $cortePasado = now()->subHours(2);
+        $limitePasado = now()->subHour();
         $config->update([
-            'dia_corte' => now()->day,
-            'hora_corte' => now()->subMinutes(20)->format('H:i:s'),
-            'dia_limite_pago' => now()->day,
-            'hora_limite_pago' => now()->subMinute()->format('H:i:s'),
+            'dia_corte' => $cortePasado->day,
+            'hora_corte' => $cortePasado->format('H:i:s'),
+            'dia_limite_pago' => $limitePasado->day,
+            'hora_limite_pago' => $limitePasado->format('H:i:s'),
             'multa_adeudo' => 300.00,
         ]);
 
@@ -464,10 +475,12 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
             'dias_limite_pago' => 5,
             'multa_adeudo' => 300.00,
         ]);
+        $cortePasado = now()->subHours(2);
+        $limiteFuturo = now()->addDays(5);
         $config->update([
-            'dia_corte' => now()->day,
-            'hora_corte' => now()->subMinutes(10)->format('H:i:s'),
-            'dia_limite_pago' => now()->addDays(5)->day,
+            'dia_corte' => $cortePasado->day,
+            'hora_corte' => $cortePasado->format('H:i:s'),
+            'dia_limite_pago' => $limiteFuturo->day,
             'hora_limite_pago' => '23:59:00',
         ]);
 
@@ -492,9 +505,10 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertEquals(150.00, $relacion->adeudo_pendiente);
 
         // 3. Vencimiento de fecha límite: se aplica multa y se actualiza la relación
+        $limitePasado = now()->subHour();
         $config->update([
-            'dia_limite_pago' => now()->day,
-            'hora_limite_pago' => now()->subMinute()->format('H:i:s'),
+            'dia_limite_pago' => $limitePasado->day,
+            'hora_limite_pago' => $limitePasado->format('H:i:s'),
             'multa_adeudo' => 300.00,
         ]);
 
@@ -558,10 +572,12 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
             'monto_base_puntos' => 1200.00,
             'puntos_por_monto_base' => 3,
         ]);
+        $cortePasado = now()->subHours(2);
+        $limiteFuturo = now()->addDays(5);
         $config->update([
-            'dia_corte' => now()->day,
-            'hora_corte' => now()->subMinute()->format('H:i:s'),
-            'dia_limite_pago' => now()->addDays(5)->day,
+            'dia_corte' => $cortePasado->day,
+            'hora_corte' => $cortePasado->format('H:i:s'),
+            'dia_limite_pago' => $limiteFuturo->day,
             'hora_limite_pago' => '23:59:00',
             'monto_base_puntos' => 1200.00,
             'puntos_por_monto_base' => 3,
@@ -807,7 +823,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
 
         // 3. Simular que llega la hora del corte
         $config->update([
-            'hora_corte' => now()->subMinute()->format('H:i:s'),
+            'hora_corte' => now()->subMinutes(10)->format('H:i:s'),
         ]);
 
         $service = app(CorteCobranzaService::class);

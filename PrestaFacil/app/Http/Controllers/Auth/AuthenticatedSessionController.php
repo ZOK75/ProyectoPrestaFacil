@@ -39,23 +39,24 @@ class AuthenticatedSessionController extends Controller
     public function store(LoginRequest $request): RedirectResponse
     {
 
-        $client = Http::asForm();
+        if (! App::environment('testing')) {
+            $client = Http::asForm();
 
-        if(App::environment('local')) {
-            $client->withoutVerifying();
-        }
+            if (App::environment('local')) {
+                $client->withoutVerifying();
+            }
 
-        $response = $client->post('https://www.google.com/recaptcha/api/siteverify', [
-            'secret'   => config('services.recaptcha.secret'),
-            'response' => $request->input('g-recaptcha-response'),
-            'remoteip' => $request->ip(),
-        ]);
+            $response = $client->post('https://www.google.com/recaptcha/api/siteverify', [
+                'secret'   => config('services.recaptcha.secret'),
+                'response' => $request->input('g-recaptcha-response'),
+                'remoteip' => $request->ip(),
+            ]);
 
-
-        if (! App::environment('testing') && ! $response->json('success')) {
-            return back()->withErrors([
-                'g-recaptcha-response' => 'Por favor, confirma que no eres un robot completando el reCAPTCHA.',
-            ])->withInput();
+            if (! $response->json('success')) {
+                return back()->withErrors([
+                    'g-recaptcha-response' => 'Por favor, confirma que no eres un robot completando el reCAPTCHA.',
+                ])->withInput();
+            }
         }
 
 

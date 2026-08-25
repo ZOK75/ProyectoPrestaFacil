@@ -264,8 +264,8 @@ class User extends Authenticatable
     }
 
     /**
-     * Calcula el monto de crédito de vales en estado 'activo' que tiene ocupados el distribuidor.
-     * El límite de crédito no se ve afectado hasta que el vale es entregado y activado por el cajero.
+     * Calcula el monto de crédito de vales en estado 'activo' o 'pendiente' que tiene ocupados el distribuidor.
+     * Al asignar un vale, se descuenta de inmediato del crédito disponible de la distribuidora.
      */
     public function creditoUtilizado(): float
     {
@@ -274,7 +274,7 @@ class User extends Authenticatable
         }
 
         return floatval(Prestamo::where('created_by_user_id', $this->id)
-            ->where('estado', 'activo')
+            ->whereIn('estado', ['activo', 'pendiente'])
             ->sum('monto_prestamo'));
     }
 
@@ -289,12 +289,16 @@ class User extends Authenticatable
 
     /**
      * Calcula el valor máximo que puede tener UN SOLO VALE otorgado por este distribuidor:
-     * Regla: (50% del Límite de Crédito Total) + $500.00
+     * Regla configurable: (Porcentaje configurado del Límite de Crédito) + Monto adicional configurado
      */
     public function montoMaximoPermitidoPorVale(): float
     {
         $limite = floatval($this->limite_credito ?? 20000.00);
-        return ($limite * 0.50) + 500.00;
+        $config = Configuracion::actual();
+        $porcentaje = $config->obtenerPorcentajeRegla() / 100.0;
+        $tolerancia = $config->obtenerTolerancia();
+
+        return ($limite * $porcentaje) + $tolerancia;
     }
 
     /**

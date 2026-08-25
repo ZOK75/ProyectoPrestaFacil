@@ -340,7 +340,7 @@ class CoordinadorRoleFlowTest extends TestCase
             'curp' => 'SORV920515MDFTRN02',
             'nombres' => 'Verónica',
             'telefono' => '8119876543',
-            'estado' => 'en espera',
+            'estado' => 'en espera de verificacion',
         ]);
     }
 

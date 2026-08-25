@@ -131,12 +131,10 @@ class GerentesRestrictionsTest extends TestCase
         $responseGG->assertDontSee('Categoría Inicial Automática:');
         $responseGG->assertDontSee('Categoría Cobre');
 
-        // 2. Gerente de Sucursal visita /usuarios/create: no debe ver el rol Distribuidor ni el mensaje de categoría
+        // 2. Gerente de Sucursal visita /usuarios/create: tiene denegado el acceso y es redirigido
         $responseGS = $this->actingAs($gerenteSucursal)->get(route('usuarios.create'));
-        $responseGS->assertStatus(200);
-        $responseGS->assertDontSee('<option value="' . $rolDistribuidor->id . '">Distribuidor</option>', false);
-        $responseGS->assertDontSee('Categoría Inicial Automática:');
-        $responseGS->assertDontSee('Categoría Cobre');
+        $responseGS->assertRedirect(route('usuarios.index'));
+        $responseGS->assertSessionHas('error');
 
         // 3. Intento de POST con rol Distribuidor por Gerente General -> Debe ser rechazado
         $responsePostGG = $this->actingAs($gerenteGeneral)->post(route('usuarios.store'), [
@@ -149,7 +147,7 @@ class GerentesRestrictionsTest extends TestCase
         ]);
         $responsePostGG->assertSessionHasErrors('rol_id');
 
-        // 4. Intento de POST con rol Distribuidor por Gerente de Sucursal -> Debe ser rechazado
+        // 4. Intento de POST con rol Distribuidor por Gerente de Sucursal -> Acceso denegado
         $responsePostGS = $this->actingAs($gerenteSucursal)->post(route('usuarios.store'), [
             'name' => 'Intento Distribuidora GS',
             'email' => 'intento.dist.gs@prestafacil.com',
@@ -158,7 +156,8 @@ class GerentesRestrictionsTest extends TestCase
             'rol_id' => $rolDistribuidor->id,
             'sucursal_id' => $sucursal->id,
         ]);
-        $responsePostGS->assertSessionHasErrors('rol_id');
+        $responsePostGS->assertRedirect(route('usuarios.index'));
+        $responsePostGS->assertSessionHas('error');
 
         // 5. Creación de un rol permitido (ej. Cajero) debe funcionar normalmente
         $responseValid = $this->actingAs($gerenteGeneral)->post(route('usuarios.store'), [

@@ -72,18 +72,6 @@
             </a>
         </div>
 
-        @if(config('app.debug') && isset($exception))
-            <details class="text-left pt-2 border-t border-slate-800/80">
-                <summary class="text-[11px] font-mono text-amber-400 cursor-pointer hover:underline">
-                    Ver detalle técnico del error (Debug)
-                </summary>
-                <div class="mt-2 p-3 rounded-xl bg-black/60 border border-slate-800 text-[11px] font-mono text-rose-300 break-all space-y-1">
-                    <p><strong>Clase:</strong> {{ get_class($exception) }}</p>
-                    <p><strong>Mensaje:</strong> {{ $exception->getMessage() }}</p>
-                </div>
-            </details>
-        @endif
-
     </div>
 </body>
 </html>

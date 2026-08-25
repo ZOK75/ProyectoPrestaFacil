@@ -38,20 +38,30 @@
             <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white">
                 ¡Ops! Algo salió mal
             </h1>
+            
+            @php
+                $mensajeSeguro = 'Ha ocurrido un problema inesperado de nuestro lado al procesar tu solicitud. Nuestro equipo técnico ha sido notificado.';
+                if (isset($exception) && $exception instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface && !empty(trim($exception->getMessage()))) {
+                    $mensajeSeguro = $exception->getMessage();
+                } elseif (isset($message) && !empty(trim($message))) {
+                    $mensajeSeguro = $message;
+                }
+            @endphp
+
             <p class="text-sm text-slate-300 leading-relaxed max-w-md mx-auto">
-                Ha ocurrido un problema inesperado de nuestro lado al procesar tu solicitud. Nuestro equipo técnico ha sido notificado.
+                {{ $mensajeSeguro }}
             </p>
         </div>
 
         <!-- Tarjeta de Causas y Recomendaciones -->
         <div class="bg-slate-950/70 border border-slate-800/90 rounded-2xl p-4 text-left space-y-2 text-xs text-slate-400">
             <span class="font-bold text-slate-200 uppercase tracking-wider block text-[11px]">
-                Posibles causas:
+                Posibles causas / Recomendaciones:
             </span>
             <ul class="space-y-1.5 list-disc list-inside text-slate-400">
                 <li>El sistema está experimentando una carga alta de solicitudes.</li>
-                <li>Se ejecutó una acción inesperada que causó un fallo en el código.</li>
-                <li>Hay un problema de configuración interno en el servidor.</li>
+                <li>Se ejecutó una acción inesperada que causó un fallo interno en el servidor.</li>
+                <li>Por favor, recarga la página o inténtalo de nuevo más tarde.</li>
             </ul>
         </div>
 

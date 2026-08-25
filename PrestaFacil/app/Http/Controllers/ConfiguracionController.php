@@ -93,6 +93,8 @@ class ConfiguracionController extends Controller
                 'comision_cobre' => $validated['comision_cobre'],
                 'comision_plata' => $validated['comision_plata'],
                 'comision_oro' => $validated['comision_oro'],
+                'porcentaje_regla_prevale' => $validated['porcentaje_regla_prevale'],
+                'tolerancia_regla_prevale' => $validated['tolerancia_regla_prevale'],
                 'monto_base_puntos' => $validated['monto_base_puntos'],
                 'puntos_por_monto_base' => $validated['puntos_por_monto_base'],
                 'valor_punto' => $validated['valor_punto'],

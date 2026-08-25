@@ -379,10 +379,12 @@ class CobranzaValesIndividualesTest extends TestCase
         ]);
 
         // Gerente de Sucursal decide marcar como morosa
-        $response = $this->actingAs($gerenteSucursal)->post(route('gerente.distribuidores.decidir-morosidad', $this->distribuidor), [
-            'accion' => 'marcar',
-            'motivo' => 'Acumuló 3 retrasos de corte sin abono',
-        ]);
+        $response = $this->actingAs($gerenteSucursal)
+            ->from(route('gerente-sucursal.dashboard'))
+            ->post(route('gerente.distribuidores.decidir-morosidad', $this->distribuidor), [
+                'accion' => 'marcar',
+                'motivo' => 'Acumuló 3 retrasos de corte sin abono',
+            ]);
 
         $response->assertSessionHas('warning');
 

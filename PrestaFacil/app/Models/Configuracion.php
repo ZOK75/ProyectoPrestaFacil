@@ -221,19 +221,19 @@ class Configuracion extends Model
     }
 
     /**
-     * Devuelve el porcentaje de la regla para prevales
+     * Devuelve el porcentaje de la regla para prevales / tope máximo por vale
      */
     public function obtenerPorcentajeRegla(): float
     {
-        return floatval($this->porcentaje_regla_prevale ?? 15.0);
+        return floatval($this->porcentaje_regla_prevale ?? 50.00);
     }
 
     /**
-     * Devuelve la tolerancia permitida en monto
+     * Devuelve la tolerancia / monto adicional permitido en monto
      */
     public function obtenerTolerancia(): float
     {
-        return floatval($this->tolerancia_regla_prevale ?? 500.0);
+        return floatval($this->tolerancia_regla_prevale ?? 500.00);
     }
  
     /**

@@ -267,10 +267,78 @@
                 </div>
             </div>
 
-            <!-- Seccion 3: Parámetros del Sistema de Puntos -->
+            <!-- Seccion 3: Reglas de Crédito y Tope Máximo por Vale -->
+            <div class="space-y-4 pt-2">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h3 class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider">
+                        3. Reglas de Crédito y Tope Máximo Permitido por Vale
+                    </h3>
+                    <span class="text-[11px] text-slate-400 font-medium">
+                        Fórmula: (Límite de Crédito &times; Porcentaje) + Margen Adicional Fijo
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Porcentaje de Crédito por Vale -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-indigo-500/20 space-y-2">
+                        <label class="block text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                            <span>Porcentaje sobre Límite (%) <span class="text-rose-400">*</span></span>
+                            <span class="text-[10px] font-normal text-slate-400 font-mono">Por defecto: 50%</span>
+                        </label>
+                        <div class="relative">
+                            <input type="number" step="0.01" min="1" max="100" name="porcentaje_regla_prevale"
+                                value="{{ old('porcentaje_regla_prevale', $configuracion->porcentaje_regla_prevale ?? 50.00) }}" required
+                                {{ !$puedeEditar ? 'disabled' : '' }}
+                                class="w-full pr-8 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-bold focus:outline-none focus:border-indigo-500 disabled:opacity-50">
+                            <span class="absolute right-3 top-2 text-slate-400 text-sm font-bold">%</span>
+                        </div>
+                        @error('porcentaje_regla_prevale')
+                            <p class="text-[10px] text-rose-400 mt-1">{{ $message }}</p>
+                        @enderror
+                        <span class="text-[10px] text-slate-500 block">Proporción máxima del crédito total que puede concentrarse en un solo vale.</span>
+                    </div>
+
+                    <!-- Margen / Monto Adicional Fijo (+/- 500) -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-indigo-500/20 space-y-2">
+                        <label class="block text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                            <span>Monto Adicional Fijo ($) <span class="text-rose-400">*</span></span>
+                            <span class="text-[10px] font-normal text-slate-400 font-mono">Por defecto: $500.00</span>
+                        </label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-2 text-slate-500 text-sm">$</span>
+                            <input type="number" step="0.01" min="0" name="tolerancia_regla_prevale"
+                                value="{{ old('tolerancia_regla_prevale', $configuracion->tolerancia_regla_prevale ?? 500.00) }}" required
+                                {{ !$puedeEditar ? 'disabled' : '' }}
+                                class="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-bold focus:outline-none focus:border-indigo-500 disabled:opacity-50">
+                        </div>
+                        @error('tolerancia_regla_prevale')
+                            <p class="text-[10px] text-rose-400 mt-1">{{ $message }}</p>
+                        @enderror
+                        <span class="text-[10px] text-slate-500 block">Monto en pesos sumado como margen/tolerancia fija sobre el porcentaje.</span>
+                    </div>
+                </div>
+
+                <!-- Tarjeta Interactiva de Previsualización y Ejemplo -->
+                <div class="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-xs text-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <strong class="text-indigo-300 font-bold block">💡 Simulación para Distribuidora (Línea de $20,000.00):</strong>
+                        <span id="js-ejemplo-formula-tope" class="text-[11px] text-slate-300 mt-0.5 block">
+                            ($20,000 &times; {{ number_format($configuracion->porcentaje_regla_prevale ?? 50, 0) }}%) + ${{ number_format($configuracion->tolerancia_regla_prevale ?? 500, 2) }}
+                        </span>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <span class="text-[10px] text-slate-400 block uppercase font-semibold">Tope Máximo Resultante</span>
+                        <span id="js-ejemplo-resultado-tope" class="text-base font-black text-emerald-400 font-mono">
+                            ${{ number_format(((20000 * (($configuracion->porcentaje_regla_prevale ?? 50) / 100)) + ($configuracion->tolerancia_regla_prevale ?? 500)), 2) }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seccion 4: Parámetros del Sistema de Puntos -->
             <div class="space-y-4 pt-2">
                 <h3 class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider border-b border-slate-800 pb-2">
-                    3. Parámetros del Sistema de Puntos
+                    4. Parámetros del Sistema de Puntos
                 </h3>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <!-- Monto Base en Productos -->
@@ -557,6 +625,28 @@ document.addEventListener('DOMContentLoaded', function () {
         if (tagResumenLimite15d) tagResumenLimite15d.textContent = formatFechaHora(fechaSiguienteLimite15d);
     }
 
+    // 5. Cálculo Dinámico de Tope por Vale
+    const inputPorcentajeVale = document.querySelector('input[name="porcentaje_regla_prevale"]');
+    const inputToleranciaVale = document.querySelector('input[name="tolerancia_regla_prevale"]');
+    const elFormulaTope = document.getElementById('js-ejemplo-formula-tope');
+    const elResultadoTope = document.getElementById('js-ejemplo-resultado-tope');
+
+    function actualizarTopeValeEnTiempoReal() {
+        if (!inputPorcentajeVale || !inputToleranciaVale) return;
+
+        const pct = parseFloat(inputPorcentajeVale.value) || 0;
+        const tol = parseFloat(inputToleranciaVale.value) || 0;
+        const lineaBase = 20000;
+        const total = (lineaBase * (pct / 100)) + tol;
+
+        if (elFormulaTope) {
+            elFormulaTope.innerHTML = `($20,000 &times; ${pct.toFixed(0)}%) + $${tol.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} = <strong class="text-emerald-400 font-bold font-mono text-xs">$${total.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>`;
+        }
+        if (elResultadoTope) {
+            elResultadoTope.textContent = `$${total.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+    }
+
     [inputDiaCorte, inputHoraCorte, inputDiaLimite, inputHoraLimite].forEach(input => {
         if (input) {
             input.addEventListener('input', actualizarCalculosEnTiempoReal);
@@ -564,7 +654,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    [inputPorcentajeVale, inputToleranciaVale].forEach(input => {
+        if (input) {
+            input.addEventListener('input', actualizarTopeValeEnTiempoReal);
+            input.addEventListener('change', actualizarTopeValeEnTiempoReal);
+        }
+    });
+
     actualizarCalculosEnTiempoReal();
+    actualizarTopeValeEnTiempoReal();
 });
 </script>
 @endsection

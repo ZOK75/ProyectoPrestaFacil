@@ -71,8 +71,11 @@ class DistribuidorController extends Controller
             ->where('estado', 'pendiente')
             ->count();
 
+        $configuracion = \App\Models\Configuracion::actual();
+
         return view('distribuidor.dashboard', compact(
             'distribuidor',
+            'configuracion',
             'limiteCredito',
             'creditoUtilizado',
             'creditoDisponible',

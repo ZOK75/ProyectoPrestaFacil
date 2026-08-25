@@ -289,12 +289,16 @@ class User extends Authenticatable
 
     /**
      * Calcula el valor máximo que puede tener UN SOLO VALE otorgado por este distribuidor:
-     * Regla: (50% del Límite de Crédito Total) + $500.00
+     * Regla configurable: (Porcentaje configurado del Límite de Crédito) + Monto adicional configurado
      */
     public function montoMaximoPermitidoPorVale(): float
     {
         $limite = floatval($this->limite_credito ?? 20000.00);
-        return ($limite * 0.50) + 500.00;
+        $config = Configuracion::actual();
+        $porcentaje = $config->obtenerPorcentajeRegla() / 100.0;
+        $tolerancia = $config->obtenerTolerancia();
+
+        return ($limite * $porcentaje) + $tolerancia;
     }
 
     /**

@@ -111,7 +111,7 @@
             <div class="text-base font-black text-slate-100 mt-1">
                 ${{ number_format($montoMaximoVale, 2) }}
             </div>
-            <span class="text-[10px] text-indigo-400 mt-0.5 block">50% Límite + $500</span>
+            <span class="text-[10px] text-indigo-400 mt-0.5 block">{{ number_format($configuracion->obtenerPorcentajeRegla(), 0) }}% Límite + ${{ number_format($configuracion->obtenerTolerancia(), 0) }}</span>
         </div>
 
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 shadow-md">

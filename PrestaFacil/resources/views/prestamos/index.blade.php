@@ -93,7 +93,7 @@
                     </div>
 
                     <div class="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-800/80">
-                        <span class="text-indigo-300 font-medium">Tope por vale (50% + $500):</span>
+                        <span class="text-indigo-300 font-medium">Tope por vale ({{ number_format(\App\Models\Configuracion::actual()->obtenerPorcentajeRegla(), 0) }}% + ${{ number_format(\App\Models\Configuracion::actual()->obtenerTolerancia(), 0) }}):</span>
                         <span class="font-extrabold text-indigo-300">${{ number_format(Auth::user()->montoMaximoPermitidoPorVale(), 2) }}</span>
                     </div>
                 </div>

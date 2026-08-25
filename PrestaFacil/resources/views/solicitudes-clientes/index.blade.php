@@ -115,7 +115,7 @@
 
     <!-- Tabla Principal de Solicitudes -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
-        @if($solicitudes->isEmpty())
+        @if($items->isEmpty())
             <div class="p-12 text-center">
                 <div class="w-12 h-12 rounded-2xl bg-slate-800 text-slate-500 flex items-center justify-center mx-auto mb-3">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -123,77 +123,57 @@
                     </svg>
                 </div>
                 <h3 class="text-base font-bold text-white">No se encontraron solicitudes</h3>
-                <p class="text-xs text-slate-500 mt-1">No hay solicitudes pendientes o que coincidan con los filtros seleccionados.</p>
+                <p class="text-xs text-slate-500 mt-1">No hay solicitudes registradas o que coincidan con los filtros seleccionados.</p>
             </div>
         @else
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm text-slate-300">
                     <thead class="bg-slate-950/70 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-800">
                         <tr>
-                            <th class="px-6 py-4">Folio / Fecha</th>
-                            <th class="px-6 py-4">Cliente</th>
-                            <th class="px-6 py-4">Distribuidor / Sucursal</th>
-                            <th class="px-6 py-4">Tipo</th>
+                            <th class="px-6 py-4">Categoría / Fecha</th>
+                            <th class="px-6 py-4">Usuario Emisor</th>
+                            <th class="px-6 py-4">Usuario Destino / Receptor</th>
+                            <th class="px-6 py-4">Detalle / Comentario</th>
                             <th class="px-6 py-4">Estado</th>
-                            <th class="px-6 py-4 text-right">Acciones</th>
+                            <th class="px-6 py-4">Sucursal</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800/60">
-                        @foreach($solicitudes as $sol)
-                            <tr class="hover:bg-slate-800/40 transition {{ $sol->esPendiente() ? 'bg-indigo-950/10' : '' }}">
+                        @foreach($items as $item)
+                            @php
+                                $esPend = str_contains(strtolower($item['estado']), 'pendiente') || $item['estado'] === 'en espera';
+                                $esAprob = in_array(strtolower($item['estado']), ['aprobada', 'aprobado', 'conciliado', 'completada']);
+                            @endphp
+                            <tr class="hover:bg-slate-800/40 transition {{ $esPend ? 'bg-indigo-950/10' : '' }}">
                                 <td class="px-6 py-4">
-                                    <span class="font-mono text-xs text-indigo-400 font-bold">#SOL-{{ str_pad($sol->id, 5, '0', STR_PAD_LEFT) }}</span>
-                                    <span class="block text-xs text-slate-500">{{ $sol->created_at->format('d/m/Y H:i') }}</span>
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                        {{ $item['tipo_categoria'] }}
+                                    </span>
+                                    <span class="block text-xs text-slate-400 font-mono mt-1">{{ $item['fecha']->format('d/m/Y H:i:s') }}</span>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <div class="font-semibold text-white">{{ $sol->cliente?->nombre }}</div>
-                                    <div class="text-xs text-slate-500 font-mono">CURP: {{ $sol->cliente?->curp }}</div>
+                                    <div class="font-bold text-white">{{ $item['usuario_emisor'] }}</div>
+                                    <div class="text-[11px] text-slate-400 font-medium">{{ $item['rol_emisor'] }}</div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <div class="text-xs font-medium text-slate-200">{{ $sol->distribuidor?->name }}</div>
-                                    <div class="text-xs text-indigo-400">{{ $sol->sucursal?->nombre ?? 'Sin Sucursal' }}</div>
+                                    <div class="font-bold text-slate-200">{{ $item['usuario_receptor'] }}</div>
                                 </td>
-                                <td class="px-6 py-4">
-                                    @if($sol->esActualizacion())
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                                            Actualización
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
-                                            Baja / Desactivación
-                                        </span>
-                                    @endif
+                                <td class="px-6 py-4 max-w-xs">
+                                    <p class="text-xs text-slate-300 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 leading-relaxed italic">
+                                        "{{ $item['comentario'] }}"
+                                    </p>
                                 </td>
-                                <td class="px-6 py-4">
-                                    @if($sol->esPendiente())
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if($esPend)
                                         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span> Pendiente
+                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span> {{ ucfirst(str_replace('_', ' ', $item['estado'])) }}
                                         </span>
-                                    @elseif($sol->estado === 'aprobada')
+                                    @elseif($esAprob)
                                         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Aprobada
+                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> {{ ucfirst(str_replace('_', ' ', $item['estado'])) }}
                                         </span>
-                                        <div class="text-[11px] text-slate-500 mt-0.5">Por: {{ $sol->aprobadoPor?->name }}</div>
                                     @else
                                         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Rechazada
-                                        </span>
-                                        <div class="text-[11px] text-slate-500 mt-0.5">Por: {{ $sol->rechazadoPor?->name }}</div>
-                                    @endif
-                                </td>
-                                <td class="px-6 py-4 text-right">
-                                    <div class="flex items-center justify-end gap-2">
-                                        <a href="{{ route('solicitudes-clientes.show', $sol) }}" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-300 border border-slate-700 transition">
-                                            Comparar / Revisar
-                                        </a>
-
-                                        @if($sol->esPendiente() && !$operador->esAdministrador())
-                                            <!-- Botón Rápido Aprobar -->
-                                            <form novalidate method="POST" action="{{ route('solicitudes-clientes.aprobar', $sol) }}" onsubmit="return confirm('¿Aprobar inmediatamente esta solicitud para {{ $sol->cliente?->nombre }}?');">
-                                                @csrf
-                                                <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition" title="Aprobar Solicitud">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                                     Aceptar
                                                 </button>

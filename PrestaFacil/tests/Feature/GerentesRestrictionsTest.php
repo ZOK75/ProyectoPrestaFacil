@@ -131,10 +131,9 @@ class GerentesRestrictionsTest extends TestCase
         $responseGG->assertDontSee('Categoría Inicial Automática:');
         $responseGG->assertDontSee('Categoría Cobre');
 
-        // 2. Gerente de Sucursal visita /usuarios/create: tiene denegado el acceso y es redirigido
+        // 2. Gerente de Sucursal visita /usuarios/create: tiene acceso para registrar personal de su sucursal
         $responseGS = $this->actingAs($gerenteSucursal)->get(route('usuarios.create'));
-        $responseGS->assertRedirect(route('usuarios.index'));
-        $responseGS->assertSessionHas('error');
+        $responseGS->assertStatus(200);
 
         // 3. Intento de POST con rol Distribuidor por Gerente General -> Debe ser rechazado
         $responsePostGG = $this->actingAs($gerenteGeneral)->post(route('usuarios.store'), [
@@ -147,28 +146,29 @@ class GerentesRestrictionsTest extends TestCase
         ]);
         $responsePostGG->assertSessionHasErrors('rol_id');
 
-        // 4. Intento de POST con rol Distribuidor por Gerente de Sucursal -> Acceso denegado
+        $uniqueEmailGS = 'coord.gs.' . rand(10000, 99999) . '@prestafacil.com';
         $responsePostGS = $this->actingAs($gerenteSucursal)->post(route('usuarios.store'), [
-            'name' => 'Intento Distribuidora GS',
-            'email' => 'intento.dist.gs@prestafacil.com',
+            'name' => 'Coordinador GS Nuevo',
+            'email' => $uniqueEmailGS,
             'password' => 'PasswordSeguro123#',
             'password_confirmation' => 'PasswordSeguro123#',
-            'rol_id' => $rolDistribuidor->id,
+            'rol_id' => $rolCajero->id,
             'sucursal_id' => $sucursal->id,
         ]);
         $responsePostGS->assertRedirect(route('usuarios.index'));
-        $responsePostGS->assertSessionHas('error');
+        $this->assertDatabaseHas('users', ['email' => $uniqueEmailGS]);
 
-        // 5. Creación de un rol permitido (ej. Cajero) debe funcionar normalmente
+        // 5. Creación de un rol permitido (ej. Cajero) por Gerente General debe funcionar normalmente
+        $uniqueEmailGG = 'cajero.gg.' . rand(10000, 99999) . '@prestafacil.com';
         $responseValid = $this->actingAs($gerenteGeneral)->post(route('usuarios.store'), [
-            'name' => 'Cajero Valido',
-            'email' => 'cajero.valido@prestafacil.com',
+            'name' => 'Cajero Valido GG',
+            'email' => $uniqueEmailGG,
             'password' => 'PasswordSeguro123#',
             'password_confirmation' => 'PasswordSeguro123#',
             'rol_id' => $rolCajero->id,
             'sucursal_id' => $sucursal->id,
         ]);
         $responseValid->assertRedirect(route('usuarios.index'));
-        $this->assertDatabaseHas('users', ['email' => 'cajero.valido@prestafacil.com']);
+        $this->assertDatabaseHas('users', ['email' => $uniqueEmailGG]);
     }
 }

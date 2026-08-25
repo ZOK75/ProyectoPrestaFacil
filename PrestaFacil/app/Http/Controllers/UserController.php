@@ -114,10 +114,6 @@ class UserController extends Controller
             abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar usuarios.');
         }
 
-        if ($operador->esGerenteSucursal()) {
-            abort(403, 'Acceso denegado: El rol de Gerente de Sucursal no tiene permisos para registrar usuarios nuevos.');
-        }
-
         if ($operador->esDistribuidor()) {
             abort(403, 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
         }
@@ -139,23 +135,51 @@ class UserController extends Controller
             abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar usuarios.');
         }
 
-        if ($operador->esGerenteSucursal()) {
-            abort(403, 'Acceso denegado: El rol de Gerente de Sucursal no tiene permisos para registrar usuarios nuevos.');
-        }
-
         if ($operador->esDistribuidor()) {
             abort(403, 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
         }
 
         $data = $request->validated();
 
+        // Si el operador es Gerente de Sucursal, forzar que la sucursal del nuevo usuario sea su sucursal
+        if ($operador->esGerenteSucursal()) {
+            $data['sucursal_id'] = $operador->sucursal_id;
+        }
+
         // Validación de permisos de rol
         $rolesPermitidosIds = $operador->rolesPermitidos()->pluck('id')->toArray();
         if (!in_array($data['rol_id'], $rolesPermitidosIds)) {
-            abort(403, 'Acceso denegado: Tu rol de Distribuidor solo puede visualizar usuarios activos.');
+            return back()->withErrors(['rol_id' => 'Acceso denegado: No tienes permisos para asignar este rol.'])->withInput();
         }
 
-        return view('usuarios.show', compact('usuario', 'operador'));
+        $rolSeleccionado = Rol::find($data['rol_id']);
+        $nombreRol = strtolower($rolSeleccionado?->nombre ?? '');
+
+        // Generar CURP ficticio único si no aplica
+        $data['curp'] = 'CURP' . strtoupper(uniqid());
+        $data['password'] = Hash::make($data['password']);
+        $data['activo'] = true;
+
+        if (in_array($nombreRol, ['distribuidor', 'distribuidora'])) {
+            $data['categoria_distribuidor'] = 'cobre';
+        }
+
+        $usuario = User::create($data);
+
+        AuditService::registrar(
+            'REGISTRO_USUARIO',
+            "Usuario '{$usuario->name}' ({$rolSeleccionado?->nombre}) creado por " . ($operador->name ?? 'Usuario'),
+            [
+                'entidad_tipo' => 'users',
+                'entidad_id' => $usuario->id,
+                'user_id' => Auth::id() ?? $operador->id,
+                'user_rol' => $operador->rol?->nombre,
+                'sucursal_id' => $usuario->sucursal_id,
+            ]
+        );
+
+        return redirect()->route('usuarios.index')
+            ->with('success', "Usuario '{$usuario->name}' registrado exitosamente con rol '{$rolSeleccionado?->nombre}'.");
     }
 
     /**

@@ -253,10 +253,21 @@ class AuthenticatedSessionController extends Controller
             return redirect()->route('auth.email-2fa.challenge');
         }
 
-        // Demás roles (Distribuidor, Cajero, Verificador) ingresan directamente a su dashboard
         if (!Auth::check()) {
             Auth::login($user);
             $request->session()->regenerate();
+        }
+
+        if ($user->esGerenteGeneral() || $user->esAdministrador()) {
+            return redirect()->route('gerente-general.dashboard');
+        }
+
+        if ($user->esGerenteSucursal()) {
+            return redirect()->route('gerente-sucursal.dashboard');
+        }
+
+        if ($user->esCoordinador()) {
+            return redirect()->route('coordinador.dashboard');
         }
 
         if ($user->esDistribuidor()) {

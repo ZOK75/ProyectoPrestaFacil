@@ -48,6 +48,15 @@ class GerenteSucursalController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Solicitudes pendientes de cambio de categoría para distribuidores de su sucursal
+        $solicitudesCategoriaPendientes = \App\Models\SolicitudCategoria::where('estado', 'pendiente')
+            ->whereHas('distribuidor', function ($q) use ($sucursalId) {
+                $q->where('sucursal_id', $sucursalId);
+            })
+            ->with(['distribuidor', 'coordinador'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         // Solicitudes en espera de la decisión final del gerente (dictaminadas por verificador)
         $solicitudesEnEspera = \App\Models\SolicitudDistribuidor::where('sucursal_id', $sucursalId)
             ->where('estado', 'en espera')
@@ -116,6 +125,7 @@ class GerenteSucursalController extends Controller
             'statsEquipo',
             'distribuidores',
             'solicitudesCreditoPendientes',
+            'solicitudesCategoriaPendientes',
             'solicitudesEnEspera',
             'solicitudesAprobadasSinCuenta',
             'transferenciasPendientesGerente',

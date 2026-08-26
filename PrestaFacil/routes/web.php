@@ -187,6 +187,7 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('solicitudes', \App\Http\Controllers\CoordinadorController::class);
         Route::post('solicitudes/{solicitud}/enviar-verificacion', [\App\Http\Controllers\CoordinadorController::class, 'enviarAVerificacion'])->name('solicitudes.enviar-verificacion');
         Route::post('distribuidores/{distribuidor}/solicitar-credito', [\App\Http\Controllers\CoordinadorController::class, 'solicitarCredito'])->name('distribuidores.solicitar-credito');
+        Route::post('distribuidores/{distribuidor}/solicitar-categoria', [\App\Http\Controllers\CoordinadorController::class, 'solicitarCategoria'])->name('distribuidores.solicitar-categoria');
         Route::post('distribuidores/{distribuidor}/solicitar-transferencia', [\App\Http\Controllers\CoordinadorController::class, 'solicitarTransferencia'])->name('distribuidores.solicitar-transferencia');
         Route::get('transferencias/{transferencia}/revisar', [\App\Http\Controllers\CoordinadorController::class, 'revisarTransferencia'])->name('transferencias.revisar');
         Route::post('transferencias/{transferencia}/decidir', [\App\Http\Controllers\CoordinadorController::class, 'decidirTransferencia'])->name('transferencias.decidir');
@@ -200,9 +201,10 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/solicitudes/{solicitud}/procesar', [\App\Http\Controllers\VerificadorController::class, 'procesarSolicitud'])->name('solicitudes.procesar');
     });
 
-    // 6. Procesamiento de incremento de crédito y creación de cuenta de distribuidor
+    // 6. Procesamiento de incremento de crédito, cambio de categoría y creación de cuenta de distribuidor
     Route::middleware(['role:coordinador,gerente_sucursal,gerente_general,administrador'])->group(function () {
         Route::post('solicitudes-credito/{solicitud}/procesar', [\App\Http\Controllers\SolicitudCreditoController::class, 'procesar'])->middleware('require.vpn')->name('solicitudes-credito.procesar');
+        Route::post('solicitudes-categoria/{solicitud}/procesar', [\App\Http\Controllers\SolicitudCategoriaController::class, 'procesar'])->middleware('require.vpn')->name('solicitudes-categoria.procesar');
         Route::post('solicitudes-distribuidor/{solicitud}/crear-cuenta', [\App\Http\Controllers\SolicitudDistribuidorCuentaController::class, 'crearCuenta'])->middleware('require.vpn')->name('solicitudes-distribuidor.crear-cuenta');
     });
 

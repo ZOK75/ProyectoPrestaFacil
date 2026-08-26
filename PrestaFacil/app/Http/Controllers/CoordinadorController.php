@@ -33,6 +33,12 @@ class CoordinadorController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Obtener historial de solicitudes de cambio de categoría
+        $solicitudesCategoria = \App\Models\SolicitudCategoria::where('coordinador_id', $user->id)
+            ->with(['distribuidor', 'gerente'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         // Solicitudes de transferencia de distribuidora emitidas
         $transferenciasEmitidas = SolicitudTransferencia::where('coordinador_emisor_id', $user->id)
             ->with(['distribuidor', 'coordinadorReceptor', 'sucursalDestino', 'gerente'])
@@ -92,6 +98,7 @@ class CoordinadorController extends Controller
         return view('coordinador.dashboard', compact(
             'user',
             'solicitudesCredito',
+            'solicitudesCategoria',
             'transferenciasEmitidas',
             'transferenciasRecibidas',
             'coordinadoresDestino',
@@ -349,6 +356,15 @@ class CoordinadorController extends Controller
             'motivo.max' => 'El motivo no puede exceder los :max caracteres.',
         ]);
 
+        // Verificar si ya existe una solicitud pendiente
+        $existente = SolicitudCredito::where('distribuidor_id', $distribuidor->id)
+            ->where('estado', 'pendiente')
+            ->first();
+
+        if ($existente) {
+            return back()->with('error', 'Ya existe una solicitud de aumento de crédito en trámite para esta distribuidora.');
+        }
+
         $solicitud = SolicitudCredito::create([
             'distribuidor_id' => $distribuidor->id,
             'coordinador_id' => $coordinador->id,
@@ -359,24 +375,107 @@ class CoordinadorController extends Controller
         ]);
 
         $gerentes = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente General', 'Administrador']))
-            ->where(function($q) use ($coordinador) {
-                $q->where('sucursal_id', $coordinador->sucursal_id)
+            ->where(function($q) use ($coordinador, $distribuidor) {
+                $sucursalId = $distribuidor->sucursal_id ?? $coordinador->sucursal_id;
+                $q->where('sucursal_id', $sucursalId)
                   ->orWhereHas('rol', fn($r) => $r->whereIn('nombre', ['Gerente General', 'Administrador']));
             })
             ->where('activo', true)
             ->get();
 
         foreach ($gerentes as $gerente) {
+            $url = $gerente->esGerenteGeneral() ? route('gerente-general.dashboard') : route('gerente-sucursal.dashboard');
             \App\Models\NotificacionCajero::enviar(
                 $gerente->id,
                 'solicitud_credito',
                 'Nueva Solicitud de Aumento de Crédito',
-                "El coordinador {$coordinador->name} solicita un aumento para {$distribuidor->name} de $" . number_format($distribuidor->limite_credito, 2) . " a $" . number_format($request->limite_nuevo, 2) . "."
+                "El coordinador {$coordinador->name} solicita un aumento para {$distribuidor->name} de $" . number_format($distribuidor->limite_credito, 2) . " a $" . number_format($request->limite_nuevo, 2) . ".",
+                [
+                    'solicitud_id' => $solicitud->id,
+                    'url' => $url,
+                    'entidad_tipo' => 'solicitud_credito',
+                    'entidad_id' => $solicitud->id,
+                ]
             );
         }
 
         return redirect()->route('coordinador.dashboard')
-            ->with('success', 'Solicitud de incremento de crédito enviada al Gerente de Sucursal para su autorización.');
+            ->with('success', 'Solicitud de incremento de crédito enviada a la Gerencia para su autorización.');
+    }
+
+    /**
+     * Registrar solicitud de cambio de categoría para un distribuidor
+     */
+    public function solicitarCategoria(Request $request, User $distribuidor)
+    {
+        $coordinador = Auth::user();
+
+        // Validaciones de seguridad
+        if (!$distribuidor->esDistribuidor() || ($distribuidor->coordinador_id && $distribuidor->coordinador_id !== $coordinador->id)) {
+            abort(403, 'Acceso denegado: El distribuidor no pertenece a tu coordinación.');
+        }
+
+        $request->validate([
+            'categoria_nueva' => 'required|in:cobre,plata,oro',
+            'motivo' => 'required|string|min:5|max:500',
+        ], [
+            'categoria_nueva.required' => 'Debes seleccionar la nueva categoría.',
+            'categoria_nueva.in' => 'La categoría seleccionada no es válida.',
+            'motivo.required' => 'El motivo o justificación del cambio de categoría es obligatorio.',
+            'motivo.min' => 'El motivo debe contener al menos :min caracteres.',
+            'motivo.max' => 'El motivo no puede exceder los :max caracteres.',
+        ]);
+
+        $categoriaActual = strtolower($distribuidor->categoria_distribuidor ?? 'cobre');
+        if ($request->categoria_nueva === $categoriaActual) {
+            return back()->withErrors(['categoria_nueva' => 'La nueva categoría debe ser diferente a la categoría actual (' . ucfirst($categoriaActual) . ').']);
+        }
+
+        // Verificar si ya existe una solicitud pendiente
+        $existente = \App\Models\SolicitudCategoria::where('distribuidor_id', $distribuidor->id)
+            ->where('estado', 'pendiente')
+            ->first();
+
+        if ($existente) {
+            return back()->with('error', 'Ya existe una solicitud de cambio de categoría en trámite para esta distribuidora.');
+        }
+
+        $solicitud = \App\Models\SolicitudCategoria::create([
+            'distribuidor_id' => $distribuidor->id,
+            'coordinador_id' => $coordinador->id,
+            'categoria_actual' => $categoriaActual,
+            'categoria_nueva' => $request->categoria_nueva,
+            'motivo' => $request->motivo,
+            'estado' => 'pendiente',
+        ]);
+
+        $gerentes = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente General', 'Administrador']))
+            ->where(function($q) use ($coordinador, $distribuidor) {
+                $sucursalId = $distribuidor->sucursal_id ?? $coordinador->sucursal_id;
+                $q->where('sucursal_id', $sucursalId)
+                  ->orWhereHas('rol', fn($r) => $r->whereIn('nombre', ['Gerente General', 'Administrador']));
+            })
+            ->where('activo', true)
+            ->get();
+
+        foreach ($gerentes as $gerente) {
+            $url = $gerente->esGerenteGeneral() ? route('gerente-general.dashboard') : route('gerente-sucursal.dashboard');
+            \App\Models\NotificacionCajero::enviar(
+                $gerente->id,
+                'solicitud_categoria',
+                'Nueva Solicitud de Aumento de Categoría',
+                "El coordinador {$coordinador->name} solicita ascender a {$distribuidor->name} de categoría " . strtoupper($categoriaActual) . " a " . strtoupper($request->categoria_nueva) . ".",
+                [
+                    'solicitud_id' => $solicitud->id,
+                    'url' => $url,
+                    'entidad_tipo' => 'solicitud_categoria',
+                    'entidad_id' => $solicitud->id,
+                ]
+            );
+        }
+
+        return redirect()->route('coordinador.dashboard')
+            ->with('success', 'Solicitud de ascenso de categoría enviada a la Gerencia para su autorización.');
     }
 
     /**

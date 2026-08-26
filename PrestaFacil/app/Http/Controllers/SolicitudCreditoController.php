@@ -49,6 +49,35 @@ class SolicitudCreditoController extends Controller
                 'limite_credito' => $solicitud->limite_nuevo,
             ]);
 
+            // Notificar al Coordinador
+            if ($solicitud->coordinador_id) {
+                \App\Models\NotificacionCajero::enviar(
+                    $solicitud->coordinador_id,
+                    'solicitud_credito_aprobada',
+                    '✅ Aumento de Crédito Aprobado',
+                    "La Gerencia ({$operador->name}) ha APROBADO la solicitud de aumento de crédito para {$distribuidor->name}. Nuevo límite: $" . number_format($solicitud->limite_nuevo, 2) . "."
+                );
+            }
+
+            // Notificar al Distribuidor
+            \App\Models\NotificacionCajero::enviar(
+                $distribuidor->id,
+                'solicitud_credito_aprobada',
+                '🎉 ¡Incremento de Línea de Crédito Aprobado!',
+                "Tu línea de crédito ha sido incrementada a $" . number_format($solicitud->limite_nuevo, 2) . ". Ya cuentas con más saldo disponible para emitir vales a tus clientes."
+            );
+
+            \App\Services\AuditService::registrar(
+                'APROBACION_AUMENTO_CREDITO',
+                "Incremento de crédito aprobado para '{$distribuidor->name}' de $" . number_format($solicitud->limite_actual, 2) . " a $" . number_format($solicitud->limite_nuevo, 2) . " por {$operador->name}",
+                [
+                    'entidad_tipo' => 'solicitudes_credito',
+                    'entidad_id' => $solicitud->id,
+                    'user_id' => $operador->id,
+                    'sucursal_id' => $distribuidor->sucursal_id,
+                ]
+            );
+
             $redirection = $operador->esGerenteGeneral() ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
             return redirect()->route($redirection)
                 ->with('success', "Se ha APROBADO el incremento de crédito a {$distribuidor->name}. Nuevo límite: $" . number_format($solicitud->limite_nuevo, 2));
@@ -59,6 +88,27 @@ class SolicitudCreditoController extends Controller
                 'gerente_id' => $operador->id,
                 'observaciones' => $request->observaciones,
             ]);
+
+            // Notificar al Coordinador
+            if ($solicitud->coordinador_id) {
+                \App\Models\NotificacionCajero::enviar(
+                    $solicitud->coordinador_id,
+                    'solicitud_credito_rechazada',
+                    '❌ Solicitud de Aumento de Crédito Rechazada',
+                    "La Gerencia ({$operador->name}) ha RECHAZADO la solicitud de aumento para {$distribuidor->name}." . ($request->observaciones ? " Observaciones: \"{$request->observaciones}\"" : "")
+                );
+            }
+
+            \App\Services\AuditService::registrar(
+                'RECHAZO_AUMENTO_CREDITO',
+                "Solicitud de aumento de crédito para '{$distribuidor->name}' rechazada por {$operador->name}",
+                [
+                    'entidad_tipo' => 'solicitudes_credito',
+                    'entidad_id' => $solicitud->id,
+                    'user_id' => $operador->id,
+                    'sucursal_id' => $distribuidor->sucursal_id,
+                ]
+            );
 
             $redirection = $operador->esGerenteGeneral() ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
             return redirect()->route($redirection)

@@ -7,10 +7,13 @@ use App\Models\Cliente;
 use App\Models\ProductoVale;
 use App\Models\Rol;
 use App\Models\User;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 class AdministradorRoleTest extends TestCase
 {
+    use DatabaseTransactions;
+
     public function test_administrador_can_view_all_gerente_general_modules_and_logs()
     {
         $adminRol = Rol::firstOrCreate(['nombre' => 'Administrador']);

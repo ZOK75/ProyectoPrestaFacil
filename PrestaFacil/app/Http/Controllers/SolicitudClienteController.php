@@ -116,7 +116,7 @@ class SolicitudClienteController extends Controller
         }
 
         // 4. Solicitudes de Traspaso de Coordinador (Gerente -> Gerente -> Gerente General)
-        $solTransCoord = \App\Models\SolicitudTransferenciaCoordinador::with(['coordinador', 'gerenteEmisor', 'gerenteReceptor', 'gerenteGeneral', 'sucursalDestino'])->get();
+        $solTransCoord = \App\Models\SolicitudTransferenciaCoordinador::with(['coordinador', 'gerenteEmisor', 'gerenteReceptor', 'sucursalDestino'])->get();
         foreach ($solTransCoord as $sol) {
             $items->push([
                 'id' => $sol->id,
@@ -124,7 +124,7 @@ class SolicitudClienteController extends Controller
                 'tipo_badge_color' => 'amber',
                 'usuario_emisor' => $sol->gerenteEmisor?->name ?? 'Gerente Emisor',
                 'rol_emisor' => 'Gerente Sucursal',
-                'usuario_receptor' => $sol->gerenteGeneral?->name ?? ($sol->gerenteReceptor?->name ?? 'Gerencia Receptora'),
+                'usuario_receptor' => $sol->gerenteReceptor?->name ?? 'Gerencia Receptora',
                 'fecha' => $sol->created_at,
                 'estado' => $sol->estado,
                 'comentario' => "Reasignación del coordinador {$sol->coordinador?->name} a sucursal '{$sol->sucursalDestino?->nombre}'. Motivo: {$sol->motivo}",
@@ -201,9 +201,28 @@ class SolicitudClienteController extends Controller
             'rechazadas' => $items->filter(fn($i) => str_contains(strtolower($i['estado']), 'rechazad'))->count(),
         ];
 
+        // Paginación manual de la colección unificada
+        $currentPage = \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPage();
+        $perPage = 15;
+        $currentPageItems = $items->slice(($currentPage - 1) * $perPage, $perPage)->values();
+
+        $solicitudes = new \Illuminate\Pagination\LengthAwarePaginator(
+            $currentPageItems,
+            $items->count(),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
         $sucursales = Sucursal::where('activo', true)->orderBy('nombre')->get();
 
-        return view('solicitudes-clientes.index', compact('items', 'stats', 'operador', 'sucursales'));
+        return view('solicitudes-clientes.index', [
+            'items' => $currentPageItems,
+            'solicitudes' => $solicitudes,
+            'stats' => $stats,
+            'operador' => $operador,
+            'sucursales' => $sucursales
+        ]);
     }
 
     /**

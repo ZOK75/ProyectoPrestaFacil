@@ -202,7 +202,12 @@ class UserController extends Controller
                 ->with('error', "No se puede editar al usuario '{$usuario->name}' porque se encuentra inactivo.");
         }
 
-        $rolesPermitidos = $operador->rolesPermitidos();
+        // Si el operador es Gerente de Sucursal, solo puede editar personal y distribuidores de su propia sucursal
+        if ($operador->esGerenteSucursal() && $usuario->sucursal_id !== $operador->sucursal_id) {
+            abort(403, 'Acceso denegado: El usuario no pertenece a tu sucursal.');
+        }
+
+        $rolesPermitidos = $operador->rolesPermitidos($usuario->esDistribuidor());
         $sucursalesPermitidas = $operador->sucursalesPermitidas();
 
         return view('usuarios.edit', compact('usuario', 'operador', 'rolesPermitidos', 'sucursalesPermitidas'));
@@ -226,6 +231,11 @@ class UserController extends Controller
         if (!$usuario->activo) {
             return redirect()->route('usuarios.index')
                 ->with('error', "No se puede modificar al usuario '{$usuario->name}' porque se encuentra inactivo.");
+        }
+
+        // Si el operador es Gerente de Sucursal, solo puede modificar usuarios de su propia sucursal
+        if ($operador->esGerenteSucursal() && $usuario->sucursal_id !== $operador->sucursal_id) {
+            abort(403, 'Acceso denegado: El usuario no pertenece a tu sucursal.');
         }
 
         $data = $request->validated();

@@ -37,7 +37,12 @@ class GerenteGeneralController extends Controller
         ];
 
         $solicitudesCreditoPendientes = \App\Models\SolicitudCredito::where('estado', 'pendiente')
-            ->with(['distribuidor', 'coordinador'])
+            ->with(['distribuidor.sucursal', 'coordinador'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $solicitudesCategoriaPendientes = \App\Models\SolicitudCategoria::where('estado', 'pendiente')
+            ->with(['distribuidor.sucursal', 'coordinador'])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -96,6 +101,7 @@ class GerenteGeneralController extends Controller
             'configuracion',
             'statsCorporativas',
             'solicitudesCreditoPendientes',
+            'solicitudesCategoriaPendientes',
             'solicitudesEnEspera',
             'solicitudesAprobadasSinCuenta',
             'transferenciasPendientesGerente',

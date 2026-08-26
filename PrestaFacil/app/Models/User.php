@@ -401,8 +401,10 @@ class User extends Authenticatable
             $query->whereNotIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']);
         }
 
-        if ($this->esGerenteGeneral() || $this->esAdministrador()) {
-            $query->where('nombre', '!=', 'Gerente General');
+        if ($this->esAdministrador()) {
+            $query->whereIn('nombre', ['Gerente General', 'gerente general']);
+        } elseif ($this->esGerenteGeneral()) {
+            $query->whereNotIn('nombre', ['Gerente General', 'gerente general']);
         } elseif ($this->esGerenteSucursal()) {
             $query->whereNotIn('nombre', ['Gerente General', 'Gerente de Sucursal', 'Administrador']);
         } else {

@@ -22,7 +22,7 @@
                 <span class="text-indigo-400 font-semibold">Operando como: {{ $operador->name }} ({{ $operador->rol?->nombre ?? 'Sin rol' }})</span>
             </p>
         </div>
-        @if(!$operador->esDistribuidor() && !$operador->esAdministrador())
+        @if(!$operador->esDistribuidor())
             <div>
                 <a href="{{ route('usuarios.create') }}" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.02]">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

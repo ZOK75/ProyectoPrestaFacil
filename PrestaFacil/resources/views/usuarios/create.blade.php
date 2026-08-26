@@ -12,7 +12,9 @@
         <h1 class="text-2xl font-extrabold text-white">Registrar Nuevo Usuario</h1>
         <p class="text-sm text-slate-400">
             Operando como <span class="text-indigo-400 font-semibold">{{ $operador->rol?->nombre ?? 'Sin rol' }}</span>.
-            @if($operador->esGerenteSucursal())
+            @if($operador->esAdministrador())
+                Solo tienes permiso para registrar cuentas de Gerente General.
+            @elseif($operador->esGerenteSucursal())
                 Solo puedes asignar roles operativos en tu sucursal.
             @else
                 Puedes asignar cualquier rol (excepto Gerente General) en cualquier sucursal.

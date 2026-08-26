@@ -110,10 +110,6 @@ class UserController extends Controller
     {
         $operador = $this->operador();
 
-        if ($operador->esAdministrador()) {
-            abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar usuarios.');
-        }
-
         if ($operador->esDistribuidor()) {
             abort(403, 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');
         }
@@ -130,10 +126,6 @@ class UserController extends Controller
     public function store(StoreUserRequest $request)
     {
         $operador = $this->operador();
-
-        if ($operador->esAdministrador()) {
-            abort(403, 'Acceso denegado: El rol de Administrador cuenta con permisos de solo lectura (auditoría) y no puede registrar usuarios.');
-        }
 
         if ($operador->esDistribuidor()) {
             abort(403, 'Acceso denegado: Tu rol de Distribuidor solo tiene permisos de lectura para usuarios activos.');

@@ -19,7 +19,7 @@ class StoreUserRequest extends FormRequest
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'confirmed', Password::min(12)],
             'rol_id' => ['required', 'exists:roles,id'],
-            'sucursal_id' => ['required', 'exists:sucursales,id'],
+            'sucursal_id' => ['nullable', 'required_unless:rol_id,' . optional(\App\Models\Rol::whereIn('nombre', ['Gerente General', 'gerente general'])->first())->id, 'exists:sucursales,id'],
             'categoria_distribuidor' => ['nullable', 'in:cobre,plata,oro'],
         ];
     }

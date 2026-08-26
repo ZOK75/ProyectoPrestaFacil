@@ -41,8 +41,11 @@ class CheckRole
 
         $userRole = $this->normalize($user->rol?->nombre ?? '');
 
-        // El Administrador tiene prohibidas las mutaciones de datos en toda la aplicación
+        // El Administrador tiene prohibidas las mutaciones de datos en toda la aplicación (excepto crear Gerente General en usuarios)
         if ($userRole === 'administrador' && !($request->isMethod('get') || $request->isMethod('head'))) {
+            if ($request->routeIs('usuarios.store')) {
+                return $next($request);
+            }
             if ($request->expectsJson()) {
                 return response()->json([
                     'error' => 'Acceso denegado',

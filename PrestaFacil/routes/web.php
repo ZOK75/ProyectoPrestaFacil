@@ -90,6 +90,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Notificaciones universales
     Route::get('/notificaciones', [NotificacionController::class, 'index'])->name('notificaciones.index');
+    Route::get('/notificaciones/live-poll', [NotificacionController::class, 'livePoll'])->name('notificaciones.live-poll');
     Route::post('/notificaciones/{notificacion}/leer', [NotificacionController::class, 'marcarLeida'])->name('notificaciones.leer');
     Route::post('/notificaciones/marcar-todas', [NotificacionController::class, 'marcarTodasLeidas'])->name('notificaciones.marcar-todas');
 
@@ -98,6 +99,7 @@ Route::middleware(['auth'])->group(function () {
     // ──────────────────────────────────────────
     Route::middleware(['role:administrador'])->group(function () {
         Route::get('/logs', [LogViewerController::class, 'index'])->name('logs.index');
+        Route::get('/logs/api/live', [LogViewerController::class, 'live'])->name('logs.live');
     });
 
     // ──────────────────────────────────────────

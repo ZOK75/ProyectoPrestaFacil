@@ -3,7 +3,7 @@
 @section('title', 'Notificaciones - PrestaFácil')
 
 @section('content')
-<div class="w-full max-w-full space-y-4">
+<div class="w-full max-w-full space-y-4" x-data="notificationsPage()" x-init="init()">
 
     <!-- Encabezado -->
     <div class="flex items-center justify-between gap-4">
@@ -13,8 +13,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                 </svg>
                 Centro de Notificaciones
+                <span class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                    En Vivo
+                </span>
             </h1>
-            <p class="text-xs text-slate-400 mt-0.5">Avisos de cortes, recordatorios de cobranza y estado de puntos</p>
+            <p class="text-xs text-slate-400 mt-0.5">Avisos de cortes, recordatorios de cobranza, solicitudes y estado operativo en tiempo real.</p>
         </div>
 
         @if($notificaciones->where('leida', false)->count() > 0)
@@ -30,7 +34,39 @@
         @endif
     </div>
 
-    <!-- Lista de Notificaciones -->
+    <!-- Contenedor para Notificaciones Inyectadas en Vivo -->
+    <template x-for="item in liveNotifications" :key="item.id">
+        <div class="bg-slate-900 border border-indigo-500/50 bg-slate-900/90 shadow-xl shadow-indigo-500/10 rounded-2xl p-4 transition-all duration-300 transform translate-y-0">
+            <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div class="flex items-start gap-3 flex-1 min-w-0">
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 bg-indigo-500/20 text-indigo-400">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                        </svg>
+                    </div>
+
+                    <div class="space-y-1 min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="text-sm font-extrabold text-white break-words" x-text="item.titulo"></h3>
+                            <span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">EN VIVO</span>
+                        </div>
+                        <p class="text-xs text-slate-300 leading-relaxed break-words" x-text="item.mensaje"></p>
+                        <span class="text-[10px] text-slate-500 font-mono block pt-0.5" x-text="item.created_at_human || 'Hace un momento'"></span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto pt-2 sm:pt-0">
+                    <template x-if="item.url">
+                        <a :href="item.url" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-[11px] font-bold text-white transition flex items-center gap-1.5 shadow whitespace-nowrap">
+                            <span>Ver Detalle</span>
+                        </a>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Lista de Notificaciones Estática / Paginada -->
     <div class="space-y-3">
         @forelse($notificaciones as $notif)
             <div class="bg-slate-900 border {{ $notif->leida ? 'border-slate-800/80 opacity-80' : 'border-indigo-500/30 bg-slate-900/90 shadow-lg shadow-indigo-500/5' }} rounded-2xl p-4 transition">
@@ -126,9 +162,8 @@
                     </div>
                 </div>
             </div>
-            </div>
         @empty
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-500 space-y-3">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-500 space-y-3" x-show="liveNotifications.length === 0">
                 <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
@@ -147,4 +182,19 @@
     @endif
 
 </div>
+
+<script>
+    function notificationsPage() {
+        return {
+            liveNotifications: [],
+            init() {
+                window.addEventListener('live-new-notification', (e) => {
+                    if (e.detail) {
+                        this.liveNotifications.unshift(e.detail);
+                    }
+                });
+            }
+        };
+    }
+</script>
 @endsection

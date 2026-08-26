@@ -38,6 +38,16 @@ class AuditLog extends Model
         'created_at' => 'datetime',
     ];
 
+    public function usuario(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function sucursal(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Sucursal::class, 'sucursal_id');
+    }
+
     /**
      * Helper para registrar un log fácilmente y asegurar la inmutabilidad
      * de la operación (el modelo AuditLog no debería ser actualizado).

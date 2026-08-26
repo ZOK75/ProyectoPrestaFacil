@@ -231,8 +231,8 @@ class AuthenticatedSessionController extends Controller
 
         $shouldEnforce2FA = !App::environment('testing') || session('testing_2fa_flow', false);
 
-        // Solamente roles privilegiados (Gerente General, Administrador, Gerente Sucursal, Coordinador) requieren verificación por correo
-        if ($shouldEnforce2FA && ($user->esGerenteGeneral() || $user->esAdministrador() || $user->esGerenteSucursal() || $user->esCoordinador())) {
+        // Solamente roles de alta gerencia (Gerente General, Administrador, Gerente Sucursal) requieren verificación por correo
+        if ($shouldEnforce2FA && ($user->esGerenteGeneral() || $user->esAdministrador() || $user->esGerenteSucursal())) {
             Auth::guard('web')->logout();
 
             $code = rand(100000, 999999);

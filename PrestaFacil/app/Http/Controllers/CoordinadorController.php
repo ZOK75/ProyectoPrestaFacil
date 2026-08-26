@@ -163,7 +163,12 @@ class CoordinadorController extends Controller
     {
         $user = Auth::user();
 
-        $solicitudes = SolicitudDistribuidor::where('sucursal_id', $user->sucursal_id)
+        $solicitudes = SolicitudDistribuidor::where(function ($q) use ($user) {
+            $q->where('coordinador_id', $user->id);
+            if ($user->sucursal_id) {
+                $q->orWhere('sucursal_id', $user->sucursal_id);
+            }
+        })
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -291,7 +296,12 @@ class CoordinadorController extends Controller
      */
     public function show(SolicitudDistribuidor $solicitud)
     {
-        if ($solicitud->sucursal_id !== Auth::user()->sucursal_id) {
+        $user = Auth::user();
+        $tieneAcceso = ($solicitud->coordinador_id && (string)$solicitud->coordinador_id === (string)$user->id) ||
+                       ($user->sucursal_id && (string)$solicitud->sucursal_id === (string)$user->sucursal_id) ||
+                       (!$solicitud->sucursal_id && !$solicitud->coordinador_id);
+
+        if (!$tieneAcceso) {
             abort(403, 'No tienes permiso para ver esta solicitud.');
         }
 
@@ -305,16 +315,29 @@ class CoordinadorController extends Controller
      */
     public function enviarAVerificacion(SolicitudDistribuidor $solicitud)
     {
-        if ($solicitud->sucursal_id !== Auth::user()->sucursal_id) {
+        $user = Auth::user();
+        $tieneAcceso = ($solicitud->coordinador_id && (string)$solicitud->coordinador_id === (string)$user->id) ||
+                       ($user->sucursal_id && (string)$solicitud->sucursal_id === (string)$user->sucursal_id) ||
+                       (!$solicitud->sucursal_id && !$solicitud->coordinador_id);
+
+        if (!$tieneAcceso) {
             abort(403, 'Acceso denegado.');
         }
 
-        $solicitud->update([
-            'estado' => 'en espera de verificacion'
-        ]);
+        if (!$solicitud->sucursal_id && $user->sucursal_id) {
+            $solicitud->sucursal_id = $user->sucursal_id;
+        }
+        if (!$solicitud->coordinador_id) {
+            $solicitud->coordinador_id = $user->id;
+        }
+
+        $solicitud->estado = 'en espera de verificacion';
+        $solicitud->save();
+
+        $sucursalId = $solicitud->sucursal_id ?: $user->sucursal_id;
 
         $verificadores = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Verificador', 'verificador']))
-            ->where('sucursal_id', Auth::user()->sucursal_id)
+            ->when($sucursalId, fn($q) => $q->where('sucursal_id', $sucursalId))
             ->where('activo', true)
             ->get();
 
@@ -323,7 +346,7 @@ class CoordinadorController extends Controller
                 $verificador->id,
                 'solicitud_verificacion',
                 'Solicitud de Distribuidora Enviada a Verificación',
-                "El coordinador " . Auth::user()->name . " ha enviado la solicitud de '{$solicitud->nombres} {$solicitud->apellidos}' para su verificación presencial."
+                "El coordinador " . $user->name . " ha enviado la solicitud de '{$solicitud->nombres} {$solicitud->apellidos}' para su verificación presencial."
             );
         }
 

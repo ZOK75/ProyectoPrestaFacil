@@ -198,11 +198,9 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                             </svg>
-                            @if($conteoNotifDist > 0)
-                                <span class="absolute -top-1 -right-1 flex h-4.5 w-4.5 min-w-[18px] min-h-[18px] items-center justify-center rounded-full bg-indigo-500 text-[10px] font-black text-white shadow-lg shadow-indigo-500/40 animate-bounce">
-                                    {{ $conteoNotifDist > 9 ? '9+' : $conteoNotifDist }}
-                                </span>
-                            @endif
+                            <span class="notification-badge-dynamic absolute -top-1 -right-1 flex h-4.5 w-4.5 min-w-[18px] min-h-[18px] items-center justify-center rounded-full bg-indigo-500 text-[10px] font-black text-white shadow-lg shadow-indigo-500/40 animate-bounce" style="{{ $conteoNotifDist > 0 ? '' : 'display: none;' }}">
+                                {{ $conteoNotifDist > 9 ? '9+' : $conteoNotifDist }}
+                            </span>
                         </a>
                     @endif
 
@@ -217,11 +215,9 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                             </svg>
-                            @if($conteoNotif > 0)
-                                <span class="absolute -top-1 -right-1 flex h-4.5 w-4.5 min-w-[18px] min-h-[18px] items-center justify-center rounded-full bg-amber-500 text-[10px] font-black text-slate-950 shadow-lg shadow-amber-500/40 animate-bounce">
-                                    {{ $conteoNotif > 9 ? '9+' : $conteoNotif }}
-                                </span>
-                            @endif
+                            <span class="notification-badge-dynamic absolute -top-1 -right-1 flex h-4.5 w-4.5 min-w-[18px] min-h-[18px] items-center justify-center rounded-full bg-amber-500 text-[10px] font-black text-slate-950 shadow-lg shadow-amber-500/40 animate-bounce" style="{{ $conteoNotif > 0 ? '' : 'display: none;' }}">
+                                {{ $conteoNotif > 9 ? '9+' : $conteoNotif }}
+                            </span>
                         </a>
                     @endif
 
@@ -237,11 +233,9 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                             </svg>
-                            @if($conteoNotifUsuario > 0)
-                                <span class="absolute -top-1 -right-1 flex h-4.5 w-4.5 min-w-[18px] min-h-[18px] items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-lg shadow-rose-500/40 animate-bounce">
-                                    {{ $conteoNotifUsuario > 9 ? '9+' : $conteoNotifUsuario }}
-                                </span>
-                            @endif
+                            <span class="notification-badge-dynamic absolute -top-1 -right-1 flex h-4.5 w-4.5 min-w-[18px] min-h-[18px] items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-lg shadow-rose-500/40 animate-bounce" style="{{ $conteoNotifUsuario > 0 ? '' : 'display: none;' }}">
+                                {{ $conteoNotifUsuario > 9 ? '9+' : $conteoNotifUsuario }}
+                            </span>
                         </a>
                     @endif
 
@@ -648,6 +642,173 @@
             PrestaFácil &copy; {{ date('Y') }} - Sistema de Vales Móvil
         </div>
     </footer>
+
+    @auth
+        <!-- Toast Notifications Container en Tiempo Real -->
+        <div x-data="realtimeNotificationApp()" x-init="init()" class="fixed bottom-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none px-3 sm:px-0">
+            <template x-for="toast in toasts" :key="toast.id">
+                <div x-show="toast.visible"
+                     x-transition:enter="transition ease-out duration-300 transform"
+                     x-transition:enter-start="opacity-0 translate-y-4 scale-95"
+                     x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                     x-transition:leave="transition ease-in duration-200 transform"
+                     x-transition:leave-start="opacity-100 scale-100"
+                     x-transition:leave-end="opacity-0 translate-x-4 scale-95"
+                     class="pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-indigo-500/40 rounded-2xl p-4 shadow-2xl shadow-indigo-950/80 flex items-start gap-3.5 text-left transition relative overflow-hidden group">
+                    
+                    <!-- Borde de progreso / tiempo -->
+                    <div class="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 w-full animate-pulse"></div>
+
+                    <!-- Icono de Notificación -->
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shadow-inner">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                        </svg>
+                    </div>
+
+                    <!-- Contenido -->
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-1 mb-0.5">
+                            <span class="text-[10px] font-black uppercase text-indigo-400 tracking-wider">Nueva Notificación</span>
+                            <button @click="dismiss(toast.id)" class="text-slate-500 hover:text-white transition text-xs leading-none p-1 -mr-1">
+                                &times;
+                            </button>
+                        </div>
+                        <h4 class="text-xs font-bold text-white truncate" x-text="toast.titulo"></h4>
+                        <p class="text-[11px] text-slate-300 leading-tight mt-0.5 line-clamp-2" x-text="toast.mensaje"></p>
+                        
+                        <template x-if="toast.url">
+                            <div class="mt-2.5">
+                                <a :href="toast.url" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold shadow transition">
+                                    <span>Ver Detalle</span>
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                </a>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <script>
+            document.addEventListener('alpine:init', () => {
+                Alpine.data('realtimeNotificationApp', () => ({
+                    toasts: [],
+                    knownIds: new Set(),
+                    isFirstLoad: true,
+                    unreadCount: {{ (Auth::user()->esAdministrador() ? Auth::user()->conteoSolicitudesPendientes() : Auth::user()->conteoNotificacionesSinLeer()) ?? 0 }},
+
+                    init() {
+                        this.poll();
+                        setInterval(() => this.poll(), 3500);
+
+                        document.addEventListener('visibilitychange', () => {
+                            if (document.visibilityState === 'visible') {
+                                this.poll();
+                            }
+                        });
+                    },
+
+                    async poll() {
+                        try {
+                            const response = await fetch('{{ route("notificaciones.live-poll") }}', {
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                }
+                            });
+
+                            if (!response.ok) return;
+                            const data = await response.json();
+
+                            this.unreadCount = data.unread_count || 0;
+                            this.updateBadges(this.unreadCount);
+
+                            if (data.notifications && Array.isArray(data.notifications)) {
+                                if (this.isFirstLoad) {
+                                    data.notifications.forEach(n => this.knownIds.add(n.id));
+                                    this.isFirstLoad = false;
+                                    return;
+                                }
+
+                                data.notifications.forEach(notif => {
+                                    if (!this.knownIds.has(notif.id)) {
+                                        this.knownIds.add(notif.id);
+                                        if (!notif.leida) {
+                                            this.showToast(notif);
+                                            this.playSound();
+                                            window.dispatchEvent(new CustomEvent('live-new-notification', { detail: notif }));
+                                        }
+                                    }
+                                });
+                            }
+                        } catch (e) {}
+                    },
+
+                    showToast(notif) {
+                        const toast = {
+                            id: notif.id,
+                            titulo: notif.titulo || 'Aviso del Sistema',
+                            mensaje: notif.mensaje || '',
+                            url: notif.url || null,
+                            visible: true
+                        };
+                        this.toasts.unshift(toast);
+                        if (this.toasts.length > 4) {
+                            this.toasts.pop();
+                        }
+
+                        setTimeout(() => {
+                            this.dismiss(toast.id);
+                        }, 6500);
+                    },
+
+                    dismiss(id) {
+                        const index = this.toasts.findIndex(t => t.id === id);
+                        if (index !== -1) {
+                            this.toasts[index].visible = false;
+                            setTimeout(() => {
+                                this.toasts = this.toasts.filter(t => t.id !== id);
+                            }, 300);
+                        }
+                    },
+
+                    playSound() {
+                        try {
+                            const AudioContext = window.AudioContext || window.webkitAudioContext;
+                            if (!AudioContext) return;
+                            const ctx = new AudioContext();
+                            const osc = ctx.createOscillator();
+                            const gain = ctx.createGain();
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                            osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08);
+                            gain.gain.setValueAtTime(0.06, ctx.currentTime);
+                            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                            osc.connect(gain);
+                            gain.connect(ctx.destination);
+                            osc.start();
+                            osc.stop(ctx.currentTime + 0.3);
+                        } catch (err) {}
+                    },
+
+                    updateBadges(count) {
+                        const badges = document.querySelectorAll('.notification-badge-dynamic');
+                        badges.forEach(badge => {
+                            if (count > 0) {
+                                badge.textContent = count > 9 ? '9+' : count;
+                                badge.style.display = 'flex';
+                                badge.classList.remove('hidden');
+                            } else {
+                                badge.style.display = 'none';
+                                badge.classList.add('hidden');
+                            }
+                        });
+                    }
+                }));
+            });
+        </script>
+    @endauth
 
     @stack('scripts')
 </body>

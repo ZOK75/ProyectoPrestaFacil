@@ -18,6 +18,7 @@ class UserSeeder extends Seeder
         $cajero = Rol::where('nombre', 'Cajero')->first();
         $verificador = Rol::where('nombre', 'Verificador')->first();
         $administrador = Rol::where('nombre', 'Administrador')->first();
+        $distribuidor = Rol::where('nombre', 'Distribuidor')->first();
 
         $sucursalNorte = Sucursal::where('nombre', 'Sucursal Norte')->first();
 
@@ -80,6 +81,20 @@ class UserSeeder extends Seeder
                 'email_verified_at' => now(),
                 'rol_id' => $verificador?->id,
                 'sucursal_id' => $sucursalNorte?->id,
+                'activo' => true,
+            ],
+            // Distribuidora Norte
+            [
+                'name' => 'Distribuidora Norte',
+                'email' => 'distribuidora.norte@prestafacil.com',
+                'password' => Hash::make('KELL200000HJNNLP07'),
+                'email_verified_at' => now(),
+                'rol_id' => $distribuidor?->id,
+                'sucursal_id' => $sucursalNorte?->id,
+                'categoria_distribuidor' => 'cobre',
+                'limite_credito' => 200000.00,
+                'puntos' => 0,
+                'multas' => 0.00,
                 'activo' => true,
             ],
         ];

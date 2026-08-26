@@ -47,7 +47,7 @@
                                 {{ $solicitud->telefono }}
                             </td>
                             <td class="p-4 text-sm text-slate-400">
-                                {{ $solicitud->created_at->format('d/m/Y H:i') }}
+                                {{ $solicitud->created_at ? ($solicitud->created_at instanceof \DateTimeInterface ? $solicitud->created_at->format('d/m/Y H:i') : \Carbon\Carbon::parse($solicitud->created_at)->format('d/m/Y H:i')) : 'N/A' }}
                             </td>
                             <td class="p-4">
                                 @if($solicitud->estado === 'en espera')

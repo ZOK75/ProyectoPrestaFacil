@@ -473,4 +473,432 @@ class CobranzaValesIndividualesTest extends TestCase
         $responseCreate = $this->actingAs($this->distribuidor)->get(route('prestamos.create'));
         $responseCreate->assertOk();
     }
+
+    public function test_abonos_match_relacion_subtracting_distribuidora_commission(): void
+    {
+        $config = Configuracion::firstOrCreate([], [
+            'comision_cobre' => 8.00,
+            'comision_plata' => 10.00,
+            'comision_oro' => 12.00,
+        ]);
+        $config->update([
+            'comision_plata' => 10.00,
+        ]);
+
+        $this->distribuidor->update([
+            'categoria_distribuidor' => 'plata',
+            'multas' => 0.00,
+        ]);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-5000-TEST',
+            'nombre' => 'Vale $5,000',
+            'monto_prestamo' => 5000.00,
+            'costo_seguro' => 150.00,
+            'comision_apertura' => 0.00,
+            'tasa_interes_quincenal' => 2.50,
+            'plazo_quincenas' => 10,
+            'multa' => 200.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-COMISION-01',
+            'cliente_id' => $this->cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $this->distribuidor->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 650.00,
+            'monto_total_pagar' => 6500.00,
+            'pagos_totales' => 10,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 5000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+        ]);
+
+        // Comisión esperada: 10% de 5000 = 500 total / 10 quincenas = $50 por quincena
+        $this->assertEquals(50.00, $prestamo->comisionDistribuidorPorQuincena());
+        // Cuota neta exigible a pagar: $650 - $50 = $600
+        $this->assertEquals(600.00, $prestamo->cuotaQuincenalNeta());
+        $this->assertEquals(600.00, $prestamo->totalExigibleQuincenalNeto());
+
+        // A nivel distribuidora
+        $this->assertEquals(50.00, $this->distribuidor->totalComisionQuincenal());
+        $this->assertEquals(600.00, $this->distribuidor->totalCuotaQuincenalNeta());
+        $this->assertEquals(600.00, $this->distribuidor->totalQuincenalExigibleRelacion());
+
+        // Vista de cajero debe mostrar cuota neta ($600.00) y comisión (-$50.00)
+        $response = $this->actingAs($this->cajero)->get(route('cajero.abonos.index'));
+        $response->assertOk();
+        $response->assertSee('$600.00');
+        $response->assertSee('-$50.00');
+        $response->assertSee('Cat. Plata (10% Com.)');
+    }
+
+    public function test_full_abono_before_cut_awards_points_and_shows_next_period_without_recargos(): void
+    {
+        $config = Configuracion::firstOrCreate([], [
+            'monto_base_puntos' => 1200.00,
+            'puntos_por_monto_base' => 3,
+            'comision_cobre' => 10.00,
+        ]);
+        $config->update([
+            'monto_base_puntos' => 1200.00,
+            'puntos_por_monto_base' => 3,
+            'comision_cobre' => 10.00,
+        ]);
+
+        $this->distribuidor->update([
+            'categoria_distribuidor' => 'cobre',
+            'puntos' => 0,
+            'multas' => 0.00,
+            'referencia_pago_distribuidor' => 'REF-DIST-PUNTOS-01',
+        ]);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-2400-PUNTOS',
+            'nombre' => 'Vale $2,400',
+            'monto_prestamo' => 2400.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 0.00,
+            'tasa_interes_quincenal' => 2.50,
+            'plazo_quincenas' => 10,
+            'multa' => 200.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-PUNTOS-01',
+            'cliente_id' => $this->cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $this->distribuidor->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 2400.00,
+            'cuota_quincenal' => 300.00,
+            'monto_total_pagar' => 3000.00,
+            'pagos_totales' => 10,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 2400.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+        ]);
+
+        // Cuota neta: 300 - ((10% * 2400)/10) = 300 - 24 = $276.00
+        $cuotaNeta = $this->distribuidor->totalCuotaQuincenalNeta();
+        $this->assertEquals(276.00, $cuotaNeta);
+
+        // 1. Abonar el TOTAL antes o al corte vía cajero
+        $responseAbono = $this->actingAs($this->cajero)->post(route('cajero.abonos.distribuidora.store', $this->distribuidor), [
+            'referencia_pago' => 'REF-DIST-PUNTOS-01',
+            'monto_abonado' => 276.00,
+            'metodo_pago' => 'efectivo',
+        ]);
+        $responseAbono->assertSessionHasNoErrors();
+
+        // 2. Se deben haber calculado y sumado los puntos inmediatamente: floor(2400 / 1200) * 3 = 6 puntos
+        $this->distribuidor->refresh();
+        $this->assertEquals(6, $this->distribuidor->puntos);
+
+        // 3. La relación debe mostrar el adeudo del siguiente mes / periodo (igual al mes pagado porque no genera recargos)
+        $responseRelacion = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
+        $responseRelacion->assertOk();
+        $responseRelacion->assertSee('Liquidado (Exigible Próximo Periodo)');
+        $responseRelacion->assertSee('$276.00'); // Mismo importe sin recargos
+    }
+
+    public function test_partial_abono_applies_recargos_and_subtracts_abono_in_relacion(): void
+    {
+        $config = Configuracion::firstOrCreate([], [
+            'comision_cobre' => 10.00,
+            'multa_adeudo' => 300.00,
+        ]);
+        $config->update([
+            'comision_cobre' => 10.00,
+            'multa_adeudo' => 300.00,
+        ]);
+
+        $this->distribuidor->update([
+            'categoria_distribuidor' => 'cobre',
+            'puntos' => 0,
+            'multas' => 0.00,
+            'referencia_pago_distribuidor' => 'REF-DIST-PARCIAL-01',
+        ]);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-2000-PARCIAL',
+            'nombre' => 'Vale $2,000',
+            'monto_prestamo' => 2000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 0.00,
+            'tasa_interes_quincenal' => 2.50,
+            'plazo_quincenas' => 10,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-PARCIAL-01',
+            'cliente_id' => $this->cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $this->distribuidor->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 2000.00,
+            'cuota_quincenal' => 250.00,
+            'monto_total_pagar' => 2500.00,
+            'pagos_totales' => 10,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 2000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+        ]);
+
+        // Cuota neta: 250 - ((10% * 2000) / 10) = 250 - 20 = $230.00
+        $cuotaNeta = $this->distribuidor->totalCuotaQuincenalNeta();
+        $this->assertEquals(230.00, $cuotaNeta);
+
+        // 1. Se abona un monto MENOR al total ($100.00 de $230.00)
+        $responseAbono = $this->actingAs($this->cajero)->post(route('cajero.abonos.distribuidora.store', $this->distribuidor), [
+            'referencia_pago' => 'REF-DIST-PARCIAL-01',
+            'monto_abonado' => 100.00,
+            'metodo_pago' => 'efectivo',
+        ]);
+        $responseAbono->assertSessionHasNoErrors();
+
+        // 2. Al vencer la fecha límite, se aplican recargos / multas ($300.00)
+        $prestamo->update(['multas' => 300.00]);
+        $this->distribuidor->update(['multas' => 300.00]);
+
+        // 3. En la relación de cobranza:
+        // Cuota neta actual ($230) + Recargos ($550 = Multa $300 + Cuota anterior $230 + Com anterior $20) = $780.00
+        // Restando el abono realizado ($100.00):
+        // Total a PAGAR = $680.00
+        $responseRelacion = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
+        $responseRelacion->assertOk();
+        $responseRelacion->assertSee('Abono Parcial ($100.00)');
+        $responseRelacion->assertSee('-$100.00'); // Abono en columna
+        $responseRelacion->assertSee('$680.00'); // Total a pagar restando abono
+    }
+
+    public function test_newly_assigned_and_cashed_prestamo_appears_in_relacion_pdf(): void
+    {
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-REC-100',
+            'nombre' => 'Vale Reciente $1,000',
+            'monto_prestamo' => 1000.00,
+            'costo_seguro' => 50.00,
+            'comision_apertura' => 0.00,
+            'tasa_interes_quincenal' => 2.50,
+            'plazo_quincenas' => 10,
+            'multa' => 100.00,
+            'activo' => true,
+        ]);
+
+        // Distribuidor asigna vale
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-RECIENTE-99',
+            'cliente_id' => $this->cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $this->distribuidor->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 1000.00,
+            'cuota_quincenal' => 125.00,
+            'monto_total_pagar' => 1250.00,
+            'pagos_totales' => 10,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 1000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado', // Cobrado/entregado por cajero
+        ]);
+
+        // Abrir la relación de cobranza
+        $response = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
+        $response->assertOk();
+        $response->assertSee('Vale Reciente $1,000');
+        $response->assertSee($this->cliente->nombre);
+        $response->assertDontSee('No se encontraron clientes con préstamos activos para este periodo.');
+    }
+
+    public function test_liquidated_cut_incurs_recargos_on_subsequent_unpaid_cuts(): void
+    {
+        $config = Configuracion::firstOrCreate([], [
+            'comision_cobre' => 10.00,
+            'multa_adeudo' => 300.00,
+            'monto_base_puntos' => 1200.00,
+            'puntos_por_monto_base' => 3,
+        ]);
+        $config->update([
+            'comision_cobre' => 10.00,
+            'multa_adeudo' => 300.00,
+            'monto_base_puntos' => 1200.00,
+            'puntos_por_monto_base' => 3,
+        ]);
+
+        $this->distribuidor->update([
+            'categoria_distribuidor' => 'cobre',
+            'puntos' => 0,
+            'multas' => 0.00,
+            'referencia_pago_distribuidor' => 'REF-DIST-MULTI-01',
+        ]);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-MULTI-01',
+            'nombre' => 'Vale Multicorte $2,000',
+            'monto_prestamo' => 2000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 0.00,
+            'tasa_interes_quincenal' => 2.50,
+            'plazo_quincenas' => 10,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-MULTI-REF',
+            'cliente_id' => $this->cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $this->distribuidor->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 2000.00,
+            'cuota_quincenal' => 250.00,
+            'monto_total_pagar' => 2500.00,
+            'pagos_totales' => 10,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 2000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+        ]);
+
+        // 1. Corte 1: Se liquida por completo ($230 cuota neta)
+        $this->actingAs($this->cajero)->post(route('cajero.abonos.distribuidora.store', $this->distribuidor), [
+            'referencia_pago' => 'REF-DIST-MULTI-01',
+            'monto_abonado' => 230.00,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // Ver relación de corte 1: Liquidado sin recargos
+        $response1 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
+        $response1->assertOk();
+        $response1->assertSee('Liquidado (Exigible Próximo Periodo)');
+        $response1->assertDontSee('Recargos por Retraso');
+
+        // 2. Simular cierre de Corte 1 (Liquidado, 0 multas) y avance a Corte 2
+        $corteService = app(\App\Services\CorteCobranzaService::class);
+        $corteService->simularSiguienteCorte();
+
+        // En Corte 2 recién iniciado: aún no tiene multas porque acaba de abrirse
+        $this->distribuidor->refresh();
+        $this->assertEquals(0, $this->distribuidor->multas);
+
+        // 3. Simular vencimiento de Corte 2 SIN PAGAR -> Aplica multas por mora
+        $corteService->simularSiguienteCorte();
+
+        $this->distribuidor->refresh();
+        $this->assertGreaterThan(0, $this->distribuidor->multas);
+
+        $response2 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
+        $response2->assertOk();
+        $response2->assertDontSee('Liquidado (Exigible Próximo Periodo)');
+        $response2->assertSee('Recargos por Retraso');
+    }
+
+    public function test_partial_payment_then_mora_then_full_payment_cleans_subsequent_cut(): void
+    {
+        $config = Configuracion::firstOrCreate([], [
+            'comision_cobre' => 3.00,
+            'multa_adeudo' => 300.00,
+        ]);
+        $config->update([
+            'comision_cobre' => 3.00,
+            'multa_adeudo' => 300.00,
+        ]);
+
+        $this->distribuidor->update([
+            'categoria_distribuidor' => 'cobre',
+            'puntos' => 0,
+            'multas' => 0.00,
+            'referencia_pago_distribuidor' => 'REF-DIST-ESCENARIO-03',
+        ]);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-5000-TEST',
+            'nombre' => 'Vale $5,000',
+            'monto_prestamo' => 5000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-5000-REF',
+            'cliente_id' => $this->cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $this->distribuidor->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'monto_total_pagar' => 7600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 5000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+        ]);
+
+        // 1. Corte 1: Abona $930.00 (pago parcial, faltaron $1.25)
+        $this->actingAs($this->cajero)->post(route('cajero.abonos.distribuidora.store', $this->distribuidor), [
+            'referencia_pago' => 'REF-DIST-ESCENARIO-03',
+            'monto_abonado' => 930.00,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // Simular vencimiento de Corte 1 sin liquidar -> Aplica multas y avanza a Corte 2
+        $corteService = app(\App\Services\CorteCobranzaService::class);
+        $corteService->simularSiguienteCorte();
+
+        // En Corte 2: Debe exigir $1,251.25 con recargos
+        $this->distribuidor->refresh();
+        $this->assertEquals(300.00, $this->distribuidor->multas);
+
+        $responseCorte2 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
+        $responseCorte2->assertOk();
+        $responseCorte2->assertSee('Recargos por Retraso');
+        $responseCorte2->assertSee('2,181.00');
+
+        // 2. En Corte 2: Abona y liquida el total con recargos ($2,181.00)
+        $this->actingAs($this->cajero)->post(route('cajero.abonos.distribuidora.store', $this->distribuidor), [
+            'referencia_pago' => 'REF-DIST-ESCENARIO-03',
+            'monto_abonado' => 2181.00,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        $this->distribuidor->refresh();
+        $this->assertEquals(0.00, $this->distribuidor->multas);
+
+        // 3. Simular avance a Corte 3
+        $corteService->simularSiguienteCorte();
+
+        // Corte 3 debe ser un periodo limpio con adeudo de la quincena 3 ($931.00), 0 recargos, 0 abonos descontados erróneamente
+        $responseCorte3 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
+        $responseCorte3->assertOk();
+        $responseCorte3->assertDontSee('ABONO PARCIAL');
+        $responseCorte3->assertDontSee('Total a PAGAR: $0.00');
+        $responseCorte3->assertSee('931.00');
+    }
 }

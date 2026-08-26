@@ -367,7 +367,7 @@ class User extends Authenticatable
     }
 
     /**
-     * Calcula la cuota quincenal total a cobrar en el periodo por todos los préstamos activos.
+     * Calcula la cuota quincenal total bruta a cobrar en el periodo por todos los préstamos activos.
      */
     public function totalCuotaQuincenal(): float
     {
@@ -378,6 +378,59 @@ class User extends Authenticatable
         return floatval(Prestamo::where('created_by_user_id', $this->id)
             ->where('estado', 'activo')
             ->sum('cuota_quincenal'));
+    }
+
+    /**
+     * Calcula la comisión total quincenal que gana la distribuidora por todos sus préstamos activos.
+     */
+    public function totalComisionQuincenal(): float
+    {
+        if (!$this->esDistribuidor()) {
+            return 0.0;
+        }
+
+        $porcentajeComision = $this->obtenerPorcentajeGanancia();
+        if ($porcentajeComision <= 0) {
+            return 0.0;
+        }
+
+        $prestamos = Prestamo::where('created_by_user_id', $this->id)
+            ->where('estado', 'activo')
+            ->get();
+
+        $totalComision = 0.0;
+        foreach ($prestamos as $p) {
+            $totalPagos = max(1, intval($p->pagos_totales));
+            $comision = (($porcentajeComision / 100.0) * floatval($p->monto_prestamo)) / $totalPagos;
+            $totalComision += $comision;
+        }
+
+        return $totalComision;
+    }
+
+    /**
+     * Calcula la cuota quincenal neta a pagar por la distribuidora (Cuota Bruta - Comisión de Distribuidora).
+     * Redondeada al piso (pesos enteros).
+     */
+    public function totalCuotaQuincenalNeta(): float
+    {
+        if (!$this->esDistribuidor()) {
+            return 0.0;
+        }
+
+        $bruta = $this->totalCuotaQuincenal();
+        $comision = $this->totalComisionQuincenal();
+
+        return floor(max(0.0, $bruta - $comision));
+    }
+
+    /**
+     * Calcula el monto quincenal exigible de la relación (Cuota Neta + Multas).
+     * Redondeado al piso (pesos enteros).
+     */
+    public function totalQuincenalExigibleRelacion(): float
+    {
+        return floor($this->totalCuotaQuincenalNeta() + floatval($this->multas ?? 0.0));
     }
 
     /**

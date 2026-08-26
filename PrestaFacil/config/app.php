@@ -123,4 +123,7 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    'vpn_required' => env('VPN_REQUIRED', true),
+    'vpn_domain' => env('VPN_DOMAIN', 'vpn.prestafacil.uk'),
+
 ];

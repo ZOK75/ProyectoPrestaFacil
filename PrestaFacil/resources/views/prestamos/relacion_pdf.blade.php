@@ -76,53 +76,43 @@
             </div>
         </div>
 
-        <!-- Banner de Fechas y Total a PAGAR -->
-        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div class="space-y-1">
-                <div>
-                    <span class="font-bold text-slate-900">Fecha límite de pago:</span>
-                    <span class="font-semibold text-slate-800 ml-1">
-                        {{ ($relacion ? $relacion->fecha_limite_pago : $configuracion->fecha_limite_pago) ? ($relacion ? $relacion->fecha_limite_pago : $configuracion->fecha_limite_pago)->format('d \d\e F Y H:i') : now()->addDays(15)->format('d \d\e F Y') }}
-                    </span>
-                </div>
-                <div>
-                    <span class="font-bold text-slate-900">Fecha de corte:</span>
-                    <span class="text-slate-700 ml-1">
-                        {{ ($relacion ? $relacion->fecha_corte : $configuracion->fecha_corte) ? ($relacion ? $relacion->fecha_corte : $configuracion->fecha_corte)->format('d \d\e F Y H:i') : '13 de febrero 2026' }}
-                    </span>
-                </div>
-                @if(isset($relacion) && $relacion->estado_pago !== 'pendiente')
-                    <div class="pt-1">
-                        <span class="font-bold text-slate-900">Estado de Liquidación:</span>
-                        @if($relacion->esPagoAnticipado())
-                            <span class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase">
-                                Pago Anticipado (+{{ $relacion->puntos_ganados }} pts)
-                            </span>
-                        @elseif($relacion->esPagoATiempo())
-                            <span class="px-2 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 uppercase">
-                                Pago a Tiempo
-                            </span>
-                        @elseif($relacion->esPagoAtrasado())
-                            <span class="px-2 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 uppercase">
-                                Pago Atrasado (-{{ $relacion->puntos_descontados }} pts)
-                            </span>
-                        @endif
-                    </div>
-                @endif
-            </div>
+        @php
+            $porcentajeComision = $distribuidora->obtenerPorcentajeGanancia();
+            
+            // Verificar si la distribuidora o sus préstamos tienen multas o retrasos activos
+            $tieneMultasPendientes = (floatval($distribuidora->multas ?? 0.0) > 0);
+            foreach($prestamos as $p) {
+                if (floatval($p->multas ?? 0.0) > 0) {
+                    $tieneMultasPendientes = true;
+                    break;
+                }
+            }
 
-            @php
-                $porcentajeComision = $distribuidora->obtenerPorcentajeGanancia();
-                $totalComisionesSum = 0;
-                $totalPagosSum = 0;
-                $totalRecargosSum = 0;
-                $totalGeneralSum = 0;
+            // Determinar si el periodo actual ya está 100% liquidado sin multas moratorias
+            $periodoLiquidado = (!$tieneMultasPendientes && $relacion && ($relacion->adeudo_pendiente <= 0 || floatval($relacion->monto_pagado) >= floatval($relacion->monto_total_periodo)) && in_array($relacion->estado_pago, ['pago_anticipado', 'pago_a_tiempo', 'liquidado']));
 
-                foreach($prestamos as $p) {
-                    $totalPagos = max(1, intval($p->pagos_totales));
-                    $comisionRow = (($porcentajeComision / 100) * floatval($p->monto_prestamo)) / $totalPagos;
-                    $pagoRow = floatval($p->cuota_quincenal) - $comisionRow;
-                    
+            $montoAbonadoPeriodo = floatval($relacion ? $relacion->monto_pagado : 0.0);
+            $esAbonoParcial = (!$periodoLiquidado && $montoAbonadoPeriodo > 0);
+            $montoAbonadoRestante = $montoAbonadoPeriodo;
+
+            $totalComisionesSum = 0;
+            $totalPagosSum = 0;
+            $totalRecargosSum = 0;
+            $totalAbonosSum = 0;
+            $totalGeneralSum = 0;
+
+            foreach($prestamos as $p) {
+                $totalPagos = max(1, intval($p->pagos_totales));
+                $comisionRow = (($porcentajeComision / 100) * floatval($p->monto_prestamo)) / $totalPagos;
+                $pagoRow = floatval($p->cuota_quincenal) - $comisionRow;
+                
+                if ($periodoLiquidado) {
+                    // Si el periodo actual fue liquidado en su totalidad:
+                    // La relación muestra el adeudo del SIGUIENTE periodo (sin recargos porque no genera recargos al estar al corriente)
+                    $recargosRow = 0.00;
+                    $abonoFila = 0.00;
+                    $totalFila = floor($pagoRow);
+                } else {
                     // Multas acumuladas y cálculo de cortes vencidos
                     $multaRow = floatval($p->multas ?? 0.0);
                     $tieneRetraso = ($multaRow > 0);
@@ -134,24 +124,80 @@
                     // Recargos: si se retrasa un pago: multas acumuladas + pagos anteriores adeudados + comisiones anteriores
                     $recargosRow = $tieneRetraso ? ($multaRow + $pagoTotalFilaAnterior + $comisionAnteriorRow) : 0.00;
                     
-                    // Total fila redondeado al piso
-                    $totalFila = floor($pagoRow + $recargosRow);
-
-                    $totalComisionesSum += $comisionRow;
-                    $totalPagosSum += $pagoRow;
-                    $totalRecargosSum += $recargosRow;
-                    $totalGeneralSum += $totalFila;
+                    // Si se abonó un monto menor al total, se hacen los recargos y se les resta el abono
+                    $exigibleBrutoFila = $pagoRow + $recargosRow;
+                    $abonoFila = min($montoAbonadoRestante, $exigibleBrutoFila);
+                    $montoAbonadoRestante -= $abonoFila;
+                    
+                    $totalFila = floor(max(0, $exigibleBrutoFila - $abonoFila));
                 }
-                $totalGeneralSum = floor($totalGeneralSum);
-            @endphp
+
+                $totalComisionesSum += $comisionRow;
+                $totalPagosSum += $pagoRow;
+                $totalRecargosSum += $recargosRow;
+                $totalAbonosSum += $abonoFila;
+                $totalGeneralSum += $totalFila;
+            }
+            $totalGeneralSum = floor($totalGeneralSum);
+        @endphp
+
+        <!-- Banner de Fechas y Total a PAGAR -->
+        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div class="space-y-1">
+                <div>
+                    <span class="font-bold text-slate-900">Fecha límite de pago:</span>
+                    <span class="font-semibold text-slate-800 ml-1">
+                        @if($periodoLiquidado && $relacion && $relacion->fecha_limite_pago)
+                            {{ $relacion->fecha_limite_pago->copy()->addDays(15)->format('d \d\e F Y H:i') }}
+                        @else
+                            {{ ($relacion ? $relacion->fecha_limite_pago : $configuracion->fecha_limite_pago) ? ($relacion ? $relacion->fecha_limite_pago : $configuracion->fecha_limite_pago)->format('d \d\e F Y H:i') : now()->addDays(15)->format('d \d\e F Y') }}
+                        @endif
+                    </span>
+                </div>
+                <div>
+                    <span class="font-bold text-slate-900">Fecha de corte:</span>
+                    <span class="text-slate-700 ml-1">
+                        @if($periodoLiquidado && $relacion && $relacion->fecha_corte)
+                            {{ $relacion->fecha_corte->copy()->addDays(15)->format('d \d\e F Y H:i') }}
+                        @else
+                            {{ ($relacion ? $relacion->fecha_corte : $configuracion->fecha_corte) ? ($relacion ? $relacion->fecha_corte : $configuracion->fecha_corte)->format('d \d\e F Y H:i') : '13 de febrero 2026' }}
+                        @endif
+                    </span>
+                </div>
+                @if(isset($relacion))
+                    <div class="pt-1">
+                        <span class="font-bold text-slate-900">Estado:</span>
+                        @if($periodoLiquidado)
+                            <span class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase">
+                                Liquidado (Exigible Próximo Periodo) @if($relacion->puntos_ganados > 0) (+{{ $relacion->puntos_ganados }} pts) @endif
+                            </span>
+                        @elseif($relacion->esPagoAtrasado())
+                            <span class="px-2 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 uppercase">
+                                Pago Atrasado (-{{ $relacion->puntos_descontados }} pts)
+                            </span>
+                        @elseif($esAbonoParcial)
+                            <span class="px-2 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 uppercase">
+                                Abono Parcial (${{ number_format($montoAbonadoPeriodo, 2) }}) - Saldo Pendiente
+                            </span>
+                        @else
+                            <span class="px-2 py-0.5 rounded text-[10px] font-black bg-slate-200 text-slate-800 border border-slate-300 uppercase">
+                                Pendiente
+                            </span>
+                        @endif
+                    </div>
+                @endif
+            </div>
 
             <div class="text-left sm:text-right border-t sm:border-t-0 sm:border-l border-slate-300 pt-2 sm:pt-0 sm:pl-4 space-y-0.5">
                 <span class="text-[11px] uppercase font-bold text-slate-500 block">Subtotal Pagos (Cuotas - Comisiones): ${{ number_format($totalPagosSum, 2) }}</span>
                 <span class="text-[11px] uppercase font-bold text-indigo-600 block">Total Comisiones (Cat. {{ ucfirst($distribuidora->categoria_distribuidor ?? 'Cobre') }} {{ $porcentajeComision }}%): ${{ number_format($totalComisionesSum, 2) }}</span>
                 @if($totalRecargosSum > 0)
-                    <span class="text-[11px] uppercase font-bold text-rose-600 block">Recargos por Retraso (Multa + Pagos Anteriores + Comisiones): +${{ number_format($totalRecargosSum, 2) }}</span>
+                    <span class="text-[11px] uppercase font-bold text-rose-600 block">Recargos por Retraso: +${{ number_format($totalRecargosSum, 2) }}</span>
                 @endif
-                <span class="text-xl font-black text-slate-900 block">Total a PAGAR: ${{ number_format($totalGeneralSum, 2) }}</span>
+                @if($totalAbonosSum > 0)
+                    <span class="text-[11px] uppercase font-bold text-emerald-600 block">(-) Abonos Realizados en el Periodo: -${{ number_format($totalAbonosSum, 2) }}</span>
+                @endif
+                <span class="text-xl font-black text-slate-900 block">Total a PAGAR{{ $periodoLiquidado ? ' (Próximo Periodo)' : '' }}: ${{ number_format($totalGeneralSum, 2) }}</span>
             </div>
         </div>
 
@@ -167,68 +213,75 @@
                         <th class="border-r border-slate-900 px-3 py-2 text-right">Comisión</th>
                         <th class="border-r border-slate-900 px-3 py-2 text-right">Pago</th>
                         <th class="border-r border-slate-900 px-3 py-2 text-right">Recargos</th>
+                        @if($esAbonoParcial)
+                            <th class="border-r border-slate-900 px-3 py-2 text-right text-emerald-800">Abono</th>
+                        @endif
                         <th class="px-3 py-2 text-right">Total</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-900">
+                    @php
+                        $montoAbonadoRestanteLoop = $montoAbonadoPeriodo;
+                    @endphp
                     @forelse($prestamos as $index => $p)
                         @php
                             $totalPagos = max(1, intval($p->pagos_totales));
-                            // Comisión = Categoría de distribuidora (%) * monto préstamo / total de pagos
                             $comision = (($porcentajeComision / 100) * floatval($p->monto_prestamo)) / $totalPagos;
-                            // Pago = Cuota 15nal - comisión
                             $pago = floatval($p->cuota_quincenal) - $comision;
                             
-                            // Multas acumuladas y cálculo de cortes vencidos
-                            $multa = floatval($p->multas ?? 0.0);
-                            $tieneRetraso = ($multa > 0);
-                            $multaVale = $p->multaConfigurada() > 0 ? $p->multaConfigurada() : 300.00;
-                            $cortesVencidos = ($tieneRetraso && $multaVale > 0) ? max(1, intval(round($multa / $multaVale))) : ($tieneRetraso ? 1 : 0);
-                            
-                            $pagoTotalFilaAnterior = $cortesVencidos * $pago;
-                            $comisionAnterior = $cortesVencidos * $comision;
-                            
-                            // Recargos: si se retrasa un pago: multas acumuladas + pagos anteriores adeudados + comisiones anteriores
-                            $recargos = $tieneRetraso ? ($multa + $pagoTotalFilaAnterior + $comisionAnterior) : 0.00;
-                            
-                            // Total = suma de pago actual + recargos acumulados (redondeado al piso)
-                            $totalFila = floor($pago + $recargos);
+                            if ($periodoLiquidado) {
+                                $recargos = 0.00;
+                                $abonoFila = 0.00;
+                                $totalFila = floor($pago);
+                            } else {
+                                $multa = floatval($p->multas ?? 0.0);
+                                $tieneRetraso = ($multa > 0);
+                                $multaVale = $p->multaConfigurada() > 0 ? $p->multaConfigurada() : 300.00;
+                                $cortesVencidos = ($tieneRetraso && $multaVale > 0) ? max(1, intval(round($multa / $multaVale))) : ($tieneRetraso ? 1 : 0);
+                                
+                                $pagoTotalFilaAnterior = $cortesVencidos * $pago;
+                                $comisionAnterior = $cortesVencidos * $comision;
+                                $recargos = $tieneRetraso ? ($multa + $pagoTotalFilaAnterior + $comisionAnterior) : 0.00;
+                                
+                                $exigibleBruto = $pago + $recargos;
+                                $abonoFila = min($montoAbonadoRestanteLoop, $exigibleBruto);
+                                $montoAbonadoRestanteLoop -= $abonoFila;
+                                
+                                $totalFila = floor(max(0, $exigibleBruto - $abonoFila));
+                            }
                         @endphp
                         <tr>
-                            <!-- #: número de préstamo a partir de 1 -->
                             <td class="border-r border-slate-900 px-2 py-2.5 text-center font-bold">{{ $index + 1 }}</td>
-                            <!-- Producto: Nombre de producto -->
                             <td class="border-r border-slate-900 px-3 py-2.5 font-semibold">
                                 {{ $p->productoVale->nombre ?? $p->productoVale->clave }}
                             </td>
-                            <!-- Cliente: Nombre de cliente -->
                             <td class="border-r border-slate-900 px-3 py-2.5 font-medium">
                                 {{ $p->cliente->nombre_completo ?? $p->cliente->nombre }}
                             </td>
-                            <!-- Pagos Realizados: ejemplo 1/10 -->
                             <td class="border-r border-slate-900 px-3 py-2.5 text-center font-bold">
                                 {{ $p->pagos_realizados }}/{{ $p->pagos_totales }}
                             </td>
-                            <!-- Comisión -->
                             <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-indigo-900 font-semibold">
                                 ${{ number_format($comision, 2) }}
                             </td>
-                            <!-- Pago -->
                             <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono font-bold">
                                 ${{ number_format($pago, 2) }}
                             </td>
-                            <!-- Recargos -->
                             <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono font-bold {{ $recargos > 0 ? 'text-rose-700' : 'text-slate-500' }}">
                                 ${{ number_format($recargos, 2) }}
                             </td>
-                            <!-- Total (redondeado al piso) -->
+                            @if($esAbonoParcial)
+                                <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono font-bold text-emerald-700">
+                                    -${{ number_format($abonoFila, 2) }}
+                                </td>
+                            @endif
                             <td class="px-3 py-2.5 text-right font-mono font-black text-slate-950">
                                 ${{ number_format($totalFila, 2) }}
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-4 py-8 text-center text-slate-500 font-medium italic">
+                            <td colspan="{{ $esAbonoParcial ? 9 : 8 }}" class="px-4 py-8 text-center text-slate-500 font-medium italic">
                                 No se encontraron clientes con préstamos activos para este periodo.
                             </td>
                         </tr>
@@ -240,6 +293,9 @@
                         <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-indigo-900">${{ number_format($totalComisionesSum, 2) }}</td>
                         <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-slate-900">${{ number_format($totalPagosSum, 2) }}</td>
                         <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-rose-700">${{ number_format($totalRecargosSum, 2) }}</td>
+                        @if($esAbonoParcial)
+                            <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-emerald-700">-${{ number_format($totalAbonosSum, 2) }}</td>
+                        @endif
                         <td class="px-3 py-2.5 text-right font-mono text-slate-950 text-sm">${{ number_format($totalGeneralSum, 2) }}</td>
                     </tr>
                 </tfoot>

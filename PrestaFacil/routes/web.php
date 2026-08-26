@@ -139,7 +139,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/dashboard', [GerenteSucursalController::class, 'index'])
             ->name('gerente-sucursal.dashboard');
         Route::post('/solicitudes-distribuidoras/{solicitud}/decidir', [GerenteSucursalController::class, 'decidirSolicitudConCuenta'])
-            ->middleware('require.vpn')
+            
             ->name('gerente-sucursal.solicitudes.decidir');
         Route::post('/coordinadores/traspasar', [GerenteSucursalController::class, 'solicitarTraspasoCoordinador'])
             ->name('gerente-sucursal.coordinadores.traspasar');

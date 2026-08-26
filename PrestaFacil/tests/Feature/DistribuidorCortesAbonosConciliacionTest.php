@@ -489,8 +489,10 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
 
         $relacion = RelacionCobranza::where('distribuidora_id', $distribuidora->id)->first();
         $this->assertNotNull($relacion);
-        $this->assertEquals(250.00, $relacion->monto_total_periodo);
-        $this->assertEquals(250.00, $relacion->adeudo_pendiente);
+        // Cuota neta con comisión de distribuidora descontada: 250 - ((4% * 2000)/10) = 242.00
+        $cuotaNetaEsperada = $distribuidora->totalCuotaQuincenalNeta();
+        $this->assertEquals($cuotaNetaEsperada, $relacion->monto_total_periodo);
+        $this->assertEquals($cuotaNetaEsperada, $relacion->adeudo_pendiente);
         $this->assertEquals(0.00, $relacion->monto_pagado);
 
         // 2. Abono en ventanilla de $100: se actualiza la relación
@@ -502,7 +504,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
 
         $relacion->refresh();
         $this->assertEquals(100.00, $relacion->monto_pagado);
-        $this->assertEquals(150.00, $relacion->adeudo_pendiente);
+        $this->assertEquals($cuotaNetaEsperada - 100.00, $relacion->adeudo_pendiente);
 
         // 3. Vencimiento de fecha límite: se aplica multa y se actualiza la relación
         $limitePasado = now()->subHour();
@@ -516,7 +518,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
 
         $relacion->refresh();
         $this->assertEquals(300.00, $relacion->multa_aplicada);
-        $this->assertEquals(450.00, $relacion->adeudo_pendiente); // 150 + 300
+        $this->assertEquals(($cuotaNetaEsperada - 100.00) + 300.00, $relacion->adeudo_pendiente);
     }
 
     public function test_gerente_general_and_gerente_sucursal_see_notification_bell_in_navbar()
@@ -718,7 +720,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertNotNull($relacionB);
         $this->assertEquals('pendiente', $relacionB->estado_pago);
         $this->assertEquals(0, $relacionB->puntos_ganados);
-        $this->assertEquals(300.00, $relacionB->adeudo_pendiente);
+        $this->assertEquals($distB->totalCuotaQuincenalNeta(), $relacionB->adeudo_pendiente);
     }
 
     public function test_points_are_not_awarded_on_abono_only_on_cut_including_prior_conciliations()

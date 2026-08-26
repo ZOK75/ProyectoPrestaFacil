@@ -66,6 +66,20 @@ class Configuracion extends Model
         'strikes_morosidad' => 'integer',
     ];
  
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saving(function ($config) {
+            if ($config->isDirty(['dia_corte', 'hora_corte']) && !$config->isDirty('fecha_corte')) {
+                $config->fecha_corte = $config->fechaCorteCalculada();
+            }
+            if ($config->isDirty(['dia_limite_pago', 'hora_limite_pago']) && !$config->isDirty('fecha_limite_pago')) {
+                $config->fecha_limite_pago = $config->fechaLimitePagoCalculada();
+            }
+        });
+    }
+
     /**
      * Usuario que creó el registro de configuración.
      */
@@ -158,10 +172,13 @@ class Configuracion extends Model
      */
     public function getFechaCorteAttribute($value): Carbon
     {
+        if (!empty($value)) {
+            return Carbon::parse($value);
+        }
         if (!empty($this->attributes['dia_corte'])) {
             return $this->fechaCorteCalculada();
         }
-        return $value ? Carbon::parse($value) : now()->startOfDay();
+        return now()->startOfDay();
     }
 
     /**
@@ -169,10 +186,13 @@ class Configuracion extends Model
      */
     public function getFechaLimitePagoAttribute($value): Carbon
     {
+        if (!empty($value)) {
+            return Carbon::parse($value);
+        }
         if (!empty($this->attributes['dia_limite_pago'])) {
             return $this->fechaLimitePagoCalculada();
         }
-        return $value ? Carbon::parse($value) : now()->addDays(15)->startOfDay();
+        return now()->addDays(15)->startOfDay();
     }
 
     /**
@@ -249,9 +269,7 @@ class Configuracion extends Model
 
         $this->update([
             'dia_corte' => $nuevoCorte->day,
-            'hora_corte' => $nuevoCorte->format('H:i:s'),
             'dia_limite_pago' => $nuevoLimite->day,
-            'hora_limite_pago' => $nuevoLimite->format('H:i:s'),
             'fecha_corte' => $nuevoCorte,
             'fecha_limite_pago' => $nuevoLimite,
         ]);

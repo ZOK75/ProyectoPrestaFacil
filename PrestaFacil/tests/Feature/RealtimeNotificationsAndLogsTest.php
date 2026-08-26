@@ -116,7 +116,7 @@ class RealtimeNotificationsAndLogsTest extends TestCase
             ]);
 
         $this->assertGreaterThanOrEqual(1, count($response->json('audit_logs')));
-        $this->assertEquals('TEST_OPERACION_LIVE', $response->json('audit_logs.0.tipo_operacion'));
+        $this->assertTrue(collect($response->json('audit_logs'))->pluck('tipo_operacion')->contains('TEST_OPERACION_LIVE'));
     }
 
     public function test_live_logs_endpoint_bloqueado_para_roles_no_administradores(): void

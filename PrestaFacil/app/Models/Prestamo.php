@@ -155,4 +155,39 @@ class Prestamo extends Model
     {
         return floatval($this->cuota_quincenal) + floatval($this->multas ?? 0.0);
     }
+
+    /**
+     * Calcula la comisión que retiene la distribuidora por cada quincena de este vale.
+     */
+    public function comisionDistribuidorPorQuincena(): float
+    {
+        $distribuidor = $this->createdBy;
+        if (!$distribuidor) {
+            return 0.0;
+        }
+        $porcentajeComision = $distribuidor->obtenerPorcentajeGanancia();
+        if ($porcentajeComision <= 0) {
+            return 0.0;
+        }
+        $totalPagos = max(1, intval($this->pagos_totales));
+        return (($porcentajeComision / 100.0) * floatval($this->monto_prestamo)) / $totalPagos;
+    }
+
+    /**
+     * Cuota quincenal neta a pagar por la distribuidora (Cuota Bruta - Comisión de Distribuidora).
+     * Redondeada al piso (pesos enteros).
+     */
+    public function cuotaQuincenalNeta(): float
+    {
+        return floor(max(0.0, floatval($this->cuota_quincenal) - $this->comisionDistribuidorPorQuincena()));
+    }
+
+    /**
+     * Total exigible del vale en la quincena (Cuota Neta + Multas).
+     * Redondeado al piso (pesos enteros).
+     */
+    public function totalExigibleQuincenalNeto(): float
+    {
+        return floor($this->cuotaQuincenalNeta() + floatval($this->multas ?? 0.0));
+    }
 }

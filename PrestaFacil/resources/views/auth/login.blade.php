@@ -83,9 +83,6 @@
                     <span class="text-red-500 text-sm mt-1 block">{{ $message }}</span>
                 @enderror
 
-
-      
-
                 <!-- Botón de Envío -->
                 <div class="pt-2">
                     <button type="submit" 

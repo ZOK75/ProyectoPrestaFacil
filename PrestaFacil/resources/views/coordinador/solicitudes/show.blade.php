@@ -43,7 +43,10 @@
                 </div>
 
                 <div class="text-xs text-slate-400 space-y-1.5 pt-2 border-t border-slate-800/60">
-                    <div><span class="text-slate-500">Registrado:</span> {{ $solicitud->created_at->format('d/m/Y H:i') }}</div>
+                    <div>
+                        <span class="text-slate-500">Registrado:</span> 
+                        {{ $solicitud->created_at ? ($solicitud->created_at instanceof \DateTimeInterface ? $solicitud->created_at->format('d/m/Y H:i') : \Carbon\Carbon::parse($solicitud->created_at)->format('d/m/Y H:i')) : 'N/A' }}
+                    </div>
                     <div><span class="text-slate-500">Sucursal:</span> {{ $solicitud->sucursal?->nombre }}</div>
                     @if($solicitud->coordinador)
                         <div><span class="text-slate-500">Coordinador:</span> {{ $solicitud->coordinador->name }}</div>
@@ -95,7 +98,16 @@
                         </div>
                         <div>
                             <span class="block text-xs text-slate-500">Fecha de Nacimiento</span>
-                            <span class="text-slate-200 font-semibold">{{ $solicitud->fecha_nacimiento?->format('d/m/Y') ?? 'No registrada' }}</span>
+                            @php
+                                $fechaNac = $solicitud->fecha_nacimiento;
+                                $fechaNacStr = 'No registrada';
+                                if ($fechaNac) {
+                                    $fechaNacStr = ($fechaNac instanceof \DateTimeInterface)
+                                        ? $fechaNac->format('d/m/Y')
+                                        : \Carbon\Carbon::parse($fechaNac)->format('d/m/Y');
+                                }
+                            @endphp
+                            <span class="text-slate-200 font-semibold">{{ $fechaNacStr }}</span>
                         </div>
                         <div>
                             <span class="block text-xs text-slate-500">Lugar de Nacimiento</span>
@@ -189,7 +201,13 @@
                             {{ $solicitud->observaciones_resolucion ?? 'Sin observaciones anotadas por el verificador.' }}
                         </p>
                         @if($solicitud->resolved_at)
-                            <span class="block text-[10px] text-slate-500 mt-3 font-semibold">Resuelto el {{ $solicitud->resolved_at->format('d/m/Y H:i') }}</span>
+                            @php
+                                $resAt = $solicitud->resolved_at;
+                                $resAtStr = ($resAt instanceof \DateTimeInterface)
+                                    ? $resAt->format('d/m/Y H:i')
+                                    : \Carbon\Carbon::parse($resAt)->format('d/m/Y H:i');
+                            @endphp
+                            <span class="block text-[10px] text-slate-500 mt-3 font-semibold">Resuelto el {{ $resAtStr }}</span>
                         @endif
                     </div>
                 </div>

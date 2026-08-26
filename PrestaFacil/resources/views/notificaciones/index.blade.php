@@ -13,10 +13,6 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                 </svg>
                 Centro de Notificaciones
-                <span class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                    En Vivo
-                </span>
             </h1>
             <p class="text-xs text-slate-400 mt-0.5">Avisos de cortes, recordatorios de cobranza, solicitudes y estado operativo en tiempo real.</p>
         </div>
@@ -48,7 +44,6 @@
                     <div class="space-y-1 min-w-0 flex-1">
                         <div class="flex items-center gap-2 flex-wrap">
                             <h3 class="text-sm font-extrabold text-white break-words" x-text="item.titulo"></h3>
-                            <span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">EN VIVO</span>
                         </div>
                         <p class="text-xs text-slate-300 leading-relaxed break-words" x-text="item.mensaje"></p>
                         <span class="text-[10px] text-slate-500 font-mono block pt-0.5" x-text="item.created_at_human || 'Hace un momento'"></span>

@@ -141,7 +141,9 @@ class UserController extends Controller
         // Validación de permisos de rol
         $rolesPermitidosIds = $operador->rolesPermitidos()->pluck('id')->toArray();
         if (!in_array($data['rol_id'], $rolesPermitidosIds)) {
-            return back()->withErrors(['rol_id' => 'Acceso denegado: No tienes permisos para asignar este rol.'])->withInput();
+            return back()->withErrors(['rol_id' => 'Acceso denegado: No tienes permisos para asignar este rol.'])
+                         ->with('error', 'Acceso denegado: No tienes permisos para asignar este rol.')
+                         ->withInput();
         }
 
         $rolSeleccionado = Rol::find($data['rol_id']);

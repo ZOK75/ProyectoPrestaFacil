@@ -14,12 +14,14 @@ class StoreUserRequest extends FormRequest
 
     public function rules(): array
     {
+        $globalRolesIds = \App\Models\Rol::whereIn('nombre', ['Gerente General', 'gerente general', 'Administrador', 'administrador'])->pluck('id')->filter()->implode(',');
+
         return [
             'name' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[a-zA-Z\sñÑáéíóúÁÉÍÓÚ]+$/'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'confirmed', Password::min(12)],
             'rol_id' => ['required', 'exists:roles,id'],
-            'sucursal_id' => ['nullable', 'required_unless:rol_id,' . optional(\App\Models\Rol::whereIn('nombre', ['Gerente General', 'gerente general'])->first())->id, 'exists:sucursales,id'],
+            'sucursal_id' => ['nullable', $globalRolesIds ? 'required_unless:rol_id,' . $globalRolesIds : 'nullable', 'exists:sucursales,id'],
             'categoria_distribuidor' => ['nullable', 'in:cobre,plata,oro'],
         ];
     }

@@ -506,19 +506,25 @@ class PrestamoController extends Controller
         if (!$relacion) {
             $this->corteService->verificarYProcesarCortesYVencimientos();
             $relacion = RelacionCobranza::where('distribuidora_id', $distribuidoraId)
-                ->where('fecha_corte', $configuracion->fecha_corte)
+                ->whereDate('fecha_corte', $configuracion->fecha_corte->toDateString())
                 ->first();
+
+            if (!$relacion) {
+                $relacion = RelacionCobranza::where('distribuidora_id', $distribuidoraId)
+                    ->orderBy('fecha_corte', 'desc')
+                    ->first();
+            }
         }
 
-        $fechaCorteRef = $relacion ? $relacion->fecha_corte : $configuracion->fecha_corte;
-
-        // Cargar todos los préstamos activos en la fecha de corte
+        // Cargar todos los préstamos activos de la distribuidora para la relación de cobranza
         $prestamosQuery = Prestamo::with(['cliente', 'productoVale', 'pagos'])
             ->where('created_by_user_id', $distribuidoraId)
-            ->where('created_at', '<=', $fechaCorteRef)
-            ->where(function($query) use ($fechaCorteRef) {
+            ->where(function($query) {
                 $query->where('estado', 'activo')
-                      ->orWhere('updated_at', '>', $fechaCorteRef);
+                      ->orWhere(function($q2) {
+                          $q2->where('estado', 'finalizado')
+                             ->where('updated_at', '>=', now()->subDays(15));
+                      });
             });
 
         $prestamos = $prestamosQuery->orderBy('created_at', 'desc')->get();

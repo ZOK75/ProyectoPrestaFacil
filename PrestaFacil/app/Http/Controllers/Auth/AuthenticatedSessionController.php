@@ -345,7 +345,12 @@ class AuthenticatedSessionController extends Controller
             'email_2fa_expires_at' => now()->addMinutes(10),
         ]);
 
-        $user->notify(new SendEmail2FACode($code));
+        try {
+            $user->notify(new SendEmail2FACode($code));
+            Log::info('Reenvío de correo 2FA Mailtrap exitoso para: ' . $user->email);
+        } catch (\Throwable $e) {
+            Log::error('Error al reenviar correo 2FA Mailtrap a ' . $user->email . ': ' . $e->getMessage());
+        }
 
         return back()->with('status', 'Hemos reenviado un nuevo código a tu correo.');
     }

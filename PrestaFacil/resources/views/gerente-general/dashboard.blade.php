@@ -270,6 +270,173 @@
         </div>
     @endif
 
+    <!-- SECCIÓN: Solicitudes de Aumento de Crédito Pendientes de Gerencia -->
+    @if(isset($solicitudesCreditoPendientes) && $solicitudesCreditoPendientes->count() > 0)
+        <div class="bg-slate-900 border border-emerald-500/40 rounded-2xl shadow-xl overflow-hidden" x-data="{ openDecisionCreditoId: null }">
+            <div class="p-6 border-b border-slate-800 bg-emerald-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-300 font-bold">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            Solicitudes de Incremento de Crédito Pendientes
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-500/30 text-emerald-300 border border-emerald-500/40">
+                                {{ $solicitudesCreditoPendientes->count() }}
+                            </span>
+                        </h2>
+                        <p class="text-slate-400 text-xs mt-0.5">Solicitudes enviadas por los coordinadores para ampliar la línea de crédito de distribuidoras.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divide-y divide-slate-800">
+                @foreach($solicitudesCreditoPendientes as $sc)
+                    <div class="p-5 space-y-3">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-extrabold text-white text-base">{{ $sc->distribuidor?->name }}</span>
+                                    <span class="text-slate-400 text-xs font-mono">Ref: {{ $sc->distribuidor?->referenciaPago() }}</span>
+                                    <span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                        Sucursal: {{ $sc->distribuidor?->sucursal?->nombre ?? 'N/A' }}
+                                    </span>
+                                </div>
+                                <p class="text-xs text-slate-300">
+                                    Coordinador Solicitante: <strong class="text-slate-100">{{ $sc->coordinador?->name }}</strong> &bull; Fecha: {{ $sc->created_at->format('d/m/Y H:i') }}
+                                </p>
+                                <p class="text-xs text-slate-400 italic bg-slate-950/40 p-2.5 rounded-xl border border-slate-800">
+                                    "{{ $sc->motivo }}"
+                                </p>
+                            </div>
+
+                            <div class="flex items-center gap-4 shrink-0">
+                                <div class="text-right">
+                                    <div class="text-[10px] text-slate-500 uppercase">Límite Actual: ${{ number_format($sc->limite_actual, 2) }}</div>
+                                    <div class="text-lg font-black text-emerald-400 font-mono">${{ number_format($sc->limite_nuevo, 2) }}</div>
+                                </div>
+                                <button @click="openDecisionCreditoId = (openDecisionCreditoId === '{{ $sc->id }}' ? null : '{{ $sc->id }}')" 
+                                        class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-950/20 transition">
+                                    Dictaminar Crédito
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Panel desplegable de decisión -->
+                        <div x-show="openDecisionCreditoId === '{{ $sc->id }}'" class="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3" style="display: none;" x-transition>
+                            <form novalidate method="POST" action="{{ route('solicitudes-credito.procesar', $sc) }}" class="space-y-3">
+                                @csrf
+                                <input type="hidden" name="accion" id="dec_cred_gg_{{ $sc->id }}">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Observaciones / Motivo (Opcional)</label>
+                                    <textarea name="observaciones" rows="2" placeholder="Notas sobre la resolución del aumento..." class="w-full bg-slate-900 border border-slate-800 rounded-xl text-white px-4 py-2 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"></textarea>
+                                </div>
+                                <div class="flex justify-end gap-2">
+                                    <button type="submit" onclick="document.getElementById('dec_cred_gg_{{ $sc->id }}').value = 'rechazar'; return confirm('¿Rechazar solicitud de incremento de crédito?')" class="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        Rechazar
+                                    </button>
+                                    <button type="submit" onclick="document.getElementById('dec_cred_gg_{{ $sc->id }}').value = 'aprobar'; return confirm('¿Aprobar incremento de crédito a ${{ number_format($sc->limite_nuevo, 2) }}?')" class="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg text-xs font-bold transition">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                        Aprobar Incremento
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
+    <!-- SECCIÓN: Solicitudes de Ascenso de Categoría Pendientes de Gerencia -->
+    @if(isset($solicitudesCategoriaPendientes) && $solicitudesCategoriaPendientes->count() > 0)
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl shadow-xl overflow-hidden" x-data="{ openDecisionCatId: null }">
+            <div class="p-6 border-b border-slate-800 bg-amber-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 font-bold">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            Solicitudes de Ascenso de Categoría Pendientes
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500/30 text-amber-300 border border-amber-500/40">
+                                {{ $solicitudesCategoriaPendientes->count() }}
+                            </span>
+                        </h2>
+                        <p class="text-slate-400 text-xs mt-0.5">Propuestas de cambio de nivel y comisiones por volumen de colocación.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divide-y divide-slate-800">
+                @foreach($solicitudesCategoriaPendientes as $scat)
+                    <div class="p-5 space-y-3">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-extrabold text-white text-base">{{ $scat->distribuidor?->name }}</span>
+                                    <span class="text-slate-400 text-xs font-mono">Ref: {{ $scat->distribuidor?->referenciaPago() }}</span>
+                                    <span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                        Sucursal: {{ $scat->distribuidor?->sucursal?->nombre ?? 'N/A' }}
+                                    </span>
+                                </div>
+                                <p class="text-xs text-slate-300">
+                                    Coordinador Solicitante: <strong class="text-slate-100">{{ $scat->coordinador?->name }}</strong> &bull; Fecha: {{ $scat->created_at->format('d/m/Y H:i') }}
+                                </p>
+                                <p class="text-xs text-slate-400 italic bg-slate-950/40 p-2.5 rounded-xl border border-slate-800">
+                                    "{{ $scat->motivo }}"
+                                </p>
+                            </div>
+
+                            <div class="flex items-center gap-4 shrink-0">
+                                <div class="text-center">
+                                    <span class="px-2.5 py-1 rounded text-xs font-bold uppercase bg-slate-800 text-slate-300 border border-slate-700">
+                                        {{ $scat->categoria_actual }}
+                                    </span>
+                                    <span class="text-amber-400 font-bold px-1">&rarr;</span>
+                                    <span class="px-2.5 py-1 rounded text-xs font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                        {{ $scat->categoria_nueva }}
+                                    </span>
+                                </div>
+                                <button @click="openDecisionCatId = (openDecisionCatId === '{{ $scat->id }}' ? null : '{{ $scat->id }}')" 
+                                        class="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-950/20 transition">
+                                    Dictaminar Categoría
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Panel desplegable de decisión -->
+                        <div x-show="openDecisionCatId === '{{ $scat->id }}'" class="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3" style="display: none;" x-transition>
+                            <form novalidate method="POST" action="{{ route('solicitudes-categoria.procesar', $scat) }}" class="space-y-3">
+                                @csrf
+                                <input type="hidden" name="accion" id="dec_cat_gg_{{ $scat->id }}">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Observaciones (Opcional)</label>
+                                    <textarea name="observaciones" rows="2" placeholder="Notas sobre la resolución del ascenso..." class="w-full bg-slate-900 border border-slate-800 rounded-xl text-white px-4 py-2 text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"></textarea>
+                                </div>
+                                <div class="flex justify-end gap-2">
+                                    <button type="submit" onclick="document.getElementById('dec_cat_gg_{{ $scat->id }}').value = 'rechazar'; return confirm('¿Rechazar solicitud de ascenso de categoría?')" class="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-bold transition">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        Rechazar
+                                    </button>
+                                    <button type="submit" onclick="document.getElementById('dec_cat_gg_{{ $scat->id }}').value = 'aprobar'; return confirm('¿Aprobar ascenso a categoría {{ strtoupper($scat->categoria_nueva) }}?')" class="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg text-xs font-bold transition">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                        Aprobar Categoría
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <!-- Sección: Solicitudes de Traspaso de Coordinadores (Paso 2: Autorización Final Gerencia General) -->
     @if(isset($transferenciasCoordinadorPendientesGG) && $transferenciasCoordinadorPendientesGG->count() > 0)
         <div class="bg-slate-900 border border-amber-500/40 rounded-2xl shadow-xl overflow-hidden" x-data="{ openDecisionCoordId: null }">

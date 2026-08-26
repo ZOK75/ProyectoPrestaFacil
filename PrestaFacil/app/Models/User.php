@@ -197,6 +197,16 @@ class User extends Authenticatable
         return $this->hasMany(SolicitudCredito::class, 'coordinador_id')->orderBy('created_at', 'desc');
     }
 
+    public function solicitudesCategoriaComoDistribuidor(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\SolicitudCategoria::class, 'distribuidor_id')->orderBy('created_at', 'desc');
+    }
+
+    public function solicitudesCategoriaComoCoordinador(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\SolicitudCategoria::class, 'coordinador_id')->orderBy('created_at', 'desc');
+    }
+
     public function esCajero(): bool
     {
         $nombre = strtolower($this->rol?->nombre ?? '');
@@ -380,13 +390,18 @@ class User extends Authenticatable
 
     /**
      * Devuelve los roles que este usuario tiene permiso de asignar.
-     * Los distribuidores NO pueden crearse manualmente por ningún gerente (solo vía solicitud y verificación).
+     * Al registrarse nuevos usuarios, los distribuidores NO pueden crearse manualmente (solo vía solicitud y verificación).
+     * Al editar un distribuidor ya existente, se permite conservar su rol.
      */
-    public function rolesPermitidos()
+    public function rolesPermitidos(bool $incluirDistribuidor = false)
     {
-        $query = Rol::query()->whereNotIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']);
+        $query = Rol::query();
 
-        if ($this->esGerenteGeneral()) {
+        if (!$incluirDistribuidor) {
+            $query->whereNotIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']);
+        }
+
+        if ($this->esGerenteGeneral() || $this->esAdministrador()) {
             $query->where('nombre', '!=', 'Gerente General');
         } elseif ($this->esGerenteSucursal()) {
             $query->whereNotIn('nombre', ['Gerente General', 'Gerente de Sucursal', 'Administrador']);

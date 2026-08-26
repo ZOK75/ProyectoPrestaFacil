@@ -14,6 +14,16 @@
         this.selectedDistLimit = limit;
         this.showCreditModal = true;
     },
+    showCategoryModal: false,
+    catDistId: '',
+    catDistName: '',
+    catDistActual: 'cobre',
+    openCategoryModal(id, name, currentCategory) {
+        this.catDistId = id;
+        this.catDistName = name;
+        this.catDistActual = currentCategory || 'cobre';
+        this.showCategoryModal = true;
+    },
     showTransferModal: false,
     transferDistId: '',
     transferDistName: '',
@@ -456,8 +466,17 @@
                                     <!-- Incrementar Crédito -->
                                     <button type="button" 
                                             @click="openCreditModal('{{ $dist->id }}', '{{ $dist->name }}', {{ $dist->limite_credito }})"
-                                            class="px-2.5 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 rounded-lg text-xs font-semibold transition">
+                                            class="px-2.5 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 rounded-lg text-xs font-semibold transition"
+                                            title="Solicitar aumento de límite de crédito a Gerencia">
                                         + Crédito
+                                    </button>
+
+                                    <!-- Ascenso de Categoría -->
+                                    <button type="button" 
+                                            @click="openCategoryModal('{{ $dist->id }}', '{{ $dist->name }}', '{{ strtolower($dist->categoria_distribuidor ?? 'cobre') }}')"
+                                            class="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-lg text-xs font-semibold transition"
+                                            title="Solicitar cambio de categoría (Cobre/Plata/Oro) a Gerencia">
+                                        + Categoría
                                     </button>
 
                                     <!-- Solicitar Cambio de Distribuidora -->
@@ -486,8 +505,13 @@
     <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-sm overflow-hidden">
         <div class="p-5 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
             <div>
-                <h2 class="text-base sm:text-lg font-bold text-white">Solicitudes de Incremento de Crédito</h2>
-                <p class="text-slate-400 text-xs mt-0.5">Estatus de autorizaciones enviadas a Gerencia.</p>
+                <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                    Solicitudes de Incremento de Crédito
+                </h2>
+                <p class="text-slate-400 text-xs mt-0.5">Estatus de aumentos de crédito solicitados a la Gerencia.</p>
             </div>
         </div>
 
@@ -551,6 +575,84 @@
         </div>
     </div>
 
+    <!-- Historial de Solicitudes de Aumento de Categoría -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+        <div class="p-5 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+            <div>
+                <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                    </svg>
+                    Solicitudes de Ascenso de Categoría
+                </h2>
+                <p class="text-slate-400 text-xs mt-0.5">Estatus de promociones de nivel (Cobre / Plata / Oro) turnadas a Gerencia.</p>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-slate-800/50 text-slate-300 uppercase tracking-wider">
+                        <th class="p-3.5 font-semibold">Distribuidora</th>
+                        <th class="p-3.5 font-semibold text-center">Categoría Actual</th>
+                        <th class="p-3.5 font-semibold text-center">Categoría Solicitada</th>
+                        <th class="p-3.5 font-semibold">Fecha</th>
+                        <th class="p-3.5 font-semibold">Estado</th>
+                        <th class="p-3.5 font-semibold">Resolución / Gerente</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    @forelse($solicitudesCategoria as $solCat)
+                        <tr class="hover:bg-slate-800/20 transition-colors">
+                            <td class="p-3.5">
+                                <div class="text-slate-200 font-bold">{{ $solCat->distribuidor?->name }}</div>
+                                <div class="text-slate-500 text-[10px] font-mono">Ref: {{ $solCat->distribuidor?->referenciaPago() }}</div>
+                            </td>
+                            <td class="p-3.5 text-center">
+                                <span class="px-2.5 py-0.5 rounded text-[11px] font-bold uppercase bg-slate-800 text-slate-300 border border-slate-700">
+                                    {{ $solCat->categoria_actual }}
+                                </span>
+                            </td>
+                            <td class="p-3.5 text-center">
+                                <span class="px-2.5 py-0.5 rounded text-[11px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                    &rarr; {{ $solCat->categoria_nueva }}
+                                </span>
+                            </td>
+                            <td class="p-3.5 text-slate-400">
+                                {{ $solCat->created_at->format('d/m/Y H:i') }}
+                            </td>
+                            <td class="p-3.5">
+                                @if($solCat->estado === 'pendiente')
+                                    <span class="px-2.5 py-1 rounded-md text-[10px] font-bold border bg-amber-500/10 text-amber-400 border-amber-500/20">Pendiente</span>
+                                @elseif($solCat->estado === 'aprobado')
+                                    <span class="px-2.5 py-1 rounded-md text-[10px] font-bold border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Aprobado</span>
+                                @else
+                                    <span class="px-2.5 py-1 rounded-md text-[10px] font-bold border bg-rose-500/10 text-rose-400 border-rose-500/20">Rechazado</span>
+                                @endif
+                            </td>
+                            <td class="p-3.5 text-slate-400 max-w-xs truncate">
+                                @if($solCat->gerente)
+                                    <span class="block text-slate-300 font-semibold">{{ $solCat->gerente->name }}</span>
+                                @endif
+                                @if($solCat->observaciones)
+                                    <span class="block italic text-slate-500">"{{ $solCat->observaciones }}"</span>
+                                @else
+                                    <span class="block italic text-slate-600">Sin comentarios</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="p-6 text-center text-slate-500 text-xs">
+                                No has solicitado cambios de categoría anteriormente.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- MODAL: Solicitar Incremento de Crédito (Alpine.js) -->
     <div x-show="showCreditModal" class="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden overflow-y-auto p-4" style="display: none;" x-transition>
         <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" @click="showCreditModal = false"></div>
@@ -595,6 +697,67 @@
                         </button>
                         <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-900/20 text-xs font-bold transition">
                             Enviar a Gerencia
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Solicitar Ascenso de Categoría (Alpine.js) -->
+    <div x-show="showCategoryModal" class="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden overflow-y-auto p-4" style="display: none;" x-transition>
+        <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" @click="showCategoryModal = false"></div>
+        
+        <div class="relative w-full max-w-lg mx-auto z-50">
+            <div class="relative flex flex-col w-full bg-slate-900 border border-amber-500/30 rounded-2xl shadow-2xl p-6">
+                <div class="flex items-start justify-between pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 font-bold text-xs">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-base font-bold text-white">Solicitar Ascenso de Categoría</h3>
+                    </div>
+                    <button type="button" @click="showCategoryModal = false" class="text-slate-400 hover:text-white text-lg font-bold leading-none">&times;</button>
+                </div>
+                
+                <form novalidate :action="`/coordinador/distribuidores/${catDistId}/solicitar-categoria`" method="POST" class="mt-4 space-y-4">
+                    @csrf
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Distribuidora</label>
+                        <input type="text" readonly :value="catDistName" class="w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-300 px-4 py-2.5 text-xs font-bold select-none focus:outline-none">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Categoría Actual</label>
+                            <div class="w-full bg-slate-950 border border-slate-800 rounded-xl text-slate-300 px-4 py-2.5 text-xs select-none font-bold uppercase"
+                                 x-text="catDistActual">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Nueva Categoría *</label>
+                            <select name="categoria_nueva" required class="w-full bg-slate-950 border border-slate-800 rounded-xl text-amber-300 px-4 py-2.5 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none font-bold">
+                                <option value="cobre" x-show="catDistActual !== 'cobre'">Cobre (Básico)</option>
+                                <option value="plata" x-show="catDistActual !== 'plata'">Plata (Intermedio)</option>
+                                <option value="oro" x-show="catDistActual !== 'oro'">Oro (Avanzado)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Motivo / Justificación del Ascenso *</label>
+                        <textarea name="motivo" rows="3" required placeholder="Explica el desempeño en colocación, puntualidad en pagos o volumen de vales que justifican la promoción..."
+                                  class="w-full bg-slate-950 border border-slate-800 rounded-xl text-white px-4 py-2.5 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-3 border-t border-slate-800 mt-5">
+                        <button type="button" @click="showCategoryModal = false" class="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold transition">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/20 text-xs font-bold transition">
+                            Enviar Solicitud a Gerencia
                         </button>
                     </div>
                 </form>

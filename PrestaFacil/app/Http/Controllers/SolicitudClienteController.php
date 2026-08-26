@@ -116,7 +116,7 @@ class SolicitudClienteController extends Controller
         }
 
         // 4. Solicitudes de Traspaso de Coordinador (Gerente -> Gerente -> Gerente General)
-        $solTransCoord = \App\Models\SolicitudTransferenciaCoordinador::with(['coordinador', 'gerenteEmisor', 'gerenteReceptor', 'gerenteGeneral', 'sucursalDestino'])->get();
+        $solTransCoord = \App\Models\SolicitudTransferenciaCoordinador::with(['coordinador', 'gerenteEmisor', 'gerenteReceptor', 'sucursalDestino'])->get();
         foreach ($solTransCoord as $sol) {
             $items->push([
                 'id' => $sol->id,
@@ -124,7 +124,7 @@ class SolicitudClienteController extends Controller
                 'tipo_badge_color' => 'amber',
                 'usuario_emisor' => $sol->gerenteEmisor?->name ?? 'Gerente Emisor',
                 'rol_emisor' => 'Gerente Sucursal',
-                'usuario_receptor' => $sol->gerenteGeneral?->name ?? ($sol->gerenteReceptor?->name ?? 'Gerencia Receptora'),
+                'usuario_receptor' => $sol->gerenteReceptor?->name ?? 'Gerencia Receptora',
                 'fecha' => $sol->created_at,
                 'estado' => $sol->estado,
                 'comentario' => "Reasignación del coordinador {$sol->coordinador?->name} a sucursal '{$sol->sucursalDestino?->nombre}'. Motivo: {$sol->motivo}",

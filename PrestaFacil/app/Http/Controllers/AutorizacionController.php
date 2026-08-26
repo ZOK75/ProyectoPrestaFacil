@@ -119,7 +119,7 @@ class AutorizacionController extends Controller
         }
 
         // 5. Traspasos de Coordinador Aprobados
-        $solTransCoord = \App\Models\SolicitudTransferenciaCoordinador::with(['coordinador', 'gerenteEmisor', 'gerenteReceptor', 'gerenteGeneral', 'sucursalDestino'])
+        $solTransCoord = \App\Models\SolicitudTransferenciaCoordinador::with(['coordinador', 'gerenteEmisor', 'gerenteReceptor', 'sucursalDestino'])
             ->where('estado', 'aprobada')
             ->get();
 
@@ -129,7 +129,7 @@ class AutorizacionController extends Controller
                 'tipo_categoria' => 'Traspaso Coordinador Aprobado',
                 'usuario_envio' => $stc->gerenteEmisor?->name ?? 'Gerente Emisor',
                 'rol_envio' => 'Gerente Sucursal',
-                'usuario_acepto' => $stc->gerenteGeneral?->name ?? ($stc->gerenteReceptor?->name ?? 'Gerente General'),
+                'usuario_acepto' => $stc->gerenteReceptor?->name ?? 'Gerente General',
                 'rol_acepto' => 'Gerencia General',
                 'estado' => $stc->estado,
                 'fecha' => $stc->resolved_at ?? $stc->updated_at,

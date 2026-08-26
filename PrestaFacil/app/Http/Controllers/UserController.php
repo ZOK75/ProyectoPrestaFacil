@@ -183,6 +183,19 @@ class UserController extends Controller
     }
 
     /**
+     * Muestra el detalle de un usuario específico.
+     */
+    public function show(User $usuario)
+    {
+        $operador = $this->operador();
+        
+        // Cargar las relaciones necesarias para evitar N+1 en la vista
+        $usuario->load(['rol', 'sucursal', 'desactivadoPor']);
+
+        return view('usuarios.show', compact('usuario', 'operador'));
+    }
+
+    /**
      * Formulario de edición. No permitido para Distribuidor ni Administrador.
      */
     public function edit(User $usuario)

@@ -201,9 +201,28 @@ class SolicitudClienteController extends Controller
             'rechazadas' => $items->filter(fn($i) => str_contains(strtolower($i['estado']), 'rechazad'))->count(),
         ];
 
+        // Paginación manual de la colección unificada
+        $currentPage = \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPage();
+        $perPage = 15;
+        $currentPageItems = $items->slice(($currentPage - 1) * $perPage, $perPage)->values();
+
+        $solicitudes = new \Illuminate\Pagination\LengthAwarePaginator(
+            $currentPageItems,
+            $items->count(),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
         $sucursales = Sucursal::where('activo', true)->orderBy('nombre')->get();
 
-        return view('solicitudes-clientes.index', compact('items', 'stats', 'operador', 'sucursales'));
+        return view('solicitudes-clientes.index', [
+            'items' => $currentPageItems,
+            'solicitudes' => $solicitudes,
+            'stats' => $stats,
+            'operador' => $operador,
+            'sucursales' => $sucursales
+        ]);
     }
 
     /**

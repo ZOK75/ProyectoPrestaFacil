@@ -93,7 +93,19 @@
                     </div>
                 @endif
                 
-                <input type="hidden" name="fecha_nacimiento" value="{{ $prestamo->cliente->fecha_nacimiento->format('Y-m-d') }}">
+                <!-- Fecha de Nacimiento -->
+                <div>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Fecha de Nacimiento</label>
+                    <div class="flex gap-2 items-center mt-1">
+                        <div class="flex-1 bg-slate-950/50 border border-slate-800 rounded-lg p-2 text-xs text-slate-400 line-through">
+                            {{ $prestamo->cliente->fecha_nacimiento?->format('d/m/Y') }}
+                        </div>
+                        <svg class="w-4 h-4 text-slate-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        <input type="date" name="fecha_nacimiento" value="{{ old('fecha_nacimiento', $prestamo->cliente->fecha_nacimiento?->format('Y-m-d')) }}" required
+                            class="flex-1 bg-slate-950 border border-indigo-500/50 rounded-lg py-2 px-2 text-xs text-white focus:ring-1 focus:ring-indigo-500">
+                    </div>
+                </div>
+
                 <input type="hidden" name="lugar_nacimiento" value="{{ $prestamo->cliente->lugar_nacimiento }}">
             </div>
         </div>

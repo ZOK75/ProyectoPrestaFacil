@@ -240,9 +240,9 @@
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 uppercase">Monto a Abonar al Vale ($)</label>
                     <input type="number" name="monto_abonado" step="0.01" min="0.01" required placeholder="0.00"
-                        :value="Math.floor(Number(valeSeleccionado?.totalExigible || 0)).toFixed(2)"
+                        :value="Math.min(Number(valeSeleccionado?.saldo || 0) + Number(valeSeleccionado?.multas || 0), Math.floor(Number(valeSeleccionado?.totalExigible || 0))).toFixed(2)"
                         class="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 px-3 text-emerald-400 font-mono text-xl font-black mt-1 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-center">
-                    <span class="text-[10px] text-slate-500 block mt-0.5">El abono cubre la cuota neta tras descontar la comisión ganada por la distribuidora.</span>
+                    <span class="text-[10px] text-slate-500 block mt-0.5">Monto sugerido ajustado al saldo pendiente del vale.</span>
                 </div>
 
                 <div>

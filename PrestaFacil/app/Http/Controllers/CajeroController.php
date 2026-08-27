@@ -21,6 +21,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CajeroController extends Controller
 {
@@ -452,6 +453,11 @@ class CajeroController extends Controller
             return back()->with('error', 'Límite de un solo abono debe ser menor a 1 millón.')->withInput();
         }
 
+        $totalMaximoPermitido = floatval($prestamo->adeudo_pendiente) + floatval($prestamo->multas ?? 0);
+        if (floatval($request->monto_abonado) > ($totalMaximoPermitido + 0.01)) {
+            return back()->with('error', "El abono ingresado (\$" . number_format($request->monto_abonado, 2) . ") excede el adeudo total pendiente del vale (\$" . number_format($totalMaximoPermitido, 2) . ").")->withInput();
+        }
+
         $cajera = $this->cajera();
         $ahora = now();
         $distribuidora = $prestamo->createdBy;
@@ -615,13 +621,25 @@ class CajeroController extends Controller
 
         DB::transaction(function () use ($request, $cajera, $path) {
             $distribuidoraId = $request->distribuidora_id ?: ($request->prestamo_id ? Prestamo::find($request->prestamo_id)?->created_by_user_id : null);
+            $distribuidora = $distribuidoraId ? User::find($distribuidoraId) : null;
+            $prestamo = $request->prestamo_id ? Prestamo::find($request->prestamo_id) : null;
+
+            $refOriginal = $request->referencia_original;
+            if (empty($refOriginal) || strtoupper(trim($refOriginal)) === 'N/A') {
+                $refOriginal = $prestamo?->referencia ?? ($distribuidora ? $distribuidora->referenciaPago() : 'REF-ERR-' . strtoupper(Str::random(6)));
+            }
+
+            $refConciliacion = $request->referencia_conciliacion;
+            if (empty($refConciliacion) || strtoupper(trim($refConciliacion)) === 'N/A') {
+                $refConciliacion = $distribuidora ? $distribuidora->referenciaPago() : ($prestamo?->referencia ?? 'REF-CONC-' . strtoupper(Str::random(6)));
+            }
 
             $conciliacion = Conciliacion::create([
                 'prestamo_id' => $request->prestamo_id ?: null,
                 'pago_prestamo_id' => $request->pago_prestamo_id ?: null,
                 'distribuidora_id' => $distribuidoraId,
-                'referencia_original' => $request->referencia_original,
-                'referencia_conciliacion' => $request->referencia_conciliacion,
+                'referencia_original' => $refOriginal,
+                'referencia_conciliacion' => $refConciliacion,
                 'fecha_pago' => $request->fecha_pago,
                 'metodo_pago' => $request->metodo_pago ?? 'transferencia',
                 'monto_original' => $request->monto_original,

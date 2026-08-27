@@ -16,8 +16,24 @@
         <div class="absolute -right-6 -top-6 w-32 h-32 bg-cyan-600/10 rounded-full blur-2xl pointer-events-none"></div>
 
         <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-            <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest">Validaciones</h2>
+            <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest">Validaciones y Monto del Vale</h2>
             <span class="px-2 py-0.5 rounded text-[10px] font-black bg-cyan-500/20 text-cyan-300 uppercase border border-cyan-500/30">Vale Digital</span>
+        </div>
+
+        <!-- Tarjeta Resumen Financiero del Vale -->
+        <div class="bg-slate-950 p-3 rounded-xl border border-indigo-500/30 space-y-1.5 text-xs">
+            <div class="flex justify-between items-center">
+                <span class="text-slate-400 font-medium">Monto del Préstamo:</span>
+                <span class="font-mono font-black text-emerald-400 text-sm">${{ number_format($prestamo->monto_prestamo, 2) }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-slate-400 font-medium">Total a Pagar (Capital + Interés):</span>
+                <span class="font-mono font-black text-white text-sm">${{ number_format($prestamo->monto_total_pagar, 2) }}</span>
+            </div>
+            <div class="flex justify-between items-center pt-1 border-t border-slate-800 text-[11px]">
+                <span class="text-slate-400">Cuota Quincenal: <strong class="text-indigo-300 font-mono">${{ number_format($prestamo->cuota_quincenal, 2) }}</strong></span>
+                <span class="text-slate-400">Plazo: <strong class="text-white font-mono">{{ $prestamo->pagos_totales }} quincenas</strong></span>
+            </div>
         </div>
         
         @if(empty($erroresNegocio))

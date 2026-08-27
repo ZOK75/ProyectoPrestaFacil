@@ -765,13 +765,13 @@
                      x-transition:leave="transition ease-in duration-200 transform"
                      x-transition:leave-start="opacity-100 scale-100"
                      x-transition:leave-end="opacity-0 translate-x-4 scale-95"
-                     class="pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-indigo-500/40 rounded-2xl p-4 shadow-2xl shadow-indigo-950/80 flex items-start gap-3.5 text-left transition relative overflow-hidden group">
+                     class="pointer-events-auto bg-white border border-emerald-500/30 rounded-2xl p-4 shadow-2xl flex items-start gap-3.5 text-left transition relative overflow-hidden group">
                     
                     <!-- Borde de progreso / tiempo -->
-                    <div class="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 w-full animate-pulse"></div>
+                    <div class="absolute bottom-0 left-0 h-1 bg-emerald-500 w-full"></div>
 
                     <!-- Icono de Notificación -->
-                    <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shadow-inner">
+                    <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-sm">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                         </svg>
@@ -780,17 +780,17 @@
                     <!-- Contenido -->
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center justify-between gap-1 mb-0.5">
-                            <span class="text-[10px] font-black uppercase text-indigo-400 tracking-wider">Nueva Notificación</span>
-                            <button @click="dismiss(toast.id)" class="text-slate-500 hover:text-white transition text-xs leading-none p-1 -mr-1">
+                            <span class="text-[10px] font-black uppercase text-emerald-700 tracking-wider">Nueva Notificación</span>
+                            <button @click="dismiss(toast.id)" class="text-slate-400 hover:text-slate-700 transition text-xs leading-none p-1 -mr-1">
                                 &times;
                             </button>
                         </div>
-                        <h4 class="text-xs font-bold text-white truncate" x-text="toast.titulo"></h4>
-                        <p class="text-[11px] text-slate-300 leading-tight mt-0.5 line-clamp-2" x-text="toast.mensaje"></p>
+                        <h4 class="text-xs font-bold text-slate-900 truncate" x-text="toast.titulo"></h4>
+                        <p class="text-[11px] text-slate-700 leading-tight mt-0.5 line-clamp-2" x-text="toast.mensaje"></p>
                         
                         <template x-if="toast.url">
                             <div class="mt-2.5">
-                                <a :href="toast.url" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold shadow transition">
+                                <a :href="toast.url" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold shadow transition">
                                     <span>Ver Detalle</span>
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                                 </a>

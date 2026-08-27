@@ -214,6 +214,12 @@ class GerenteSucursalController extends Controller
                 }
             }
 
+            \App\Services\AuditService::registrar(
+                'RECHAZAR_SOLICITUD_DISTRIBUIDOR',
+                "Gerencia rechaza solicitud de distribuidora {$solicitud->nombre_completo}",
+                ['solicitud_id' => $solicitud->id, 'observaciones' => $request->observaciones_resolucion]
+            );
+
             $rutaVolver = $esGeneral ? 'gerente-general.dashboard' : 'gerente-sucursal.dashboard';
             return redirect()->route($rutaVolver)
                 ->with('info', "La solicitud de {$solicitud->nombre_completo} ha sido rechazada definitivamente.");
@@ -253,6 +259,12 @@ class GerenteSucursalController extends Controller
             'observaciones_resolucion' => $request->observaciones_resolucion,
             'resolved_at' => now(),
         ]);
+
+        \App\Services\AuditService::registrar(
+            'APROBAR_SOLICITUD_DISTRIBUIDOR',
+            "Gerencia aprueba solicitud y crea cuenta para distribuidora {$nombreCompletoFinal} ({$request->email}) con límite de \${$request->limite_credito}",
+            ['solicitud_id' => $solicitud->id, 'nuevo_user_id' => $newUser->id]
+        );
 
         // Notificar al coordinador
         \App\Models\NotificacionCajero::enviar(
@@ -660,6 +672,12 @@ class GerenteSucursalController extends Controller
                 );
             }
 
+            \App\Services\AuditService::registrar(
+                'RECHAZAR_CONCILIACION',
+                "Gerencia rechaza conciliación manual (Ref: {$conciliacion->referencia_conciliacion})",
+                ['conciliacion_id' => $conciliacion->id, 'observaciones' => $request->observaciones]
+            );
+
             return back()->with('info', 'La conciliación ha sido rechazada y se han enviado las notificaciones correspondientes.');
         }
 
@@ -743,6 +761,12 @@ class GerenteSucursalController extends Controller
                     );
                 }
             }
+
+            \App\Services\AuditService::registrar(
+                'APROBAR_CONCILIACION',
+                "Gerencia aprueba conciliación manual (Ref: {$conciliacion->referencia_conciliacion}) por \${$conciliacion->monto_corregido}",
+                ['conciliacion_id' => $conciliacion->id, 'monto_corregido' => $conciliacion->monto_corregido]
+            );
         });
 
         return back()->with('success', "La conciliación manual ha sido autorizada y aplicada exitosamente.");

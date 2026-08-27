@@ -193,7 +193,7 @@ class CoordinadorController extends Controller
             'apellidos' => ['required', 'string', 'min:2', 'max:255', 'regex:/^[a-zA-Z\sñÑáéíóúÁÉÍÓÚ]+$/'],
             'telefono' => 'required|string|regex:/^[0-9]{10}$/',
             'fecha_nacimiento' => 'required|date|before:today',
-            'curp' => 'required|string|size:18|regex:/^[A-Z]{4}[0-9]{6}[H,M][A-Z]{5}[0-9,A-Z][0-9]$/i',
+            'curp' => ['required', 'string', 'size:18', 'regex:/^[A-Z]{4}\d{6}[HM][A-Z]{2}[B-DF-HJ-NP-TV-Z]{3}[A-Z0-9]\d$/i'],
             'rfc' => 'required|string|min:12|max:13|regex:/^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/i',
             'lugar_nacimiento' => 'nullable|string|max:255',
             'calle' => 'required|string|min:3|max:255',

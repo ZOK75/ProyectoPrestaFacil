@@ -200,7 +200,7 @@
 
     <!-- Modal Registro de Pago por Vale Individual -->
     <div x-show="pagoValeModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm" style="display: none;">
-        <div class="bg-slate-900 border border-emerald-900/50 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden" @click.away="pagoValeModalOpen = false">
+        <div class="bg-slate-900 border border-emerald-900/50 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" @click.away="pagoValeModalOpen = false">
             
             <div class="bg-emerald-600 p-4">
                 <h3 class="text-white font-black text-base">Cobro de Vale Individual</h3>
@@ -211,7 +211,7 @@
                 </div>
             </div>
 
-            <form novalidate :action="'{{ url('cajero/abonos') }}/' + valeSeleccionado?.id" method="POST" class="p-4 space-y-3.5">
+            <form novalidate :action="'{{ url('cajero/abonos') }}/' + valeSeleccionado?.id" method="POST" class="p-4 space-y-3.5 overflow-y-auto flex-1">
                 @csrf
                 
                 <div class="bg-slate-950 rounded-xl p-3 border border-slate-800 text-xs space-y-1.5">
@@ -273,7 +273,7 @@
 
     <!-- Modal Registro de Abono Global por Distribuidora -->
     <div x-show="pagoModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm" style="display: none;">
-        <div class="bg-slate-900 border border-emerald-900/50 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden" @click.away="pagoModalOpen = false">
+        <div class="bg-slate-900 border border-emerald-900/50 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" @click.away="pagoModalOpen = false">
             
             <div class="bg-indigo-600 p-4">
                 <h3 class="text-white font-black text-base">Registrar Abono Global</h3>
@@ -281,7 +281,7 @@
                 <p class="text-indigo-200 text-[11px] font-mono" x-text="'Ref Oficial: ' + distSeleccionada?.ref"></p>
             </div>
 
-            <form novalidate :action="'{{ url('cajero/abonos/distribuidora') }}/' + distSeleccionada?.id" method="POST" class="p-4 space-y-3.5">
+            <form novalidate :action="'{{ url('cajero/abonos/distribuidora') }}/' + distSeleccionada?.id" method="POST" class="p-4 space-y-3.5 overflow-y-auto flex-1">
                 @csrf
                 
                 <div class="bg-slate-950 rounded-xl p-3 border border-slate-800 text-xs space-y-1.5">

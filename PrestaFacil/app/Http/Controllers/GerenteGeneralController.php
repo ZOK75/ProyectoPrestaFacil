@@ -166,6 +166,12 @@ class GerenteGeneralController extends Controller
                 "La Gerencia General no ha autorizado tu transferencia de sucursal. Permaneces asignado a la sucursal {$transferencia->sucursalOrigen?->nombre}."
             );
 
+            \App\Services\AuditService::registrar(
+                'RECHAZAR_TRASPASO_COORDINADOR',
+                "Gerencia General rechaza traspaso de coordinador {$coordinador->name} a sucursal {$transferencia->sucursalDestino?->nombre}",
+                ['transferencia_id' => $transferencia->id, 'observaciones' => $request->observaciones]
+            );
+
             return back()->with('info', "Has rechazado el traspaso del coordinador {$coordinador->name}.");
         }
 
@@ -185,6 +191,12 @@ class GerenteGeneralController extends Controller
                 ->where('coordinador_id', $coordinador->id)
                 ->update(['sucursal_id' => $nuevaSucursalId]);
         });
+
+        \App\Services\AuditService::registrar(
+            'APROBAR_TRASPASO_COORDINADOR',
+            "Gerencia General aprueba traspaso de coordinador {$coordinador->name} y su estructura a sucursal {$transferencia->sucursalDestino?->nombre}",
+            ['transferencia_id' => $transferencia->id, 'observaciones' => $request->observaciones]
+        );
 
         // Notificaciones de Aprobación
         \App\Models\NotificacionCajero::enviar(
@@ -234,6 +246,12 @@ class GerenteGeneralController extends Controller
             $solicitud->resolved_at = now();
             $solicitud->save();
 
+            \App\Services\AuditService::registrar(
+                'APROBAR_SOLICITUD_DISTRIBUIDOR',
+                "Gerencia General aprueba solicitud de distribuidora {$solicitud->nombre_completo}",
+                ['solicitud_id' => $solicitud->id, 'observaciones' => $request->observaciones_resolucion]
+            );
+
             return redirect()->route('gerente-general.dashboard')
                 ->with('success', "La solicitud de {$solicitud->nombre_completo} ha sido APROBADA. Ahora debes crear su cuenta para activar su acceso.");
         } else {
@@ -241,6 +259,12 @@ class GerenteGeneralController extends Controller
             $solicitud->observaciones_resolucion = $request->observaciones_resolucion;
             $solicitud->resolved_at = now();
             $solicitud->save();
+
+            \App\Services\AuditService::registrar(
+                'RECHAZAR_SOLICITUD_DISTRIBUIDOR',
+                "Gerencia General rechaza solicitud de distribuidora {$solicitud->nombre_completo}",
+                ['solicitud_id' => $solicitud->id, 'observaciones' => $request->observaciones_resolucion]
+            );
 
             // Notificar al coordinador que fue rechazada (Paso 7/11)
             \App\Models\NotificacionCajero::enviar(

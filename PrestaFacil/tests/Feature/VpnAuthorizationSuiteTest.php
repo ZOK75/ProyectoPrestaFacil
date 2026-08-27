@@ -72,6 +72,46 @@ class VpnAuthorizationSuiteTest extends TestCase
         $response->assertSessionHas('error', 'no tienes autorizacion para completar el proceso');
     }
 
+    public function test_proceso_verificador_edicion_solicitud_bloqueado_sin_vpn()
+    {
+        $verificador = $this->crearOperador('Verificador');
+        $solicitud = SolicitudDistribuidor::create([
+            'nombres' => 'Juan',
+            'apellidos' => 'Gómez',
+            'telefono' => '1234567890',
+            'fecha_nacimiento' => '1990-01-01',
+            'curp' => 'GOMJ900101HDFRRN01',
+            'rfc' => 'GOMJ900101XXX',
+            'calle' => 'Calle 2',
+            'colonia' => 'Colonia',
+            'codigo_postal' => '12345',
+            'ciudad' => 'Ciudad',
+            'estado_republica' => 'Estado',
+            'datos_casa' => 'Propia',
+            'coordinador_id' => $verificador->id,
+            'sucursal_id' => $verificador->sucursal_id,
+            'estado' => 'en espera',
+        ]);
+
+        $response = $this->actingAs($verificador)
+            ->from('http://prestafacil.uk/verificador/dashboard')
+            ->post("http://prestafacil.uk/verificador/solicitudes/{$solicitud->id}/procesar", [
+                'dictamen' => 'aprobado',
+                'comentarios_verificador' => 'Todo correcto',
+                'nombres' => 'Juan Modificado',
+                'apellidos' => 'Gómez',
+                'telefono' => '1234567890',
+                'calle' => 'Calle 2',
+                'colonia' => 'Colonia',
+                'codigo_postal' => '12345',
+                'ciudad' => 'Ciudad',
+                'estado_republica' => 'Estado',
+            ]);
+
+        $response->assertStatus(302);
+        $response->assertSessionHas('error', 'no tienes autorizacion para completar el proceso');
+    }
+
     public function test_proceso_1_aceptar_distribuidora_permitido_con_vpn()
     {
         $gerente = $this->crearOperador('Gerente General');

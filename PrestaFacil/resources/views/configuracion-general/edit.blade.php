@@ -321,7 +321,7 @@
                 <!-- Tarjeta Interactiva de Previsualización y Ejemplo -->
                 <div class="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-xs text-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                        <strong class="text-indigo-300 font-bold block">💡 Simulación para Distribuidora (Línea de $20,000.00):</strong>
+                        <strong class="text-indigo-300 font-bold block">Simulación para Distribuidora (Línea de $20,000.00):</strong>
                         <span id="js-ejemplo-formula-tope" class="text-[11px] text-slate-300 mt-0.5 block">
                             ($20,000 &times; {{ number_format($configuracion->porcentaje_regla_prevale ?? 50, 0) }}%) + ${{ number_format($configuracion->tolerancia_regla_prevale ?? 500, 2) }}
                         </span>

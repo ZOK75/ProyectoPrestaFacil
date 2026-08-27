@@ -115,7 +115,6 @@
                             <th class="px-4 py-3.5">Usuario / Rol</th>
                             <th class="px-4 py-3.5">Descripción</th>
                             <th class="px-4 py-3.5">IP</th>
-                            <th class="px-4 py-3.5 text-right">Detalle</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800/60 font-medium">
@@ -149,18 +148,11 @@
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap" x-text="log.ip_address || '127.0.0.1'"></td>
-                                <td class="px-4 py-3 text-right whitespace-nowrap">
-                                    <button x-show="log.datos_anteriores || log.datos_nuevos || log.detalles" 
-                                            @click="openModal(log)"
-                                            class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 text-[11px] font-bold transition">
-                                        Ver JSON
-                                    </button>
-                                </td>
                             </tr>
                         </template>
 
                         <tr x-show="auditLogs.length === 0">
-                            <td colspan="6" class="px-6 py-12 text-center text-slate-500 italic">
+                            <td colspan="5" class="px-6 py-12 text-center text-slate-500 italic">
                                 No se encontraron registros de auditoría que coincidan con los filtros.
                             </td>
                         </tr>

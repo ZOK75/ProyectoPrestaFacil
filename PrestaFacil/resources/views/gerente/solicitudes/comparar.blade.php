@@ -154,7 +154,22 @@
                         </div>
                         <div>
                             <span class="text-slate-500 block">Fecha de Nacimiento:</span>
-                            <span class="text-slate-200">{{ $solicitud->fecha_nacimiento?->format('d/m/Y') }}</span>
+                            @php
+                                $fnC = $solicitud->fecha_nacimiento;
+                                $fnCFormatted = 'N/A';
+                                if ($fnC) {
+                                    if ($fnC instanceof \DateTimeInterface) {
+                                        $fnCFormatted = $fnC->format('d/m/Y');
+                                    } else {
+                                        try {
+                                            $fnCFormatted = \Carbon\Carbon::parse($fnC)->format('d/m/Y');
+                                        } catch (\Throwable $e) {
+                                            $fnCFormatted = $fnC;
+                                        }
+                                    }
+                                }
+                            @endphp
+                            <span class="text-slate-200">{{ $fnCFormatted }}</span>
                         </div>
                         <div>
                             <span class="text-slate-500 block">Lugar de Nacimiento:</span>

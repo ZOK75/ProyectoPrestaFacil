@@ -156,7 +156,7 @@
             <!-- 3. Carga de PDFs -->
             <div class="space-y-3 pt-2">
                 <span class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider block border-b border-slate-800 pb-1">
-                    3. Expedientes en PDF
+                    3. Expedientes en PDF <span class="text-rose-400">*</span>
                 </span>
 
                 <!-- PDF INE -->

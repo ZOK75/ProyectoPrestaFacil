@@ -955,4 +955,83 @@ class CobranzaValesIndividualesTest extends TestCase
         $responseDespues->assertDontSee('Vale Liquidado Test');
         $responseDespues->assertSee('No se encontraron clientes con préstamos activos');
     }
+
+    public function test_cliente_creation_requires_pdf_files_and_stores_them(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+
+        // Intento sin archivos: debe fallar con errores de validación
+        $responseSin = $this->actingAs($this->distribuidor)->post(route('clientes.store'), [
+            'nombre' => 'Juan Perez Sin Archivos',
+            'curp' => 'PESJ900101HDFRRN01',
+            'rfc' => 'PESJ900101XXX',
+            'fecha_nacimiento' => '1990-01-01',
+            'lugar_nacimiento' => 'CDMX',
+            'calle' => 'Av. Reforma 123',
+            'colonia' => 'Juarez',
+            'codigo_postal' => '06600',
+            'ciudad' => 'CDMX',
+            'estado' => 'CDMX',
+        ]);
+        $responseSin->assertSessionHasErrors(['pdf_ine', 'pdf_comprobante']);
+
+        // Con archivos: debe registrar exitosamente
+        $fileIne = \Illuminate\Http\UploadedFile::fake()->create('ine.pdf', 100, 'application/pdf');
+        $fileComp = \Illuminate\Http\UploadedFile::fake()->create('comprobante.pdf', 100, 'application/pdf');
+
+        $responseCon = $this->actingAs($this->distribuidor)->post(route('clientes.store'), [
+            'nombre' => 'Juan Perez Con Archivos',
+            'curp' => 'PESJ900101HDFRRN01',
+            'rfc' => 'PESJ900101XXX',
+            'fecha_nacimiento' => '1990-01-01',
+            'lugar_nacimiento' => 'CDMX',
+            'calle' => 'Av. Reforma 123',
+            'colonia' => 'Juarez',
+            'codigo_postal' => '06600',
+            'ciudad' => 'CDMX',
+            'estado' => 'CDMX',
+            'pdf_ine' => $fileIne,
+            'pdf_comprobante' => $fileComp,
+        ]);
+
+        $responseCon->assertRedirect();
+        $this->assertDatabaseHas('clientes', [
+            'nombre' => 'Juan Perez Con Archivos',
+            'curp' => 'PESJ900101HDFRRN01',
+        ]);
+    }
+
+    public function test_distribuidora_and_cajero_can_view_document_stream(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+
+        $fileIne = \Illuminate\Http\UploadedFile::fake()->create('ine_cliente.pdf', 100, 'application/pdf');
+        $path = $fileIne->store('expedientes_clientes/ine', 'public');
+
+        $cliente = Cliente::create([
+            'nombre' => 'María García',
+            'curp' => 'GAMM920202MDFRRN02',
+            'rfc' => 'GAMM920202YYY',
+            'fecha_nacimiento' => '1992-02-02',
+            'lugar_nacimiento' => 'Puebla',
+            'calle' => 'Calle 5 Poniente',
+            'colonia' => 'Centro',
+            'codigo_postal' => '72000',
+            'ciudad' => 'Puebla',
+            'estado' => 'Puebla',
+            'path_ine_pdf' => $path,
+            'created_by_user_id' => $this->distribuidor->id,
+            'activo' => true,
+        ]);
+
+        // Distribuidora propietaria puede abrir el INE
+        $responseDist = $this->actingAs($this->distribuidor)->get(route('clientes.documento', [$cliente, 'ine']));
+        $responseDist->assertOk();
+        $responseDist->assertHeader('Content-Type', 'application/pdf');
+
+        // Cajero puede abrir el INE
+        $responseCajero = $this->actingAs($this->cajero)->get(route('clientes.documento', [$cliente, 'ine']));
+        $responseCajero->assertOk();
+        $responseCajero->assertHeader('Content-Type', 'application/pdf');
+    }
 }

@@ -24,8 +24,8 @@ class StoreClienteRequest extends FormRequest
             'codigo_postal' => ['required', 'string', 'size:5'],
             'ciudad' => ['required', 'string', 'max:255'],
             'estado' => ['required', 'string', 'max:255'],
-            'pdf_ine' => ['required', 'file', 'mimes:pdf', 'max:5120'], // Máximo 5MB PDF
-            'pdf_comprobante' => ['required', 'file', 'mimes:pdf', 'max:5120'], // Máximo 5MB PDF
+            'pdf_ine' => ['required', 'file', 'mimes:pdf', 'max:5120'], // Obligatorio PDF hasta 5MB
+            'pdf_comprobante' => ['required', 'file', 'mimes:pdf', 'max:5120'], // Obligatorio PDF hasta 5MB
         ];
     }
 

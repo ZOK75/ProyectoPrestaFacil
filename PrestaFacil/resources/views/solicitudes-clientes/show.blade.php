@@ -147,7 +147,7 @@
                     </div>
                     <div class="flex items-center gap-3">
                         @if($solicitud->cliente?->path_ine_pdf)
-                            <a href="{{ asset('storage/' . $solicitud->cliente->path_ine_pdf) }}" target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700 transition">
+                            <a href="{{ route('clientes.documento', [$solicitud->cliente, 'ine']) }}" target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700 transition">
                                 Ver INE Actual
                             </a>
                         @endif
@@ -171,7 +171,7 @@
                     </div>
                     <div class="flex items-center gap-3">
                         @if($solicitud->cliente?->path_comprobante_pdf)
-                            <a href="{{ asset('storage/' . $solicitud->cliente->path_comprobante_pdf) }}" target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700 transition">
+                            <a href="{{ route('clientes.documento', [$solicitud->cliente, 'comprobante']) }}" target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700 transition">
                                 Ver Comprobante Actual
                             </a>
                         @endif

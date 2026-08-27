@@ -129,7 +129,7 @@
                     </div>
 
                     @if($cliente->path_ine_pdf)
-                        <a href="{{ Storage::url($cliente->path_ine_pdf) }}" target="_blank" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow transition shrink-0 flex items-center gap-1">
+                        <a href="{{ route('clientes.documento', [$cliente, 'ine']) }}" target="_blank" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow transition shrink-0 flex items-center gap-1">
                             Abrir
                         </a>
                     @endif
@@ -150,7 +150,7 @@
                     </div>
 
                     @if($cliente->path_comprobante_pdf)
-                        <a href="{{ Storage::url($cliente->path_comprobante_pdf) }}" target="_blank" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow transition shrink-0 flex items-center gap-1">
+                        <a href="{{ route('clientes.documento', [$cliente, 'comprobante']) }}" target="_blank" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow transition shrink-0 flex items-center gap-1">
                             Abrir
                         </a>
                     @endif

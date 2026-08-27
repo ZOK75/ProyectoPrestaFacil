@@ -294,6 +294,8 @@ Route::middleware(['auth'])->group(function () {
     // ──────────────────────────────────────────
     // 8. CLIENTES (Distribuidores y Administrador)
     // ──────────────────────────────────────────
+    Route::get('clientes/{cliente}/documento/{tipo}', [ClienteController::class, 'verDocumento'])->name('clientes.documento');
+
     Route::middleware(['role:distribuidor,administrador'])->group(function () {
         Route::resource('clientes', ClienteController::class);
         Route::post('clientes/{cliente}/traspasar', [ClienteController::class, 'solicitarTraspaso'])->name('clientes.traspasar');

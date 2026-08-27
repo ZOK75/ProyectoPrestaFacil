@@ -95,7 +95,7 @@
         <div class="pt-1 border-t border-slate-800/80 space-y-2">
             <span class="text-[10px] font-bold text-slate-400 uppercase block">Expediente Digital Adjunto:</span>
             @if($prestamo->cliente->path_ine_pdf)
-                <a href="{{ Storage::url($prestamo->cliente->path_ine_pdf) }}" target="_blank" class="flex items-center justify-between p-2.5 bg-slate-950 border border-slate-700 hover:border-indigo-500 rounded-xl text-xs text-indigo-300 font-bold transition">
+                <a href="{{ route('clientes.documento', [$prestamo->cliente, 'ine']) }}" target="_blank" class="flex items-center justify-between p-2.5 bg-slate-950 border border-slate-700 hover:border-indigo-500 rounded-xl text-xs text-indigo-300 font-bold transition">
                     <span class="inline-flex items-center gap-1.5">
                         <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                         Ver PDF INE

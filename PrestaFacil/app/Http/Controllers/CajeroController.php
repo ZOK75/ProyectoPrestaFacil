@@ -616,7 +616,8 @@ class CajeroController extends Controller
         
         $path = null;
         if ($request->hasFile('evidencia')) {
-            $path = $request->file('evidencia')->store('evidencias', 'public');
+            $disk = config('filesystems.default', 'public');
+            $path = $request->file('evidencia')->store('evidencias', $disk);
         }
 
         DB::transaction(function () use ($request, $cajera, $path) {

@@ -140,15 +140,17 @@ class ClienteController extends Controller
 
         $data = $request->validated();
 
+        $disk = config('filesystems.default', 'public');
+
         // Almacenar el archivo INE PDF
         if ($request->hasFile('pdf_ine')) {
-            $pathIne = $request->file('pdf_ine')->store('expedientes_clientes/ine', 'public');
+            $pathIne = $request->file('pdf_ine')->store('expedientes_clientes/ine', $disk);
             $data['path_ine_pdf'] = $pathIne;
         }
 
         // Almacenar el archivo Comprobante de Domicilio PDF
         if ($request->hasFile('pdf_comprobante')) {
-            $pathComprobante = $request->file('pdf_comprobante')->store('expedientes_clientes/comprobantes', 'public');
+            $pathComprobante = $request->file('pdf_comprobante')->store('expedientes_clientes/comprobantes', $disk);
             $data['path_comprobante_pdf'] = $pathComprobante;
         }
 
@@ -247,14 +249,15 @@ class ClienteController extends Controller
         }
 
         $data = $request->validated();
+        $disk = config('filesystems.default', 'public');
 
         if ($request->hasFile('pdf_ine')) {
-            $pathIne = $request->file('pdf_ine')->store('expedientes_clientes/ine', 'public');
+            $pathIne = $request->file('pdf_ine')->store('expedientes_clientes/ine', $disk);
             $data['path_ine_pdf'] = $pathIne;
         }
 
         if ($request->hasFile('pdf_comprobante')) {
-            $pathComprobante = $request->file('pdf_comprobante')->store('expedientes_clientes/comprobantes', 'public');
+            $pathComprobante = $request->file('pdf_comprobante')->store('expedientes_clientes/comprobantes', $disk);
             $data['path_comprobante_pdf'] = $pathComprobante;
         }
 
@@ -662,5 +665,60 @@ class ClienteController extends Controller
         );
 
         return back()->with('success', "Has APROBADO el traspaso del cliente '{$cliente->nombre}' a la distribuidora {$distribuidorReceptor->name} exitosamente.");
+    }
+
+    /**
+     * Visualizar / Servir de forma segura los documentos del expediente del cliente
+     * Compatible con arquitecturas multi-servidor (Load Balancer, Storage Server NFS / S3).
+     */
+    public function verDocumento(Cliente $cliente, string $tipo)
+    {
+        $operador = Auth::user();
+        if (!$operador) {
+            abort(401, 'Usuario no autenticado.');
+        }
+
+        // Si es distribuidora, solo puede consultar documentos de sus clientes asignados
+        if ($operador->esDistribuidor() && $cliente->created_by_user_id !== $operador->id) {
+            abort(403, 'Acceso denegado: No tienes permiso para consultar el expediente de este cliente.');
+        }
+
+        $path = match(strtolower($tipo)) {
+            'ine', 'pdf_ine' => $cliente->path_ine_pdf,
+            'comprobante', 'pdf_comprobante' => $cliente->path_comprobante_pdf,
+            default => null,
+        };
+
+        if (!$path) {
+            return back()->with('error', 'El cliente no cuenta con este archivo digital adjunto.');
+        }
+
+        $disk = config('filesystems.default', 'public');
+
+        // 1. Intentar servir desde el disco configurado (S3 / MinIO / Local / Public)
+        if (Storage::disk($disk)->exists($path)) {
+            return Storage::disk($disk)->response($path, basename($path), [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
+            ]);
+        }
+
+        // 2. Intentar servir desde el disco public
+        if ($disk !== 'public' && Storage::disk('public')->exists($path)) {
+            return Storage::disk('public')->response($path, basename($path), [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
+            ]);
+        }
+
+        // 3. Intentar servir desde el disco local
+        if (Storage::disk('local')->exists($path)) {
+            return Storage::disk('local')->response($path, basename($path), [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
+            ]);
+        }
+
+        return back()->with('error', 'El documento solicitado no fue encontrado en el servidor de almacenamiento.');
     }
 }

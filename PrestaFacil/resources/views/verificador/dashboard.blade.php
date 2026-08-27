@@ -108,17 +108,17 @@
                                 <div class="text-slate-500 text-xs">CURP: {{ $sol->curp }}</div>
                             </td>
                             <td class="p-4 text-xs text-slate-400">
-                                {{ $sol->resolved_at?->format('d/m/Y H:i') ?? 'N/A' }}
+                                {{ $sol->updated_at?->format('d/m/Y H:i') ?? 'N/A' }}
                             </td>
                             <td class="p-4">
-                                @if($sol->estado === 'aprobado')
-                                    <span class="px-2.5 py-1 rounded-md text-xs font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Aprobado</span>
+                                @if(($sol->dictamen_verificador ?? $sol->estado) === 'aceptado')
+                                    <span class="px-2.5 py-1 rounded-md text-xs font-semibold border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Aceptado</span>
                                 @else
                                     <span class="px-2.5 py-1 rounded-md text-xs font-semibold border bg-rose-500/10 text-rose-400 border-rose-500/20">Rechazado</span>
                                 @endif
                             </td>
                             <td class="p-4 text-xs text-slate-400 max-w-xs truncate">
-                                {{ $sol->observaciones_resolucion }}
+                                {{ $sol->comentarios_verificador ?? $sol->observaciones_resolucion }}
                             </td>
                             <td class="p-4 text-right">
                                 <a href="{{ route('verificador.solicitudes.show', $sol->id) }}" 

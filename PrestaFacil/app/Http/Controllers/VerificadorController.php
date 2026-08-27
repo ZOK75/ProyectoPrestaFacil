@@ -19,16 +19,16 @@ class VerificadorController extends Controller
     {
         $user = Auth::user();
 
-        // Solicitudes pendientes de evaluar en la sucursal del verificador
+        // Solicitudes pendientes de evaluar en la sucursal del verificador (Únicamente en estado 'en espera de verificacion')
         $solicitudesPendientes = SolicitudDistribuidor::where('sucursal_id', $user->sucursal_id)
-            ->whereIn('estado', ['en espera de verificacion', 'en espera'])
+            ->where('estado', 'en espera de verificacion')
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Solicitudes resueltas por este verificador
+        // Solicitudes resueltas/procesadas por este verificador
         $solicitudesResueltas = SolicitudDistribuidor::where('verificador_id', $user->id)
             ->with(['coordinador'])
-            ->orderBy('resolved_at', 'desc')
+            ->orderBy('updated_at', 'desc')
             ->get();
 
         return view('verificador.dashboard', compact('solicitudesPendientes', 'solicitudesResueltas'));

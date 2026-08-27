@@ -249,8 +249,6 @@
                     <label class="text-[10px] font-bold text-slate-400 uppercase">Método de Pago</label>
                     <select name="metodo_pago" required class="w-full bg-slate-950 border border-slate-700 rounded-xl py-2 px-3 text-white text-xs mt-1 focus:ring-2 focus:ring-emerald-500">
                         <option value="transferencia">Transferencia / SPEI Bancario</option>
-                        <option value="tarjeta">Tarjeta de Débito / Crédito</option>
-                        <option value="efectivo">Efectivo</option>
                     </select>
                 </div>
 
@@ -326,8 +324,6 @@
                     <label class="text-[10px] font-bold text-slate-400 uppercase">Método de Pago</label>
                     <select name="metodo_pago" required class="w-full bg-slate-950 border border-slate-700 rounded-xl py-2 px-3 text-white text-xs mt-1 focus:ring-2 focus:ring-indigo-500">
                         <option value="transferencia">Transferencia / SPEI Bancario</option>
-                        <option value="tarjeta">Tarjeta de Débito / Crédito</option>
-                        <option value="efectivo">Efectivo</option>
                     </select>
                 </div>
 

@@ -733,6 +733,13 @@ class GerenteSucursalController extends Controller
                     $pago->prestamo->decrement('adeudo_pendiente', $diferencia);
                     $pago->prestamo->increment('pagos_recibidos', $diferencia);
                 }
+            } elseif ($conciliacion->distribuidora_id && $conciliacion->distribuidora) {
+                // Conciliación de abono directo de distribuidora
+                $diferencia = floatval($conciliacion->monto_corregido) - floatval($conciliacion->monto_original);
+                if ($diferencia != 0) {
+                    $corteService = app(\App\Services\CorteCobranzaService::class);
+                    $corteService->actualizarRelacionPorAbono($conciliacion->distribuidora, $diferencia);
+                }
             }
 
             // Notificar al Cajero Solicitante

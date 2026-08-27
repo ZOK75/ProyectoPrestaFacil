@@ -901,4 +901,58 @@ class CobranzaValesIndividualesTest extends TestCase
         $responseCorte3->assertDontSee('Total a PAGAR: $0.00');
         $responseCorte3->assertSee('931.00');
     }
+
+    public function test_liquidated_prestamo_does_not_appear_in_relacion_pdf(): void
+    {
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-LIQ-TEST',
+            'nombre' => 'Vale Liquidado Test',
+            'monto_prestamo' => 1000.00,
+            'costo_seguro' => 50.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 1,
+            'multa' => 100.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-LIQUIDADO-99',
+            'cliente_id' => $this->cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $this->distribuidor->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 1000.00,
+            'cuota_quincenal' => 1100.00,
+            'monto_total_pagar' => 1100.00,
+            'pagos_totales' => 1,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 1000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+        ]);
+
+        // Ver relación antes de liquidar: debe aparecer el vale
+        $responseAntes = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
+        $responseAntes->assertOk();
+        $responseAntes->assertSee('Vale Liquidado Test');
+
+        // Cajero liquida el vale en su totalidad
+        $this->actingAs($this->cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 1000.00,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        $prestamo->refresh();
+        $this->assertEquals('finalizado', $prestamo->estado);
+        $this->assertEquals(0, $prestamo->adeudo_pendiente);
+
+        // Ver relación después de liquidar: el vale ya NO debe aparecer en la relación
+        $responseDespues = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
+        $responseDespues->assertOk();
+        $responseDespues->assertDontSee('Vale Liquidado Test');
+        $responseDespues->assertSee('No se encontraron clientes con préstamos activos');
+    }
 }

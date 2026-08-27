@@ -516,16 +516,10 @@ class PrestamoController extends Controller
             }
         }
 
-        // Cargar todos los préstamos activos de la distribuidora para la relación de cobranza
+        // Cargar únicamente los préstamos activos de la distribuidora para la relación de cobranza
         $prestamosQuery = Prestamo::with(['cliente', 'productoVale', 'pagos'])
             ->where('created_by_user_id', $distribuidoraId)
-            ->where(function($query) {
-                $query->where('estado', 'activo')
-                      ->orWhere(function($q2) {
-                          $q2->where('estado', 'finalizado')
-                             ->where('updated_at', '>=', now()->subDays(15));
-                      });
-            });
+            ->where('estado', 'activo');
 
         $prestamos = $prestamosQuery->orderBy('created_at', 'desc')->get();
 

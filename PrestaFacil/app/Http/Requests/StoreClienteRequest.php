@@ -16,7 +16,7 @@ class StoreClienteRequest extends FormRequest
         return [
             'nombre' => ['required', 'string', 'max:255'],
             'curp' => ['required', 'string', 'size:18', 'unique:clientes,curp'],
-            'rfc' => ['nullable', 'string', 'min:12', 'max:13'],
+            'rfc' => ['required', 'string', 'min:12', 'max:13'],
             'fecha_nacimiento' => ['required', 'date', 'before:today'],
             'lugar_nacimiento' => ['required', 'string', 'max:255'],
             'calle' => ['required', 'string', 'max:255'],
@@ -36,6 +36,7 @@ class StoreClienteRequest extends FormRequest
             'curp.required' => 'La CURP es obligatoria.',
             'curp.size' => 'La CURP debe tener exactamente 18 caracteres.',
             'curp.unique' => 'Esta CURP ya se encuentra registrada.',
+            'rfc.required' => 'El RFC es obligatorio.',
             'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
             'fecha_nacimiento.before' => 'La fecha de nacimiento debe ser anterior a hoy.',
             'lugar_nacimiento.required' => 'El lugar de nacimiento es obligatorio.',

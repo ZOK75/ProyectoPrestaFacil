@@ -54,7 +54,7 @@ class SolicitudCreditoController extends Controller
                 \App\Models\NotificacionCajero::enviar(
                     $solicitud->coordinador_id,
                     'solicitud_credito_aprobada',
-                    '✅ Aumento de Crédito Aprobado',
+                    'Aumento de Crédito Aprobado',
                     "La Gerencia ({$operador->name}) ha APROBADO la solicitud de aumento de crédito para {$distribuidor->name}. Nuevo límite: $" . number_format($solicitud->limite_nuevo, 2) . "."
                 );
             }
@@ -63,7 +63,7 @@ class SolicitudCreditoController extends Controller
             \App\Models\NotificacionCajero::enviar(
                 $distribuidor->id,
                 'solicitud_credito_aprobada',
-                '🎉 ¡Incremento de Línea de Crédito Aprobado!',
+                'Incremento de Línea de Crédito Aprobado',
                 "Tu línea de crédito ha sido incrementada a $" . number_format($solicitud->limite_nuevo, 2) . ". Ya cuentas con más saldo disponible para emitir vales a tus clientes."
             );
 
@@ -94,7 +94,7 @@ class SolicitudCreditoController extends Controller
                 \App\Models\NotificacionCajero::enviar(
                     $solicitud->coordinador_id,
                     'solicitud_credito_rechazada',
-                    '❌ Solicitud de Aumento de Crédito Rechazada',
+                    'Solicitud de Aumento de Crédito Rechazada',
                     "La Gerencia ({$operador->name}) ha RECHAZADO la solicitud de aumento para {$distribuidor->name}." . ($request->observaciones ? " Observaciones: \"{$request->observaciones}\"" : "")
                 );
             }

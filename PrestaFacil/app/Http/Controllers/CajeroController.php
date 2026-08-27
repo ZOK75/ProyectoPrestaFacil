@@ -742,6 +742,13 @@ class CajeroController extends Controller
                 'entidad_tipo' => 'canjes_puntos',
                 'entidad_id' => $canje->id,
             ]);
+
+            NotificacionCajero::enviar(
+                $distribuidora->id,
+                'canje_puntos',
+                'Canje de Puntos Realizado',
+                "Se han canjeado {$puntosACanjear} puntos de tu cuenta por un equivalente de $" . number_format($equivalenteEnDinero, 2) . " en ventanilla de caja."
+            );
         });
 
         return back()->with('success', "Puntos cobrados, realiza la transferencia correspondiente");

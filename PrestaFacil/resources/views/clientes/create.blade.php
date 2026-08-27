@@ -53,9 +53,9 @@
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                            RFC
+                            RFC <span class="text-rose-400">*</span>
                         </label>
-                        <input type="text" name="rfc" value="{{ old('rfc') }}" placeholder="Opcional" maxlength="13"
+                        <input type="text" name="rfc" value="{{ old('rfc') }}" placeholder="12 o 13 caracteres" maxlength="13" required
                             class="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white uppercase font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-500 @error('rfc') border-rose-500 @enderror">
                         @error('rfc')
                             <p class="text-[10px] text-rose-400 mt-1">{{ $message }}</p>

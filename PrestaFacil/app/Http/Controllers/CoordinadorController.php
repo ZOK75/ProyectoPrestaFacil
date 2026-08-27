@@ -251,7 +251,7 @@ class CoordinadorController extends Controller
             'datos_familiares.*.parentesco.required_with' => 'El parentesco del familiar de referencia es obligatorio.',
         ]);
 
-        SolicitudDistribuidor::create([
+        $nuevaSol = SolicitudDistribuidor::create([
             'nombres' => $request->nombres,
             'apellidos' => $request->apellidos,
             'telefono' => $request->telefono,
@@ -272,6 +272,12 @@ class CoordinadorController extends Controller
             'sucursal_id' => Auth::user()->sucursal_id,
             'estado' => 'en espera de verificacion',
         ]);
+
+        \App\Services\AuditService::registrar(
+            'CREAR_SOLICITUD_DISTRIBUIDOR',
+            "Coordinador " . Auth::user()->name . " registra solicitud para distribuidora {$nuevaSol->nombre_completo} (CURP: {$nuevaSol->curp})",
+            ['solicitud_id' => $nuevaSol->id, 'curp' => $nuevaSol->curp]
+        );
 
         $verificadores = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Verificador', 'verificador']))
             ->where('sucursal_id', Auth::user()->sucursal_id)
@@ -397,6 +403,12 @@ class CoordinadorController extends Controller
             'estado' => 'pendiente',
         ]);
 
+        \App\Services\AuditService::registrar(
+            'SOLICITUD_AUMENTO_CREDITO',
+            "Coordinador {$coordinador->name} solicita aumento de crédito para {$distribuidor->name} de \${$distribuidor->limite_credito} a \${$request->limite_nuevo}",
+            ['solicitud_id' => $solicitud->id, 'limite_nuevo' => $request->limite_nuevo]
+        );
+
         $gerentes = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente General', 'Administrador']))
             ->where(function($q) use ($coordinador, $distribuidor) {
                 $sucursalId = $distribuidor->sucursal_id ?? $coordinador->sucursal_id;
@@ -471,6 +483,12 @@ class CoordinadorController extends Controller
             'motivo' => $request->motivo,
             'estado' => 'pendiente',
         ]);
+
+        \App\Services\AuditService::registrar(
+            'SOLICITUD_AUMENTO_CATEGORIA',
+            "Coordinador {$coordinador->name} solicita ascenso de categoría para {$distribuidor->name} de " . strtoupper($categoriaActual) . " a " . strtoupper($request->categoria_nueva),
+            ['solicitud_id' => $solicitud->id, 'categoria_nueva' => $request->categoria_nueva]
+        );
 
         $gerentes = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente General', 'Administrador']))
             ->where(function($q) use ($coordinador, $distribuidor) {
@@ -571,6 +589,12 @@ class CoordinadorController extends Controller
             'motivo' => $request->motivo,
             'estado' => 'pendiente_coordinador',
         ]);
+
+        \App\Services\AuditService::registrar(
+            'SOLICITUD_TRASPASO_DISTRIBUIDORA',
+            "Coordinador {$emisor->name} solicita traspaso de distribuidora {$distribuidor->name} a coordinador {$receptor->name}",
+            ['transferencia_id' => $transferencia->id]
+        );
 
         // Enviar Notificación al Coordinador Receptor con enlace directo de revisión
         NotificacionCajero::enviar(

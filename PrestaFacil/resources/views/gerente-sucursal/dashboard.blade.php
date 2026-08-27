@@ -135,57 +135,55 @@
                                         @endif
                                     @else
                                         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-bold uppercase tracking-wider">
-                                            ⚠️ Alerta (3+ Retrasos)
+                                            Alerta (3+ Retrasos)
                                         </span>
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 text-right">
-                                    <button @click="openMorosidadDistId = (openMorosidadDistId === '{{ $distM->id }}' ? null : '{{ $distM->id }}')"
-                                            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-md transition {{ $distM->esMorosa() ? 'bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30' : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/20' }}">
-                                        {{ $distM->esMorosa() ? 'Quitar Morosidad' : 'Marcar como Morosa' }}
-                                    </button>
+                                    @if(!$distM->esMorosa())
+                                        <button @click="openMorosidadDistId = (openMorosidadDistId === '{{ $distM->id }}' ? null : '{{ $distM->id }}')"
+                                                class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-md transition bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/20">
+                                            Marcar como Morosa
+                                        </button>
+                                    @else
+                                        <span class="text-xs text-rose-400 font-semibold">Distribuidor Moroso</span>
+                                    @endif
                                 </td>
                             </tr>
                             <!-- Panel desplegable de confirmación y motivo -->
-                            <tr x-show="openMorosidadDistId === '{{ $distM->id }}'" class="bg-slate-950/60" style="display: none;" x-transition>
-                                <td colspan="6" class="px-6 py-4">
-                                    <form novalidate method="POST" action="{{ route('gerente.distribuidores.decidir-morosidad', $distM) }}" class="space-y-3">
-                                        @csrf
-                                        <input type="hidden" name="accion" value="{{ $distM->esMorosa() ? 'desmarcar' : 'marcar' }}">
-                                        
-                                        <div class="p-4 rounded-xl border {{ $distM->esMorosa() ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-rose-950/20 border-rose-500/30' }}">
-                                            <h4 class="text-sm font-bold text-white mb-1">
-                                                {{ $distM->esMorosa() ? '¿Deseas levantar el estado de morosidad para ' . $distM->name . '?' : '¿Declarar a ' . $distM->name . ' en Estado de Morosidad?' }}
-                                            </h4>
-                                            <p class="text-xs text-slate-400">
-                                                {{ $distM->esMorosa() ? 'Al retirar la morosidad, se reseteará su conteo de retrasos y la distribuidora podrá volver a emitir vales.' : 'Al marcar como morosa, TODOS sus vales pendientes de cobro en ventanilla se cancelarán/desactivarán automáticamente y no podrá asignar nuevos vales.' }}
-                                            </p>
+                            @if(!$distM->esMorosa())
+                                <tr x-show="openMorosidadDistId === '{{ $distM->id }}'" class="bg-slate-950/60" style="display: none;" x-transition>
+                                    <td colspan="6" class="px-6 py-4">
+                                        <form novalidate method="POST" action="{{ route('gerente.distribuidores.decidir-morosidad', $distM) }}" class="space-y-3">
+                                            @csrf
+                                            <input type="hidden" name="accion" value="marcar">
+                                            
+                                            <div class="p-4 rounded-xl border bg-rose-950/20 border-rose-500/30">
+                                                <h4 class="text-sm font-bold text-white mb-1">
+                                                    ¿Declarar a {{ $distM->name }} en Estado de Morosidad?
+                                                </h4>
+                                                <p class="text-xs text-slate-400">
+                                                    Al marcar como morosa, TODOS sus vales pendientes de cobro en ventanilla se cancelarán/desactivarán automáticamente y no podrá asignar nuevos vales.
+                                                </p>
 
-                                            @if(!$distM->esMorosa())
                                                 <div class="mt-3">
                                                     <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Motivo / Observaciones (Opcional)</label>
                                                     <textarea name="motivo" rows="2" placeholder="Motivo de la morosidad o notas para auditoría..." class="w-full bg-slate-900 border border-slate-800 rounded-xl text-white px-4 py-2 text-xs focus:ring-1 focus:ring-rose-500 focus:outline-none"></textarea>
                                                 </div>
-                                            @endif
 
-                                            <div class="flex justify-end gap-2 mt-3">
-                                                <button type="button" @click="openMorosidadDistId = null" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold">
-                                                    Cancelar
-                                                </button>
-                                                @if($distM->esMorosa())
-                                                    <button type="submit" onclick="return confirm('¿Confirmas retirar el estado de morosidad?')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg">
-                                                        Confirmar Retiro de Morosidad
+                                                <div class="flex justify-end gap-2 mt-3">
+                                                    <button type="button" @click="openMorosidadDistId = null" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold">
+                                                        Cancelar
                                                     </button>
-                                                @else
                                                     <button type="submit" onclick="return confirm('¿Confirmas declarar en MOROSIDAD a esta distribuidora? Sus vales pendientes se cancelarán automáticamente.')" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg">
                                                         Confirmar Estado de Morosidad
                                                     </button>
-                                                @endif
+                                                </div>
                                             </div>
-                                        </div>
-                                    </form>
-                                </td>
-                            </tr>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @endif
                         @endforeach
                     </tbody>
                 </table>

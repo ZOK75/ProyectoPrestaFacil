@@ -136,7 +136,18 @@
                                     <span class="text-white font-bold block" x-text="log.user_rol || 'Sistema'"></span>
                                     <span class="text-[10px] text-slate-500 font-mono" x-text="log.user_name || 'N/A'"></span>
                                 </td>
-                                <td class="px-4 py-3 text-slate-200 max-w-xs truncate" :title="log.descripcion" x-text="log.descripcion"></td>
+                                <td class="px-4 py-3 text-slate-200" x-data="{ expanded: false }">
+                                    <div class="flex items-start gap-1.5">
+                                        <div :class="expanded ? '' : 'max-w-xs truncate'" x-text="log.descripcion"></div>
+                                        <button @click="expanded = !expanded" 
+                                                title="Expandir / Contraer descripción"
+                                                class="text-slate-400 hover:text-white p-0.5 rounded hover:bg-slate-800 transition shrink-0 mt-0.5">
+                                            <svg class="w-3.5 h-3.5 transform transition-transform duration-200" :class="expanded ? 'rotate-180 text-emerald-400' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
                                 <td class="px-4 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap" x-text="log.ip_address || '127.0.0.1'"></td>
                                 <td class="px-4 py-3 text-right whitespace-nowrap">
                                     <button x-show="log.datos_anteriores || log.datos_nuevos || log.detalles" 

@@ -60,7 +60,16 @@ class AuthenticatedSessionController extends Controller
         }
 
 
-        $request->authenticate();
+        try {
+            $request->authenticate();
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \App\Services\AuditService::registrar(
+                'LOGIN_FALLIDO',
+                "Intento de inicio de sesión fallido para el correo: " . $request->input('email'),
+                ['email' => $request->input('email'), 'ip' => $request->ip()]
+            );
+            throw $e;
+        }
 
         $request->session()->regenerate();
 
@@ -68,6 +77,12 @@ class AuthenticatedSessionController extends Controller
         $request->session()->forget('url.intended');
 
         $user = Auth::user()->load('rol');
+
+        \App\Services\AuditService::registrar(
+            'LOGIN_EXITOSO',
+            "Inicio de sesión exitoso de {$user->name} ({$user->email})",
+            ['user_id' => $user->id, 'rol' => $user->rol?->nombre]
+        );
 
         // El rol Verificador solo requiere correo y contraseña (sin Google 2FA ni Mailtrap)
         if ($user->esVerificador()) {

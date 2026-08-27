@@ -24,22 +24,6 @@ class NotificacionController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(15);
 
-        // Limpiar automáticamente (marcar leídas) las informativas (sin URL)
-        $informativasIds = [];
-        foreach ($notificaciones as $notif) {
-            if (!$notif->leida) {
-                $hasUrl = isset($notif->data['url']) && !empty($notif->data['url']);
-                if (!$hasUrl && $notif->tipo !== 'corte_generado') {
-                    $informativasIds[] = $notif->id;
-                    $notif->leida = true;
-                }
-            }
-        }
-
-        if (!empty($informativasIds)) {
-            NotificacionCajero::whereIn('id', $informativasIds)->update(['leida' => true, 'leida_at' => now()]);
-        }
-
         return view('notificaciones.index', compact('notificaciones', 'operador'));
     }
 

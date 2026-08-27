@@ -494,6 +494,11 @@ class CajeroController extends Controller
 
             if ($prestamo->adeudo_pendiente <= 0 && ($prestamo->multas ?? 0) <= 0) {
                 $prestamo->update(['estado' => 'finalizado']);
+                AuditService::registrar('VALE_FINALIZADO', "Vale {$prestamo->referencia} ha sido liquidado en su totalidad y marcado como FINALIZADO", [
+                    'prestamo_id' => $prestamo->id,
+                    'cliente_id' => $prestamo->cliente_id,
+                    'distribuidora_id' => $prestamo->created_by_user_id,
+                ]);
             }
 
             if ($distribuidora) {

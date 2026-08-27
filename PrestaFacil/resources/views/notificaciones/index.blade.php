@@ -100,7 +100,14 @@
                                 @endif
                             </div>
                             <p class="text-xs text-slate-300 leading-relaxed break-words">{{ $notif->mensaje }}</p>
-                            <span class="text-[10px] text-slate-500 font-mono block pt-0.5">{{ $notif->created_at->diffForHumans() }} ({{ $notif->created_at->format('d/m/Y H:i') }})</span>
+                            <div class="flex items-center gap-2 pt-0.5 flex-wrap">
+                                <span class="text-[10px] text-slate-500 font-mono">{{ $notif->created_at->diffForHumans() }} ({{ $notif->created_at->format('d/m/Y H:i') }})</span>
+                                @if(isset($notif->data['sucursal_nombre']) || isset($notif->data['sucursal']))
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                                        Sucursal: {{ $notif->data['sucursal_nombre'] ?? $notif->data['sucursal'] }}
+                                    </span>
+                                @endif
+                            </div>
                         </div>
                     </div>
 
@@ -149,8 +156,9 @@
                         @if(!$notif->leida)
                             <form novalidate action="{{ route('notificaciones.leer', $notif) }}" method="POST">
                                 @csrf
-                                <button type="submit" class="text-[10px] text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
-                                    Marcar leída
+                                <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold transition whitespace-nowrap flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    Marcar como leída
                                 </button>
                             </form>
                         @endif

@@ -506,6 +506,12 @@ class GerenteSucursalController extends Controller
             'estado' => 'pendiente_gerente_receptor',
         ]);
 
+        \App\Services\AuditService::registrar(
+            'SOLICITUD_TRASPASO_COORDINADOR',
+            "Gerencia Emisora {$gerenteEmisor->name} solicita traspaso del coordinador {$coordinador->name} a la sucursal de {$gerenteReceptor->name}",
+            ['transferencia_id' => $transferencia->id]
+        );
+
         // Notificar al Gerente Receptor
         \App\Models\NotificacionCajero::enviar(
             $gerenteReceptor->id,
@@ -547,6 +553,12 @@ class GerenteSucursalController extends Controller
                 'resolved_at' => now(),
             ]);
 
+            \App\Services\AuditService::registrar(
+                'RECHAZAR_TRASPASO_COORDINADOR_SUCURSAL',
+                "Gerente Receptor {$gerenteReceptor->name} rechaza recibir al coordinador {$coordinador->name}",
+                ['transferencia_id' => $transferencia->id]
+            );
+
             // Notificar al emisor
             \App\Models\NotificacionCajero::enviar(
                 $gerenteEmisor->id,
@@ -563,6 +575,12 @@ class GerenteSucursalController extends Controller
             'estado' => 'pendiente_gerente_general',
             'observaciones_gerente_receptor' => $request->observaciones,
         ]);
+
+        \App\Services\AuditService::registrar(
+            'ACEPTAR_TRASPASO_COORDINADOR_SUCURSAL',
+            "Gerente Receptor {$gerenteReceptor->name} acepta recibir al coordinador {$coordinador->name} (Pendiente Visto Bueno Gerencia General)",
+            ['transferencia_id' => $transferencia->id]
+        );
 
         // Notificar al emisor
         \App\Models\NotificacionCajero::enviar(
@@ -611,9 +629,19 @@ class GerenteSucursalController extends Controller
 
         if ($request->accion === 'marcar') {
             $distribuidor->marcarComoMorosa($gerente, $request->motivo);
+            \App\Services\AuditService::registrar(
+                'MOROSIDAD_DECLARADA',
+                "{$gerente->name} declara a la distribuidora {$distribuidor->name} en estado de MOROSIDAD" . ($request->motivo ? " (Motivo: {$request->motivo})" : ""),
+                ['distribuidor_id' => $distribuidor->id, 'motivo' => $request->motivo]
+            );
             return back()->with('warning', "Se ha marcado a la distribuidora {$distribuidor->name} como MOROSA. Sus vales pendientes fueron desactivados y la colocación de nuevos vales ha sido bloqueada.");
         } else {
             $distribuidor->desmarcarMorosidad();
+            \App\Services\AuditService::registrar(
+                'MOROSIDAD_RETIRADA',
+                "{$gerente->name} retira el estado de morosidad a la distribuidora {$distribuidor->name}",
+                ['distribuidor_id' => $distribuidor->id]
+            );
             return back()->with('success', "Se ha retirado el estado de morosidad a la distribuidora {$distribuidor->name}. Ya puede volver a emitir vales con normalidad.");
         }
     }

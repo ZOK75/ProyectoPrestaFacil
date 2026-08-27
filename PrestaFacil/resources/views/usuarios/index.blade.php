@@ -176,16 +176,16 @@
                                 @if($usuario->rol)
                                     @php
                                         $colorMap = [
-                                            'Gerente General' => 'bg-violet-500/10 text-violet-400 border-violet-500/20',
-                                            'Gerente de Sucursal' => 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-                                            'Administrador' => 'bg-slate-500/10 text-slate-300 border-slate-500/20',
-                                            'Asesor de Crédito' => 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-                                            'Cajero' => 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-                                            'Cobrador' => 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-                                            'Distribuidor' => 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-                                            'Distribuidora' => 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+                                            'Gerente General' => 'bg-emerald-50 text-slate-800 border-emerald-200 font-semibold',
+                                            'Gerente de Sucursal' => 'bg-emerald-50 text-slate-800 border-emerald-200 font-semibold',
+                                            'Administrador' => 'bg-slate-100 text-slate-800 border-slate-200 font-semibold',
+                                            'Asesor de Crédito' => 'bg-emerald-50 text-slate-800 border-emerald-200 font-semibold',
+                                            'Cajero' => 'bg-emerald-50 text-slate-800 border-emerald-200 font-semibold',
+                                            'Cobrador' => 'bg-emerald-50 text-slate-800 border-emerald-200 font-semibold',
+                                            'Distribuidor' => 'bg-emerald-50 text-slate-800 border-emerald-200 font-semibold',
+                                            'Distribuidora' => 'bg-emerald-50 text-slate-800 border-emerald-200 font-semibold',
                                         ];
-                                        $cls = $colorMap[$usuario->rol->nombre] ?? 'bg-slate-800 text-slate-300 border-slate-700';
+                                        $cls = $colorMap[$usuario->rol->nombre] ?? 'bg-slate-100 text-slate-800 border-slate-200 font-semibold';
                                     @endphp
                                     <div class="space-y-1">
                                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border {{ $cls }}">

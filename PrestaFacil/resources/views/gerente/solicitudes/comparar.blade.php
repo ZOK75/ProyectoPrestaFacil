@@ -203,9 +203,22 @@
                             <span class="text-slate-500 block">Fecha de Nacimiento:</span>
                             @php
                                 $fnV = $solicitud->getDatoVerificado('fecha_nacimiento');
+                                $fnVFormatted = 'N/A';
+                                if ($fnV) {
+                                    if ($fnV instanceof \DateTimeInterface) {
+                                        $fnVFormatted = $fnV->format('d/m/Y');
+                                    } else {
+                                        try {
+                                            $fnVFormatted = \Carbon\Carbon::parse($fnV)->format('d/m/Y');
+                                        } catch (\Throwable $e) {
+                                            $fnVFormatted = $fnV;
+                                        }
+                                    }
+                                }
                             @endphp
                             <span class="{{ $solicitud->isCampoModificado('fecha_nacimiento') ? 'text-amber-300 bg-amber-500/10 px-1 rounded' : 'text-slate-200' }}">
-                                {{ is_string($fnV) ? $fnV : ($fnV?->format('d/m/Y') ?? 'N/A') }}
+                                {{ $fnVFormatted }}
+                                @if($solicitud->isCampoModificado('fecha_nacimiento')) <span class="text-[9px] text-amber-400 font-bold">(Corregido)</span> @endif
                             </span>
                         </div>
                         <div>

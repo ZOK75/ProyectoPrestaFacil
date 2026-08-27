@@ -332,8 +332,8 @@
                         </a>
                     @endif
 
-                    <!-- Campana de Notificaciones (Cajeros, Coordinadores y Gerentes) -->
-                    @if(Auth::user()->esCajero() || Auth::user()->esCoordinador() || Auth::user()->esGerenteGeneral() || Auth::user()->esGerenteSucursal())
+                    <!-- Campana de Notificaciones (Cajeros, Coordinadores, Verificadores y Gerentes) -->
+                    @if(Auth::user()->esCajero() || Auth::user()->esCoordinador() || Auth::user()->esVerificador() || Auth::user()->esGerenteGeneral() || Auth::user()->esGerenteSucursal())
                         @php
                             $conteoNotifUsuario = Auth::user()->conteoNotificacionesSinLeer();
                             $rutaCampana = Auth::user()->esCajero() ? route('cajero.notificaciones') : route('notificaciones.index');

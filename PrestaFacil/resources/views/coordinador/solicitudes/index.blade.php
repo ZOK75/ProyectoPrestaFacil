@@ -51,13 +51,15 @@
                             </td>
                             <td class="p-4">
                                 @if($solicitud->estado === 'en espera')
-                                    <span class="px-2.5 py-1 rounded-md text-xs font-medium border bg-slate-500/10 text-slate-400 border-slate-500/20">En Espera</span>
+                                    <span class="px-2.5 py-1 rounded-md text-xs font-bold border bg-slate-500/20 text-slate-300 border-slate-500/30">En Espera de Envío</span>
                                 @elseif($solicitud->estado === 'en espera de verificacion')
-                                    <span class="px-2.5 py-1 rounded-md text-xs font-medium border bg-amber-500/10 text-amber-400 border-amber-500/20">En Verificación</span>
+                                    <span class="px-2.5 py-1 rounded-md text-xs font-bold border bg-amber-500/20 text-amber-300 border-amber-500/30">En Verificación Presencial</span>
                                 @elseif($solicitud->estado === 'aprobado')
-                                    <span class="px-2.5 py-1 rounded-md text-xs font-medium border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Aprobado</span>
+                                    <span class="px-2.5 py-1 rounded-md text-xs font-bold border bg-emerald-500/20 text-emerald-300 border-emerald-500/30">Aprobado</span>
+                                @elseif($solicitud->estado === 'rechazado')
+                                    <span class="px-2.5 py-1 rounded-md text-xs font-bold border bg-rose-500/20 text-rose-300 border-rose-500/30">Rechazado</span>
                                 @else
-                                    <span class="px-2.5 py-1 rounded-md text-xs font-medium border bg-red-500/10 text-red-400 border-red-500/20">Rechazado</span>
+                                    <span class="px-2.5 py-1 rounded-md text-xs font-bold border bg-indigo-500/20 text-indigo-300 border-indigo-500/30">{{ ucfirst($solicitud->estado) }}</span>
                                 @endif
                             </td>
                             <td class="p-4 text-right">

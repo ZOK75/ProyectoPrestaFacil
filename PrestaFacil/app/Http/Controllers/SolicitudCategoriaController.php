@@ -62,7 +62,7 @@ class SolicitudCategoriaController extends Controller
                 NotificacionCajero::enviar(
                     $solicitud->coordinador_id,
                     'solicitud_categoria_aprobada',
-                    '✅ Aumento de Categoría Aprobado',
+                    'Aumento de Categoría Aprobado',
                     "La Gerencia ({$operador->name}) ha APROBADO el cambio a categoría " . strtoupper($solicitud->categoria_nueva) . " para {$distribuidor->name}."
                 );
             }
@@ -71,7 +71,7 @@ class SolicitudCategoriaController extends Controller
             NotificacionCajero::enviar(
                 $distribuidor->id,
                 'solicitud_categoria_aprobada',
-                '🎉 ¡Felicidades! Ascenso de Categoría Aprobado',
+                'Ascenso de Categoría Aprobado',
                 "La Gerencia ha aprobado tu ascenso a categoría " . strtoupper($solicitud->categoria_nueva) . ". Tu porcentaje de ganancia por colocación ha sido actualizado."
             );
 

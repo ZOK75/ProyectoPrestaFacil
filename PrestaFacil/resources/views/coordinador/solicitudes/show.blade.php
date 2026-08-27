@@ -24,20 +24,24 @@
                 <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">Estado de Solicitud</h3>
                 <div>
                     @if($solicitud->estado === 'en espera')
-                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-500/20 text-slate-400 border border-slate-500/30 uppercase tracking-wide">
-                            En Espera
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-500/20 text-slate-300 border border-slate-500/30 uppercase tracking-wide">
+                            En Espera de Envío
                         </span>
                     @elseif($solicitud->estado === 'en espera de verificacion')
                         <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wide animate-pulse">
-                            En Verificación
+                            En Verificación Presencial
                         </span>
                     @elseif($solicitud->estado === 'aprobado')
                         <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
                             Aprobado
                         </span>
-                    @else
+                    @elseif($solicitud->estado === 'rechazado')
                         <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 uppercase tracking-wide">
                             Rechazado
+                        </span>
+                    @else
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase tracking-wide">
+                            {{ ucfirst($solicitud->estado) }}
                         </span>
                     @endif
                 </div>

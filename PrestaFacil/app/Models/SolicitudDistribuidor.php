@@ -79,6 +79,14 @@ class SolicitudDistribuidor extends Model
 
         if ($orig instanceof \Carbon\Carbon || $orig instanceof \DateTimeInterface) {
             $orig = $orig->format('Y-m-d');
+        } elseif (is_string($orig) && preg_match('/^\d{4}-\d{2}-\d{2}/', $orig)) {
+            $orig = substr($orig, 0, 10);
+        }
+
+        if ($verif instanceof \Carbon\Carbon || $verif instanceof \DateTimeInterface) {
+            $verif = $verif->format('Y-m-d');
+        } elseif (is_string($verif) && preg_match('/^\d{4}-\d{2}-\d{2}/', $verif)) {
+            $verif = substr($verif, 0, 10);
         }
 
         if (is_array($orig) || is_array($verif)) {

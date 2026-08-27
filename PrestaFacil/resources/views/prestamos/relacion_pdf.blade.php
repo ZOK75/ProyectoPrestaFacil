@@ -45,8 +45,13 @@
                     </div>
                 </div>
                 <div>
-                    <span class="text-xl font-extrabold tracking-tight text-slate-900 block">PrestaFácil</span>
-                    <span class="text-xs text-slate-500 font-semibold block">Sistema de Vales & Cobranza</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl font-extrabold tracking-tight text-slate-900 block">PrestaFácil</span>
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-indigo-100 text-indigo-800 border border-indigo-300">
+                            Corte #{{ $numeroCorte ?? 1 }}
+                        </span>
+                    </div>
+                    <span class="text-xs text-slate-500 font-semibold block">Relación de Cobranza Oficial</span>
                 </div>
             </div>
 

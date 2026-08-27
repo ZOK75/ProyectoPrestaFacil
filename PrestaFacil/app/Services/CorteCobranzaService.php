@@ -392,6 +392,13 @@ class CorteCobranzaService
             }
         }
 
+        // Si la distribuidora liquidó por completo su adeudo exigible y deudas moratorias, se limpia automáticamente el estado de morosidad y retrasos
+        if ($distribuidora->totalAdeudoGlobal() <= 0) {
+            if ($distribuidora->es_morosa || $distribuidora->conteo_retrasos > 0) {
+                $distribuidora->desmarcarMorosidad();
+            }
+        }
+
         return $relacion;
     }
 

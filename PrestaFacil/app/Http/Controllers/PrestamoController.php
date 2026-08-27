@@ -516,13 +516,37 @@ class PrestamoController extends Controller
             }
         }
 
-        // Cargar únicamente los préstamos activos de la distribuidora para la relación de cobranza
+        // Obtener el número correlativo de este corte dentro del historial de la distribuidora
+        $numeroCorte = 1;
+        if ($relacion) {
+            $numeroCorte = RelacionCobranza::where('distribuidora_id', $distribuidoraId)
+                ->where('created_at', '<=', $relacion->created_at)
+                ->count();
+            if ($numeroCorte === 0) {
+                $numeroCorte = 1;
+            }
+        }
+
+        // Si se especificó un corte histórico ($corte_id), cargar préstamos de ese periodo histórico; de lo contrario, cargar préstamos activos del periodo
         $prestamosQuery = Prestamo::with(['cliente', 'productoVale', 'pagos'])
-            ->where('created_by_user_id', $distribuidoraId)
-            ->where('estado', 'activo');
+            ->where('created_by_user_id', $distribuidoraId);
+
+        if ($corte_id && $relacion) {
+            $fechaCorteRef = $relacion->fecha_corte;
+            $prestamosQuery->where('created_at', '<=', $fechaCorteRef->endOfDay())
+                ->where(function($q) use ($fechaCorteRef) {
+                    $q->where('estado', 'activo')
+                      ->orWhere(function($sub) use ($fechaCorteRef) {
+                          $sub->where('estado', 'finalizado')
+                              ->where('updated_at', '>=', $fechaCorteRef->startOfDay());
+                      });
+                });
+        } else {
+            $prestamosQuery->where('estado', 'activo');
+        }
 
         $prestamos = $prestamosQuery->orderBy('created_at', 'desc')->get();
 
-        return view('prestamos.relacion_pdf', compact('operador', 'distribuidora', 'configuracion', 'prestamos', 'relacion'));
+        return view('prestamos.relacion_pdf', compact('operador', 'distribuidora', 'configuracion', 'prestamos', 'relacion', 'numeroCorte'));
     }
 }

@@ -457,9 +457,9 @@ class User extends Authenticatable
         if ($this->esAdministrador()) {
             $query->whereIn('nombre', ['Gerente General', 'gerente general']);
         } elseif ($this->esGerenteGeneral()) {
-            $query->whereNotIn('nombre', ['Gerente General', 'gerente general']);
+            $query->whereNotIn('nombre', ['Gerente General', 'gerente general', 'Administrador', 'administrador']);
         } elseif ($this->esGerenteSucursal()) {
-            $query->whereNotIn('nombre', ['Gerente General', 'Gerente de Sucursal', 'Administrador']);
+            $query->whereNotIn('nombre', ['Gerente General', 'Gerente de Sucursal', 'Administrador', 'administrador']);
         } else {
             return Rol::where('id', 0)->get();
         }

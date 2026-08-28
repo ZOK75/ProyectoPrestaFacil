@@ -58,11 +58,26 @@
     <div class="space-y-4">
         @foreach($distribuidoras as $dist)
             @php
-                $cuotaBruta = $dist->totalCuotaQuincenal();
-                $comisionDist = $dist->totalComisionQuincenal();
-                $cuotaNeta = $dist->totalCuotaQuincenalNeta();
-                $multasAcum = floatval($dist->multas ?? 0);
-                $totalRelacion = $cuotaNeta + $multasAcum;
+                $corteService = app(\App\Services\CorteCobranzaService::class);
+                $filasDist = $corteService->generarFilasRelacionCobranza($dist);
+
+                $totalComisionesSum = 0;
+                $totalPagosSum = 0;
+                $totalRecargosSum = 0;
+                $totalGeneralSum = 0;
+
+                foreach($filasDist as $f) {
+                    $totalComisionesSum += floatval($f['comision']);
+                    $totalPagosSum += floatval($f['pago']);
+                    $totalRecargosSum += floatval($f['recargos']);
+                    $totalGeneralSum += floatval($f['total']);
+                }
+
+                $cuotaBruta = $totalPagosSum;
+                $comisionDist = $totalComisionesSum;
+                $cuotaNeta = max(0.0, $cuotaBruta - $comisionDist);
+                $multasAcum = $totalRecargosSum;
+                $totalRelacion = floor(max(0.0, $totalGeneralSum));
                 $adeudoGlobal = $dist->totalAdeudoGlobal();
             @endphp
             <div class="bg-slate-900 border border-slate-800 hover:border-emerald-500/30 rounded-2xl p-5 shadow-xl transition-all space-y-4" x-data="{ expanded: true }">
@@ -112,7 +127,7 @@
                         @endif
                     </div>
                     <div>
-                        <span class="text-[10px] text-slate-500 block uppercase">Multas Totales</span>
+                        <span class="text-[10px] text-slate-500 block uppercase">Multas / Recargos</span>
                         <span class="font-bold font-mono {{ $multasAcum > 0 ? 'text-rose-400' : 'text-slate-400' }}">${{ number_format($multasAcum, 2) }}</span>
                     </div>
                     <div>
@@ -124,17 +139,35 @@
                 <!-- Desglose de Vales Individuales -->
                 <div x-show="expanded" class="space-y-2 pt-1" x-transition>
                     <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                        <span>Vales Activos (Cobro Individual con Comisión Descontada)</span>
+                        <span>Vales Activos (Cobro Individual según Relación)</span>
                         <span class="text-slate-500">{{ $dist->prestamos->count() }} vale(s)</span>
                     </div>
 
                     <div class="space-y-2">
                         @forelse($dist->prestamos as $prestamo)
                             @php
-                                $multaPrestamo = floatval($prestamo->multas ?? 0.0);
-                                $comisionVale = $prestamo->comisionDistribuidorPorQuincena();
-                                $cuotaNetaVale = $prestamo->cuotaQuincenalNeta();
-                                $totalExigibleVale = $prestamo->totalExigibleQuincenalNeto();
+                                $filasPrestamo = array_filter($filasDist, fn($f) => $f['prestamo_id'] == $prestamo->id);
+                                $cuotaBrutaVale = 0;
+                                $comisionVale = 0;
+                                $multaPrestamo = 0;
+                                $totalExigibleVale = 0;
+
+                                foreach($filasPrestamo as $fp) {
+                                    $cuotaBrutaVale += floatval($fp['pago']);
+                                    $comisionVale += floatval($fp['comision']);
+                                    $multaPrestamo += floatval($fp['recargos']);
+                                    $totalExigibleVale += floatval($fp['total']);
+                                }
+
+                                if (empty($filasPrestamo)) {
+                                    $cuotaBrutaVale = floatval($prestamo->cuota_quincenal);
+                                    $comisionVale = $prestamo->comisionDistribuidorPorQuincena();
+                                    $multaPrestamo = floatval($prestamo->multas ?? 0.0);
+                                    $totalExigibleVale = $prestamo->totalExigibleQuincenalNeto();
+                                }
+
+                                $cuotaNetaVale = max(0.0, $cuotaBrutaVale - $comisionVale);
+                                $totalExigibleVale = floor(max(0.0, $totalExigibleVale));
                                 $saldoCapital = floatval($prestamo->adeudo_pendiente);
                             @endphp
                             <div class="bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
@@ -145,8 +178,8 @@
                                     </div>
                                     <div class="text-[11px] text-slate-400">
                                         Producto: <strong class="text-slate-300">{{ $prestamo->productoVale?->nombre ?? 'Vale Estándar' }}</strong>
-                                        @if($prestamo->productoVale?->multa > 0)
-                                            &bull; <span class="text-slate-500">Multa config: ${{ number_format($prestamo->productoVale->multa, 2) }}</span>
+                                        @if($multaPrestamo > 0)
+                                            &bull; <span class="text-rose-400 font-bold font-mono">Recargos: ${{ number_format($multaPrestamo, 2) }}</span>
                                         @endif
                                     </div>
                                 </div>
@@ -170,7 +203,7 @@
                                                 cliente: '{{ addslashes($prestamo->cliente?->nombre_completo ?? '') }}',
                                                 producto: '{{ addslashes($prestamo->productoVale?->nombre ?? 'Vale') }}',
                                                 distribuidora: '{{ addslashes($dist->name) }}',
-                                                cuotaBruta: {{ floatval($prestamo->cuota_quincenal) }},
+                                                cuotaBruta: {{ $cuotaBrutaVale }},
                                                 comision: {{ $comisionVale }},
                                                 cuotaNeta: {{ $cuotaNetaVale }},
                                                 multas: {{ $multaPrestamo }},

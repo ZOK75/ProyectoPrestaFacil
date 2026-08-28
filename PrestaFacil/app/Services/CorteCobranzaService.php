@@ -679,8 +679,13 @@ class CorteCobranzaService
             $adeudoArrastre = 0.0;
 
             for ($corteNum = 1; $corteNum <= $cortesTranscurridos; $corteNum++) {
+                $esExcedidoPlazo = ($corteNum > $totalQuincenas);
                 $pagoDisplayNum = min($corteNum, $totalQuincenas);
                 $numeroPagoTexto = "{$pagoDisplayNum}/{$totalQuincenas}";
+
+                $cuotaBrutaFila = $esExcedidoPlazo ? 0.00 : $cuotaBruta;
+                $comisionFila = $esExcedidoPlazo ? 0.00 : $comision;
+                $cuotaNetaFila = $esExcedidoPlazo ? 0.00 : $cuotaNeta;
 
                 // Abonos asociados a este corte
                 $abonoEsteCorte = 0.0;
@@ -690,7 +695,7 @@ class CorteCobranzaService
                 if ($pagosEnEsteCorte->isNotEmpty()) {
                     $abonoEsteCorte = floatval($pagosEnEsteCorte->sum('monto_abonado'));
                 } elseif ($pagosRealizados >= $corteNum) {
-                    $abonoEsteCorte = $cuotaNeta;
+                    $abonoEsteCorte = $cuotaNetaFila;
                 }
 
                 // Recargos
@@ -705,28 +710,28 @@ class CorteCobranzaService
                 // Total Fila
                 $totalFila = 0.00;
                 if ($corteNum === 1) {
-                    if ($abonoEsteCorte >= $cuotaNeta) {
-                        $excedente = $abonoEsteCorte - $cuotaNeta;
+                    if ($abonoEsteCorte >= $cuotaNetaFila) {
+                        $excedente = $abonoEsteCorte - $cuotaNetaFila;
                         $totalFila = ($excedente > 0) ? -$excedente : 0.00;
                     } elseif ($abonoEsteCorte > 0) {
                         // Pago parcial (faltante + comisión perdida)
-                        $faltante = $cuotaNeta - $abonoEsteCorte;
-                        $totalFila = $faltante + $comision;
+                        $faltante = $cuotaNetaFila - $abonoEsteCorte;
+                        $totalFila = $faltante + $comisionFila;
                     } else {
                         // Impago en corte 1
                         if ($corteNum < $cortesTranscurridos || $tieneRetraso) {
-                            $totalFila = $cuotaBruta;
+                            $totalFila = $cuotaBrutaFila;
                         } else {
-                            if ($relacion && ($relacion->estaLiquidada() || $montoAbonadoPeriodo >= $cuotaNeta)) {
+                            if ($relacion && ($relacion->estaLiquidada() || $montoAbonadoPeriodo >= $cuotaNetaFila)) {
                                 $totalFila = 0.00;
                             } else {
-                                $totalFila = $cuotaNeta;
+                                $totalFila = $cuotaNetaFila;
                             }
                         }
                     }
                 } else {
-                    // Cortes subsecuentes (2/8, 3/8...)
-                    $exigibleCorte = $cuotaNeta + $recargosFila;
+                    // Cortes subsecuentes (2/8, 3/8... o post-límite 8/8)
+                    $exigibleCorte = $cuotaNetaFila + $recargosFila;
 
                     if ($abonoEsteCorte >= $exigibleCorte) {
                         $excedente = $abonoEsteCorte - $exigibleCorte;
@@ -756,9 +761,9 @@ class CorteCobranzaService
                         'numero_pago' => $numeroPagoTexto,
                         'corte_num' => $corteNum,
                         'total_quincenas' => $totalQuincenas,
-                        'comision' => $comision,
-                        'pago' => $cuotaBruta,
-                        'cuota_neta' => $cuotaNeta,
+                        'comision' => $comisionFila,
+                        'pago' => $cuotaBrutaFila,
+                        'cuota_neta' => $cuotaNetaFila,
                         'recargos' => $recargosFila,
                         'abono' => $abonoEsteCorte,
                         'total' => $totalFila,

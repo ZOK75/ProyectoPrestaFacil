@@ -68,6 +68,6 @@ class RelacionCobranza extends Model
 
     public function estaLiquidada(): bool
     {
-        return in_array($this->estado_pago, ['pago_anticipado', 'pago_a_tiempo', 'pago_atrasado']);
+        return ($this->adeudo_pendiente !== null && floatval($this->adeudo_pendiente) <= 0) || in_array($this->estado_pago, ['pago_anticipado', 'pago_a_tiempo', 'liquidado']);
     }
 }

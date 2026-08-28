@@ -121,6 +121,15 @@ class GerenteSucursalController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Histórico de Cortes y Relaciones de Cobranza (PDFs) para esta sucursal
+        $cortesRealizados = \App\Models\RelacionCobranza::whereHas('distribuidora', function ($q) use ($sucursalId) {
+                $q->where('sucursal_id', $sucursalId)
+                  ->orWhereHas('coordinador', fn($c) => $c->where('sucursal_id', $sucursalId));
+            })
+            ->with(['distribuidora.sucursal'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+
         return view('gerente-sucursal.dashboard', compact(
             'operador',
             'personalSucursal',
@@ -135,7 +144,8 @@ class GerenteSucursalController extends Controller
             'otrosGerentesSucursal',
             'coordinadoresSucursal',
             'distribuidorasMorosasOEnRiesgo',
-            'conciliacionesPendientesGerencia'
+            'conciliacionesPendientesGerencia',
+            'cortesRealizados'
         ));
     }
 

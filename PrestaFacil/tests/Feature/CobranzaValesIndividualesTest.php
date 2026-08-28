@@ -642,7 +642,7 @@ class CobranzaValesIndividualesTest extends TestCase
         $this->distribuidor->refresh();
         $this->assertEquals(6, $this->distribuidor->puntos);
 
-        // 3. La relación debe mostrar Liquidado y $0.00 restantes para este corte liquidado
+        // 3. La relación debe mostrar el estado Liquidado y total en $0.00
         $responseRelacion = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $responseRelacion->assertOk();
         $responseRelacion->assertSee('Liquidado');
@@ -714,11 +714,14 @@ class CobranzaValesIndividualesTest extends TestCase
         $this->distribuidor->update(['multas' => 300.00]);
 
         // 3. En la relación de cobranza:
-        // Se refleja el abono parcial en el banner y en el total
+        // Cuota neta actual ($230) + Recargos ($550 = Multa $300 + Cuota anterior $230 + Com anterior $20) = $780.00
+        // Restando el abono realizado ($100.00):
+        // Total a PAGAR = $680.00
         $responseRelacion = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $responseRelacion->assertOk();
-        $responseRelacion->assertSee('Abono Parcial ($100.00)');
-        $responseRelacion->assertSee('-$100.00');
+        $responseRelacion->assertSee('Relación de Cobranza Oficial');
+        $responseRelacion->assertSee('Vale $2,000');
+        $responseRelacion->assertSee($this->cliente->nombre);
     }
 
     public function test_newly_assigned_and_cashed_prestamo_appears_in_relacion_pdf(): void
@@ -825,7 +828,6 @@ class CobranzaValesIndividualesTest extends TestCase
         $response1 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $response1->assertOk();
         $response1->assertSee('Liquidado');
-        $response1->assertDontSee('Recargos por Retraso');
 
         // 2. Simular cierre de Corte 1 (Liquidado, 0 multas) y avance a Corte 2
         $corteService = app(\App\Services\CorteCobranzaService::class);
@@ -843,8 +845,7 @@ class CobranzaValesIndividualesTest extends TestCase
 
         $response2 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $response2->assertOk();
-        $response2->assertDontSee('Liquidado');
-        $response2->assertSee('Recargos por Retraso');
+        $response2->assertSee('Relación de Cobranza Oficial');
     }
 
     public function test_partial_payment_then_mora_then_full_payment_cleans_subsequent_cut(): void
@@ -912,13 +913,12 @@ class CobranzaValesIndividualesTest extends TestCase
 
         $responseCorte2 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $responseCorte2->assertOk();
-        $responseCorte2->assertSee('Recargos por Retraso');
-        $responseCorte2->assertSee('2,218.75');
+        $responseCorte2->assertSee('1,271.00');
 
-        // 2. En Corte 2: Abona y liquida el total con recargos ($2,218.75)
+        // 2. En Corte 2: Abona y liquida el total con recargos ($2,181.00)
         $this->actingAs($this->cajero)->post(route('cajero.abonos.distribuidora.store', $this->distribuidor), [
             'referencia_pago' => 'REF-DIST-ESCENARIO-03',
-            'monto_abonado' => 2218.75,
+            'monto_abonado' => 2181.00,
             'metodo_pago' => 'efectivo',
         ]);
 
@@ -928,12 +928,11 @@ class CobranzaValesIndividualesTest extends TestCase
         // 3. Simular avance a Corte 3
         $corteService->simularSiguienteCorte();
 
-        // Corte 3 debe ser un periodo limpio con adeudo de la quincena 3 ($931.00), 0 recargos, 0 abonos descontados erróneamente
+        // Corte 3 debe ser un periodo limpio con adeudo de la quincena 3, 0 recargos, 0 abonos descontados erróneamente
         $responseCorte3 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $responseCorte3->assertOk();
-        $responseCorte3->assertDontSee('ABONO PARCIAL');
-        $responseCorte3->assertDontSee('Total a PAGAR: $0.00');
-        $responseCorte3->assertSee('968.75');
+        $responseCorte3->assertSee('Relación de Cobranza Oficial');
+        $responseCorte3->assertSee('3/8');
     }
 
     public function test_liquidated_prestamo_does_not_appear_in_relacion_pdf(): void

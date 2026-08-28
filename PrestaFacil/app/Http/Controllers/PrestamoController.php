@@ -545,10 +545,9 @@ class PrestamoController extends Controller
             $prestamosQuery->where('estado', 'activo');
         }
 
-        $prestamos = $prestamosQuery->get()->sortBy(function($p) {
-            return strtolower($p->cliente->nombre_completo ?? $p->cliente->nombre ?? '');
-        })->values();
+        $prestamos = $prestamosQuery->orderBy('created_at', 'desc')->get();
+        $filasRelacion = $this->corteService->generarFilasRelacionCobranza($distribuidora, $relacion, $configuracion);
 
-        return view('prestamos.relacion_pdf', compact('operador', 'distribuidora', 'configuracion', 'prestamos', 'relacion', 'numeroCorte'));
+        return view('prestamos.relacion_pdf', compact('operador', 'distribuidora', 'configuracion', 'prestamos', 'relacion', 'numeroCorte', 'filasRelacion'));
     }
 }

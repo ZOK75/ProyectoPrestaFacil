@@ -842,107 +842,459 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertEquals(9, $relacion->puntos_ganados);
     }
 
-    public function test_relacion_cobranza_formato_nuevo_orden_cliente_y_calculo_filas()
+    private function crearClienteTest(string $nombre, ?User $distribuidora = null): \App\Models\Cliente
+    {
+        return \App\Models\Cliente::create([
+            'nombre' => $nombre,
+            'curp' => substr('CURP' . strtoupper(bin2hex(random_bytes(7))), 0, 18),
+            'fecha_nacimiento' => '1990-01-01',
+            'lugar_nacimiento' => 'Torreón',
+            'calle' => 'Calle 1',
+            'colonia' => 'Centro',
+            'codigo_postal' => '27000',
+            'ciudad' => 'Torreón',
+            'estado' => 'Coahuila',
+            'activo' => true,
+            'distribuidor_id' => $distribuidora?->id,
+            'created_by_user_id' => $distribuidora?->id,
+        ]);
+    }
+
+    public function test_relacion_cobranza_ordenada_por_cliente_y_progresion_de_pagos()
     {
         $distribuidora = User::factory()->create([
             'rol_id' => $this->rolDistribuidor->id,
             'sucursal_id' => $this->sucursal->id,
-            'referencia_pago_distribuidor' => 'REF-DIST-00000099',
-            'categoria_distribuidor' => 'cobre',
-            'activo' => true,
+            'categoria_distribuidor' => 'Cobre',
         ]);
 
-        $clienteB = \App\Models\Cliente::create([
-            'nombre' => 'Bernardo Ramirez',
-            'curp' => substr('CURP' . strtoupper(bin2hex(random_bytes(7))), 0, 18),
-            'fecha_nacimiento' => '1990-01-01',
-            'lugar_nacimiento' => 'Torreón',
-            'calle' => 'Calle B',
-            'colonia' => 'Centro',
-            'codigo_postal' => '27000',
-            'ciudad' => 'Torreón',
-            'estado' => 'Coahuila',
-            'activo' => true,
-            'created_by_user_id' => $distribuidora->id,
-        ]);
+        $clienteB = $this->crearClienteTest('Bernardo Benitez', $distribuidora);
+        $clienteA = $this->crearClienteTest('Ana Alvarez', $distribuidora);
 
-        $clienteA = \App\Models\Cliente::create([
-            'nombre' => 'Alicia Alvarez',
-            'curp' => substr('CURP' . strtoupper(bin2hex(random_bytes(7))), 0, 18),
-            'fecha_nacimiento' => '1992-02-02',
-            'lugar_nacimiento' => 'Torreón',
-            'calle' => 'Calle A',
-            'colonia' => 'Centro',
-            'codigo_postal' => '27000',
-            'ciudad' => 'Torreón',
-            'estado' => 'Coahuila',
-            'activo' => true,
-            'created_by_user_id' => $distribuidora->id,
-        ]);
-
-        $productoVale = ProductoVale::create([
-            'clave' => 'VALE-1000-' . uniqid(),
-            'nombre' => 'Vale 1',
-            'monto_prestamo' => 1000.00,
-            'costo_seguro' => 0.00,
-            'comision_apertura' => 0.00,
-            'tasa_interes_quincenal' => 0.00,
+        $producto = ProductoVale::firstOrCreate(['clave' => 'VALE-8Q'], [
+            'nombre' => 'Vale 8 Quincenas',
+            'monto_prestamo' => 8000.00,
             'plazo_quincenas' => 8,
-            'cuota_quincenal' => 1000.00,
-            'multa_diaria' => 20.00,
+            'cuota_quincenal' => 1010.00,
+            'multa' => 20.00,
+            'comision_distribuidor' => 10.00,
             'activo' => true,
         ]);
 
-        // Préstamo para Bernardo
-        Prestamo::create([
-            'referencia' => 'VAL-BERN-01',
+        $prestamoB = Prestamo::create([
+            'referencia' => 'VALE-B',
             'cliente_id' => $clienteB->id,
-            'producto_vale_id' => $productoVale->id,
-            'created_by_user_id' => $distribuidora->id,
-            'tipo' => 'vale',
-            'monto_prestamo' => 1000.00,
-            'cuota_quincenal' => 1000.00,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 8000.00,
+            'cuota_quincenal' => 1010.00,
             'pagos_totales' => 8,
             'pagos_realizados' => 0,
-            'monto_total_pagar' => 8000.00,
-            'adeudo_pendiente' => 8000.00,
-            'multas' => 0.00,
+            'monto_total_pagar' => 8080.00,
+            'adeudo_pendiente' => 8080.00,
             'estado' => 'activo',
-            'estado_entrega' => 'entregado',
+            'created_by_user_id' => $distribuidora->id,
         ]);
 
-        // Préstamo para Alicia
-        Prestamo::create([
-            'referencia' => 'VAL-ALIC-01',
+        $prestamoA = Prestamo::create([
+            'referencia' => 'VALE-A',
             'cliente_id' => $clienteA->id,
-            'producto_vale_id' => $productoVale->id,
-            'created_by_user_id' => $distribuidora->id,
-            'tipo' => 'vale',
-            'monto_prestamo' => 1000.00,
-            'cuota_quincenal' => 1000.00,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 8000.00,
+            'cuota_quincenal' => 1010.00,
             'pagos_totales' => 8,
             'pagos_realizados' => 0,
-            'monto_total_pagar' => 8000.00,
-            'adeudo_pendiente' => 8000.00,
-            'multas' => 0.00,
+            'monto_total_pagar' => 8080.00,
+            'adeudo_pendiente' => 8080.00,
             'estado' => 'activo',
-            'estado_entrega' => 'entregado',
+            'created_by_user_id' => $distribuidora->id,
         ]);
 
-        $response = $this->actingAs($distribuidora)->get(route('prestamos.relacion-pdf'));
+        $service = app(CorteCobranzaService::class);
+        $filas = $service->generarFilasRelacionCobranza($distribuidora);
 
-        $response->assertStatus(200);
-        $response->assertSee('Relación de Cobranza');
-        $response->assertSee('Número de Pago');
-        $response->assertSee('1/8');
+        // Ana Alvarez debe aparecer primero y Bernardo Benitez después
+        $this->assertNotEmpty($filas);
+        $this->assertEquals('Ana Alvarez', $filas[0]['cliente']);
+        $this->assertEquals('1/8', $filas[0]['numero_pago']);
+        $this->assertEquals('Bernardo Benitez', $filas[1]['cliente']);
+    }
 
-        // Alicia debe aparecer antes que Bernardo (orden alfabético por cliente)
-        $content = $response->getContent();
-        $posAlicia = strpos($content, 'Alicia Alvarez');
-        $posBernardo = strpos($content, 'Bernardo Ramirez');
+    public function test_relacion_cobranza_calculo_atraso_y_recargos()
+    {
+        Configuracion::actual()->update(['comision_cobre' => 10.00]);
 
-        $this->assertNotFalse($posAlicia);
-        $this->assertNotFalse($posBernardo);
-        $this->assertLessThan($posBernardo, $posAlicia, 'Los clientes deben mostrarse en orden alfabético.');
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+        ]);
+
+        $cliente = $this->crearClienteTest('Juan Perez', $distribuidora);
+
+        $producto = ProductoVale::firstOrCreate(['clave' => 'VALE-TEST'], [
+            'nombre' => 'Vale 1',
+            'monto_prestamo' => 800.00,
+            'plazo_quincenas' => 8,
+            'cuota_quincenal' => 1010.00,
+            'multa' => 20.00,
+            'comision_distribuidor' => 1.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VALE-JUAN-1',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 800.00,
+            'cuota_quincenal' => 1010.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 8080.00,
+            'adeudo_pendiente' => 8080.00,
+            'multas' => 20.00,
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+        $prestamo->timestamps = false;
+        $prestamo->created_at = now()->subDays(20);
+        $prestamo->save();
+        $prestamo->timestamps = true;
+
+        // Crear 2 relaciones históricas (2 cortes transcurridos)
+        RelacionCobranza::create([
+            'distribuidora_id' => $distribuidora->id,
+            'fecha_corte' => now()->subDays(15),
+            'fecha_limite_pago' => now()->subDays(10),
+            'monto_total_periodo' => 1010.00,
+            'monto_pagado' => 0.00,
+            'adeudo_pendiente' => 1010.00,
+            'estado_pago' => 'pago_atrasado',
+        ]);
+        RelacionCobranza::create([
+            'distribuidora_id' => $distribuidora->id,
+            'fecha_corte' => now(),
+            'fecha_limite_pago' => now()->addDays(5),
+            'monto_total_periodo' => 2030.00,
+            'monto_pagado' => 0.00,
+            'adeudo_pendiente' => 2030.00,
+            'estado_pago' => 'pendiente',
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+        $filas = $service->generarFilasRelacionCobranza($distribuidora);
+
+        $this->assertCount(2, $filas);
+        // Fila 1 (Corte 1 / 1/8): 1010.00
+        $this->assertEquals('1/8', $filas[0]['numero_pago']);
+        $this->assertEquals(1010.00, $filas[0]['pago']);
+        $this->assertEquals(1010.00, $filas[0]['total']);
+
+        // Fila 2 (Corte 2 / 2/8): 2030.00 (1000 + 1010 + 20)
+        $this->assertEquals('2/8', $filas[1]['numero_pago']);
+        $this->assertEquals(20.00, $filas[1]['recargos']);
+        $this->assertEquals(2030.00, $filas[1]['total']);
+    }
+
+    public function test_relacion_cobranza_pago_parcial_y_excedente()
+    {
+        Configuracion::actual()->update(['comision_cobre' => 10.00]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+        ]);
+
+        $clienteParcial = $this->crearClienteTest('Cliente Parcial', $distribuidora);
+        $clienteExcedente = $this->crearClienteTest('Cliente Excedente', $distribuidora);
+
+        $producto = ProductoVale::firstOrCreate(['clave' => 'VALE-8Q-EXP'], [
+            'nombre' => 'Vale 1',
+            'monto_prestamo' => 800.00,
+            'plazo_quincenas' => 8,
+            'cuota_quincenal' => 1010.00,
+            'multa' => 20.00,
+            'comision_distribuidor' => 1.00,
+            'activo' => true,
+        ]);
+
+        // Préstamo 1: Con pago parcial (990) en corte 1
+        $prestamoParcial = Prestamo::create([
+            'referencia' => 'VALE-PARCIAL',
+            'cliente_id' => $clienteParcial->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 800.00,
+            'cuota_quincenal' => 1010.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 8080.00,
+            'adeudo_pendiente' => 7090.00,
+            'multas' => 20.00,
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+        $prestamoParcial->timestamps = false;
+        $prestamoParcial->created_at = now()->subDays(20);
+        $prestamoParcial->save();
+        $prestamoParcial->timestamps = true;
+
+        PagoPrestamo::create([
+            'prestamo_id' => $prestamoParcial->id,
+            'folio_pago' => 'PAGO-P1',
+            'numero_quincena' => 1,
+            'monto_abonado' => 990.00,
+            'monto_multa' => 0,
+            'metodo_pago' => 'Efectivo',
+        ]);
+
+        // Préstamo 2: Con pago excedente (1010) en corte 1
+        $prestamoExcedente = Prestamo::create([
+            'referencia' => 'VALE-EXCEDENTE',
+            'cliente_id' => $clienteExcedente->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 800.00,
+            'cuota_quincenal' => 1010.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 1,
+            'monto_total_pagar' => 8080.00,
+            'adeudo_pendiente' => 7070.00,
+            'multas' => 0,
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+        $prestamoExcedente->timestamps = false;
+        $prestamoExcedente->created_at = now()->subDays(20);
+        $prestamoExcedente->save();
+        $prestamoExcedente->timestamps = true;
+        PagoPrestamo::create([
+            'prestamo_id' => $prestamoExcedente->id,
+            'folio_pago' => 'PAGO-E1',
+            'numero_quincena' => 1,
+            'monto_abonado' => 1010.00,
+            'monto_multa' => 0,
+            'metodo_pago' => 'Efectivo',
+        ]);
+
+        RelacionCobranza::create([
+            'distribuidora_id' => $distribuidora->id,
+            'fecha_corte' => now()->subDays(15),
+            'fecha_limite_pago' => now()->subDays(10),
+            'monto_total_periodo' => 2000.00,
+            'monto_pagado' => 2000.00,
+            'adeudo_pendiente' => 0.00,
+            'estado_pago' => 'pago_a_tiempo',
+        ]);
+        RelacionCobranza::create([
+            'distribuidora_id' => $distribuidora->id,
+            'fecha_corte' => now(),
+            'fecha_limite_pago' => now()->addDays(5),
+            'monto_total_periodo' => 2000.00,
+            'monto_pagado' => 0.00,
+            'adeudo_pendiente' => 2000.00,
+            'estado_pago' => 'pendiente',
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+        $filas = $service->generarFilasRelacionCobranza($distribuidora);
+
+        // Buscar filas del cliente excedente
+        $filasExcedente = array_values(array_filter($filas, fn($f) => $f['cliente'] === 'Cliente Excedente'));
+        $this->assertEquals(-10.00, $filasExcedente[0]['total']);
+        $this->assertEquals(990.00, $filasExcedente[1]['total']);
+
+        // Buscar filas del cliente parcial
+        $filasParcial = array_values(array_filter($filas, fn($f) => $f['cliente'] === 'Cliente Parcial'));
+        $this->assertEquals(20.00, $filasParcial[0]['total']); // 10 restante + 10 comision
+        $this->assertEquals(1040.00, $filasParcial[1]['total']); // 1000 + 20 adeudo + 20 recargos
+    }
+
+    public function test_historico_cortes_accesible_para_gerentes_y_administrador()
+    {
+        $rolGerenteGeneral = Rol::firstOrCreate(['nombre' => 'Gerente General']);
+        $rolGerenteSucursal = Rol::firstOrCreate(['nombre' => 'Gerente de Sucursal']);
+        $rolAdmin = Rol::firstOrCreate(['nombre' => 'Administrador']);
+
+        $gg = User::factory()->create(['rol_id' => $rolGerenteGeneral->id]);
+        $gs = User::factory()->create(['rol_id' => $rolGerenteSucursal->id, 'sucursal_id' => $this->sucursal->id]);
+        $admin = User::factory()->create(['rol_id' => $rolAdmin->id]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+        ]);
+
+        $corte = RelacionCobranza::create([
+            'distribuidora_id' => $distribuidora->id,
+            'fecha_corte' => now()->subDays(15),
+            'fecha_limite_pago' => now()->subDays(10),
+            'monto_total_periodo' => 1500.00,
+            'monto_pagado' => 1500.00,
+            'adeudo_pendiente' => 0.00,
+            'estado_pago' => 'pago_a_tiempo',
+        ]);
+
+        // Gerente General accede al PDF del corte histórico
+        $resGG = $this->actingAs($gg)->get(route('prestamos.relacion-pdf', ['corte_id' => $corte->id]));
+        $resGG->assertStatus(200);
+        $resGG->assertSee('Relación de Cobranza Oficial');
+
+        // Gerente Sucursal accede al PDF del corte histórico
+        $resGS = $this->actingAs($gs)->get(route('prestamos.relacion-pdf', ['corte_id' => $corte->id]));
+        $resGS->assertStatus(200);
+
+        // Administrador accede al PDF del corte histórico
+        $resAdmin = $this->actingAs($admin)->get(route('prestamos.relacion-pdf', ['corte_id' => $corte->id]));
+        $resAdmin->assertStatus(200);
+    }
+
+    public function test_relacion_cobranza_se_detiene_en_limite_quincenas()
+    {
+        Configuracion::actual()->update(['comision_cobre' => 10.00]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+        ]);
+
+        $cliente = $this->crearClienteTest('Cliente Plazo 4', $distribuidora);
+
+        $producto = ProductoVale::firstOrCreate(['clave' => 'VALE-4Q'], [
+            'nombre' => 'Vale 4 Quincenas',
+            'monto_prestamo' => 400.00,
+            'plazo_quincenas' => 4,
+            'cuota_quincenal' => 1010.00,
+            'multa' => 20.00,
+            'comision_distribuidor' => 1.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VALE-4Q-1',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 400.00,
+            'cuota_quincenal' => 1010.00,
+            'pagos_totales' => 4,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 4040.00,
+            'adeudo_pendiente' => 4040.00,
+            'multas' => 80.00,
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+        $prestamo->timestamps = false;
+        $prestamo->created_at = now()->subDays(90);
+        $prestamo->save();
+        $prestamo->timestamps = true;
+
+        // Crear 6 cortes transcurridos
+        for ($i = 6; $i >= 1; $i--) {
+            RelacionCobranza::create([
+                'distribuidora_id' => $distribuidora->id,
+                'fecha_corte' => now()->subDays($i * 15),
+                'fecha_limite_pago' => now()->subDays($i * 15 - 5),
+                'monto_total_periodo' => 1010.00,
+                'monto_pagado' => 0.00,
+                'adeudo_pendiente' => 1010.00,
+                'estado_pago' => 'pago_atrasado',
+            ]);
+        }
+
+        $service = app(CorteCobranzaService::class);
+        $filas = $service->generarFilasRelacionCobranza($distribuidora);
+
+        $this->assertCount(6, $filas);
+        $this->assertEquals('1/4', $filas[0]['numero_pago']);
+        $this->assertEquals('2/4', $filas[1]['numero_pago']);
+        $this->assertEquals('3/4', $filas[2]['numero_pago']);
+        $this->assertEquals('4/4', $filas[3]['numero_pago']);
+        // Cortes 5 y 6 se detienen en el límite 4/4
+        $this->assertEquals('4/4', $filas[4]['numero_pago']);
+        $this->assertEquals('4/4', $filas[5]['numero_pago']);
+    }
+
+    public function test_relacion_cobranza_elimina_prestamos_liquidados()
+    {
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+        ]);
+
+        $clienteLiquidado = $this->crearClienteTest('Cliente Liquidado', $distribuidora);
+        $clienteActivo = $this->crearClienteTest('Cliente Activo', $distribuidora);
+
+        $producto = ProductoVale::firstOrCreate(['clave' => 'VALE-TEST-LIQ'], [
+            'nombre' => 'Vale Test',
+            'monto_prestamo' => 800.00,
+            'plazo_quincenas' => 8,
+            'cuota_quincenal' => 1010.00,
+            'multa' => 20.00,
+            'comision_distribuidor' => 1.00,
+            'activo' => true,
+        ]);
+
+        // Préstamo liquidado en el pasado
+        $prestamoLiq = Prestamo::create([
+            'referencia' => 'VALE-LIQ',
+            'cliente_id' => $clienteLiquidado->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 800.00,
+            'cuota_quincenal' => 1010.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 8,
+            'monto_total_pagar' => 8080.00,
+            'adeudo_pendiente' => 0.00,
+            'multas' => 0,
+            'estado' => 'finalizado',
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+        $prestamoLiq->timestamps = false;
+        $prestamoLiq->created_at = now()->subDays(60);
+        $prestamoLiq->updated_at = now()->subDays(30);
+        $prestamoLiq->save();
+        $prestamoLiq->timestamps = true;
+
+        // Préstamo activo
+        $prestamoActivo = Prestamo::create([
+            'referencia' => 'VALE-ACTIVO',
+            'cliente_id' => $clienteActivo->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 800.00,
+            'cuota_quincenal' => 1010.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 8080.00,
+            'adeudo_pendiente' => 8080.00,
+            'multas' => 0,
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+
+        RelacionCobranza::create([
+            'distribuidora_id' => $distribuidora->id,
+            'fecha_corte' => now(),
+            'fecha_limite_pago' => now()->addDays(5),
+            'monto_total_periodo' => 1000.00,
+            'monto_pagado' => 0.00,
+            'adeudo_pendiente' => 1000.00,
+            'estado_pago' => 'pendiente',
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+        $filas = $service->generarFilasRelacionCobranza($distribuidora);
+
+        // Solo debe figurar el préstamo activo; el liquidado no aparece
+        $this->assertCount(1, $filas);
+        $this->assertEquals('Cliente Activo', $filas[0]['cliente']);
     }
 }

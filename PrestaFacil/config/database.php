@@ -34,7 +34,7 @@ return [
         'sqlite' => [
             'driver' => 'sqlite',
             'url' => env('DB_URL'),
-            'database' => env('DB_DATABASE_SQLITE', database_path('database.sqlite')),
+            'database' => env('DB_DATABASE') === 'presta_facil' || env('DB_DATABASE') === 'Prestafacil' ? database_path('database.sqlite') : env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
             'busy_timeout' => null,
@@ -45,26 +45,10 @@ return [
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
-
-            'read' => [
-                'host' => [
-                    env('DB_READ_HOST', '159.223.202.120'),
-                ],
-                // Puerto específico para el Slave (Lectura)
-                'port' => env('DB_READ_PORT', env('DB_BACKUP_PORT', '59823')),
-            ],
-
-            'write' => [
-                'host' => [
-                    env('DB_WRITE_HOST', '64.23.153.121'),
-                ],
-                // Puerto específico para el Master (Escritura)
-                'port' => env('DB_WRITE_PORT', env('DB_PORT', '56349')),
-            ],
-
-            'sticky' => true,
-            'database' => env('DB_DATABASE', 'forge'),
-            'username' => env('DB_USERNAME', 'forge'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),
             'unix_socket' => env('DB_SOCKET', ''),
             'charset' => env('DB_CHARSET', 'utf8mb4'),
@@ -73,14 +57,9 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
-
-            // =========================================================================
-            // OPCIONES SSL CORREGIDAS (SIN array_filter que borre el false)
-            // =========================================================================
-            'options' => (extension_loaded('pdo_mysql') && env('MYSQL_ATTR_SSL_CA')) ? [
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-                PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
-            ] : [],
+            ]) : [],
         ],
 
         'mariadb' => [

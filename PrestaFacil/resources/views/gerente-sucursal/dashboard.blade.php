@@ -1051,6 +1051,50 @@
         </div>
     @endif
 
+    <!-- Histórico de Cortes de Cobranza (PDFs) -->
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl shadow-xl overflow-hidden">
+        <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Histórico de Cortes de Cobranza de la Sucursal (PDFs)
+            </h2>
+            <a href="{{ route('prestamos.relacion-pdf') }}" target="_blank" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition">
+                Generar Relación General &rarr;
+            </a>
+        </div>
+
+        @if(isset($cortesRealizados) && $cortesRealizados->count() > 0)
+            <div class="divide-y divide-slate-800">
+                @foreach($cortesRealizados as $corte)
+                    <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-800/30 transition">
+                        <div>
+                            <span class="text-xs font-extrabold text-white">Distribuidora: {{ $corte->distribuidora?->name }}</span>
+                            <p class="text-xs text-slate-400">Sucursal: {{ $corte->distribuidora?->sucursal?->nombre ?? 'N/A' }} &bull; Fecha Corte: {{ $corte->fecha_corte ? $corte->fecha_corte->format('d/m/Y H:i') : 'N/A' }}</p>
+                            <span class="text-[11px] text-emerald-400 font-mono font-bold">Monto Periodo: ${{ number_format($corte->monto_total_periodo, 2) }}</span>
+                        </div>
+                        <div>
+                            <a href="{{ route('prestamos.relacion-pdf', ['corte_id' => $corte->id]) }}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                Descargar PDF
+                            </a>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+            @if($cortesRealizados->hasPages())
+                <div class="p-4 border-t border-slate-800">
+                    {{ $cortesRealizados->links() }}
+                </div>
+            @endif
+        @else
+            <div class="p-8 text-center text-slate-500 text-xs">
+                No se han registrado cortes de cobranza en el historial de esta sucursal.
+            </div>
+        @endif
+    </div>
+
     <!-- Modal Solicitar Traspaso de Coordinador -->
     <div x-show="showTraspasoCoordModal" class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4" style="display: none;" x-transition>
         <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" @click="showTraspasoCoordModal = false"></div>

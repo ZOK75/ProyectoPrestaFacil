@@ -75,12 +75,26 @@
             border-color: #e2e8f0 !important;
         }
         
-        /* Normalización Estricta de Textos: Blanco o Negro */
-        .text-white, .text-slate-100, .text-slate-200, .text-slate-300, .text-slate-400, .text-slate-500, .text-slate-600, .text-indigo-200, .text-indigo-300, .text-indigo-400, .text-indigo-500, .text-amber-200, .text-amber-300, .text-amber-400, .text-amber-500, .text-yellow-300, .text-yellow-400, .text-emerald-300, .text-emerald-400, .text-violet-300, .text-purple-300 {
+        /* Normalización Estricta de Textos: Ajustes para legibilidad en tema claro */
+        .text-indigo-200, .text-indigo-300, .text-indigo-400, .text-amber-200, .text-amber-300, .text-yellow-300, .text-yellow-400, .text-violet-300, .text-purple-300 {
             color: #0f172a !important;
         }
 
-        /* Excepciones de texto Blanco ÚNICAMENTE para botones verdes o oscuros */
+        /* Colores con contraste corregido para vista clara */
+        .text-slate-500, .text-slate-400 {
+            color: #64748b !important;
+        }
+        .text-slate-300, .text-slate-200, .text-slate-100, .text-white {
+            color: #0f172a !important;
+        }
+        .text-emerald-400, .text-emerald-300 {
+            color: #047857 !important;
+        }
+        .text-rose-400, .text-rose-300 {
+            color: #be123c !important;
+        }
+
+        /* Excepciones de texto Blanco ÚNICAMENTE para botones verdes u oscuros */
         button.bg-emerald-600, button.bg-emerald-700, button.bg-indigo-600, a.bg-emerald-600, a.bg-emerald-700, a.bg-indigo-600, .bg-emerald-600, .bg-emerald-700, .bg-emerald-800, button[type="submit"].bg-emerald-600, button[type="submit"].bg-indigo-600, .notification-badge-dynamic {
             color: #ffffff !important;
         }
@@ -124,9 +138,24 @@
         }
 
         /* Badges e indicadores suaves estilo Login */
-        .bg-amber-500\/20, .bg-amber-500\/10, .bg-amber-950\/70, .bg-indigo-500\/20, .bg-indigo-500\/10, .bg-emerald-500\/20 {
+        .bg-amber-500\/20, .bg-amber-500\/10, .bg-amber-950\/70 {
+            background-color: #fef3c7 !important;
+            color: #b45309 !important;
+            border-color: #fde68a !important;
+        }
+        .bg-emerald-500\/20, .bg-emerald-500\/10 {
+            background-color: #d1fae5 !important;
+            color: #047857 !important;
+            border-color: #a7f3d0 !important;
+        }
+        .bg-rose-500\/20, .bg-rose-500\/10 {
+            background-color: #ffe4e6 !important;
+            color: #be123c !important;
+            border-color: #fecdd3 !important;
+        }
+        .bg-indigo-500\/20, .bg-indigo-500\/10, .bg-slate-500\/20 {
             background-color: #f1f5f9 !important;
-            color: #0f172a !important;
+            color: #334155 !important;
             border-color: #cbd5e1 !important;
         }
         .border-amber-500\/30, .border-amber-500\/20, .border-amber-500\/40, .border-amber-900\/30, .border-indigo-500\/40, .border-indigo-500\/30 {

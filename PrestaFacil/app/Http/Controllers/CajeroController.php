@@ -313,7 +313,12 @@ class CajeroController extends Controller
         }
 
         $query->with(['sucursal', 'prestamos' => function($qp) {
-            $qp->where('estado', 'activo')->with(['cliente', 'productoVale']);
+            $qp->where('estado', 'activo')
+               ->where(function($q) {
+                   $q->whereNull('estado_entrega')
+                     ->orWhere('estado_entrega', '!=', 'pendiente');
+               })
+               ->with(['cliente', 'productoVale']);
         }]);
             
         if ($request->filled('buscar')) {

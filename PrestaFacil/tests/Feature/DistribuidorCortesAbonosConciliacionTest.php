@@ -1435,18 +1435,18 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertEquals('3/4', $filas[2]['numero_pago']);
         $this->assertEquals('4/4', $filas[3]['numero_pago']);
         
-        // Cortes 5 y 6 se detienen en el límite 4/4 y llevan 0 cuota/comision, solo multas
+        // Cortes 5 y 6 se detienen en el límite 4/4 y suman las multas al total acumulado anterior
         $this->assertEquals('4/4', $filas[4]['numero_pago']);
         $this->assertEquals(0.00, $filas[4]['comision']);
         $this->assertEquals(0.00, $filas[4]['pago']);
         $this->assertEquals(20.00, $filas[4]['recargos']);
-        $this->assertEquals(20.00, $filas[4]['total']);
+        $this->assertEquals(4090.00, $filas[4]['total']);
 
         $this->assertEquals('4/4', $filas[5]['numero_pago']);
         $this->assertEquals(0.00, $filas[5]['comision']);
         $this->assertEquals(0.00, $filas[5]['pago']);
         $this->assertEquals(20.00, $filas[5]['recargos']);
-        $this->assertEquals(20.00, $filas[5]['total']);
+        $this->assertEquals(4110.00, $filas[5]['total']);
     }
 
     public function test_relacion_cobranza_corte_nueve_post_limite_ocho_lleva_solo_multas()
@@ -1508,7 +1508,13 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
 
         $this->assertCount(9, $filas);
 
-        // Fila 9: 9, vale 1, Juan, 8/8, 00.00, 00.00, 300.00, 300.00
+        // Fila 8: 8/8 con 9568.75
+        $fila8 = $filas[7];
+        $this->assertEquals(8, $fila8['numero']);
+        $this->assertEquals('8/8', $fila8['numero_pago']);
+        $this->assertEquals(9568.75, $fila8['total']);
+
+        // Fila 9: 9, vale 1, Juan, 8/8, 00.00, 00.00, 300.00, 9868.75 (9568.75 + 300.00)
         $fila9 = $filas[8];
         $this->assertEquals(9, $fila9['numero']);
         $this->assertEquals('vale 1', $fila9['producto']);
@@ -1517,7 +1523,73 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertEquals(0.00, $fila9['comision']);
         $this->assertEquals(0.00, $fila9['pago']);
         $this->assertEquals(300.00, $fila9['recargos']);
-        $this->assertEquals(300.00, $fila9['total']);
+        $this->assertEquals(9868.75, $fila9['total']);
+    }
+
+    public function test_prestamo_recien_asignado_muestra_solo_una_fila_aunque_distribuidora_tenga_muchos_cortes_historicos()
+    {
+        Configuracion::actual()->update(['comision_cobre' => 3.00]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+        ]);
+
+        // Simular 21 cortes históricos antiguos de la distribuidora
+        for ($i = 21; $i >= 1; $i--) {
+            RelacionCobranza::create([
+                'distribuidora_id' => $distribuidora->id,
+                'fecha_corte' => now()->subDays($i * 15),
+                'fecha_limite_pago' => now()->subDays($i * 15 - 5),
+                'monto_total_periodo' => 950.00,
+                'monto_pagado' => 950.00,
+                'adeudo_pendiente' => 0.00,
+                'estado_pago' => 'pago_a_tiempo',
+            ]);
+        }
+
+        $cliente = $this->crearClienteTest('Maria Garcia', $distribuidora);
+
+        $producto = ProductoVale::firstOrCreate(['clave' => 'VALE-5K-MARIA'], [
+            'nombre' => '5/8',
+            'monto_prestamo' => 5000.00,
+            'plazo_quincenas' => 8,
+            'cuota_quincenal' => 950.00,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        // Préstamo recién creado hoy
+        $prestamo = Prestamo::create([
+            'referencia' => 'VALE-MARIA-NEW',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 7600.00,
+            'adeudo_pendiente' => 7600.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+        $filas = $service->generarFilasRelacionCobranza($distribuidora);
+
+        // Debe tener exactamente 1 fila (Corte 1 / 1/8)
+        $this->assertCount(1, $filas);
+        $this->assertEquals(1, $filas[0]['numero']);
+        $this->assertEquals('5/8', $filas[0]['producto']);
+        $this->assertEquals('Maria Garcia', $filas[0]['cliente']);
+        $this->assertEquals('1/8', $filas[0]['numero_pago']);
+        $this->assertEquals(18.75, $filas[0]['comision']);
+        $this->assertEquals(950.00, $filas[0]['pago']);
+        $this->assertEquals(0.00, $filas[0]['recargos']);
+        $this->assertEquals(931.25, $filas[0]['total']);
     }
 
     public function test_relacion_cobranza_elimina_prestamos_liquidados()
@@ -1596,5 +1668,218 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         // Solo debe figurar el préstamo activo; el liquidado no aparece
         $this->assertCount(1, $filas);
         $this->assertEquals('Cliente Activo', $filas[0]['cliente']);
+    }
+
+    public function test_asignar_vale_hacer_corte_y_luego_asignar_segundo_vale_segundo_no_se_ve_afectado()
+    {
+        Configuracion::actual()->update(['comision_cobre' => 3.00]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+        ]);
+
+        $clienteLeo = $this->crearClienteTest('Leo', $distribuidora);
+        $clienteMaria = $this->crearClienteTest('Maria Garcia', $distribuidora);
+
+        $producto = ProductoVale::firstOrCreate(['clave' => 'VALE-5K-TEST-FLOW'], [
+            'nombre' => '5/8',
+            'monto_prestamo' => 5000.00,
+            'plazo_quincenas' => 8,
+            'cuota_quincenal' => 950.00,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        // 1. Asignar vale a Leo hace 20 días
+        $prestamoLeo = Prestamo::create([
+            'referencia' => 'VALE-LEO-1',
+            'cliente_id' => $clienteLeo->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 7600.00,
+            'adeudo_pendiente' => 7600.00,
+            'multas' => 300.00, // No pagó corte 1
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+        $prestamoLeo->timestamps = false;
+        $prestamoLeo->created_at = now()->subDays(20);
+        $prestamoLeo->save();
+        $prestamoLeo->timestamps = true;
+
+        // Corte 1 de la distribuidora (hace 15 días)
+        RelacionCobranza::create([
+            'distribuidora_id' => $distribuidora->id,
+            'fecha_corte' => now()->subDays(15),
+            'fecha_limite_pago' => now()->subDays(10),
+            'monto_total_periodo' => 950.00,
+            'monto_pagado' => 0.00,
+            'adeudo_pendiente' => 950.00,
+            'estado_pago' => 'pago_atrasado',
+        ]);
+
+        // Corte 2 de la distribuidora (hoy)
+        $relacionActual = RelacionCobranza::create([
+            'distribuidora_id' => $distribuidora->id,
+            'fecha_corte' => now(),
+            'fecha_limite_pago' => now()->addDays(5),
+            'monto_total_periodo' => 3112.50,
+            'monto_pagado' => 0.00,
+            'adeudo_pendiente' => 3112.50,
+            'estado_pago' => 'pendiente',
+        ]);
+
+        // 2. DESPUÉS del primer corte se asigna vale a Maria Garcia (hoy)
+        $prestamoMaria = Prestamo::create([
+            'referencia' => 'VALE-MARIA-2',
+            'cliente_id' => $clienteMaria->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 7600.00,
+            'adeudo_pendiente' => 7600.00,
+            'multas' => 0.00, // Recién asignado, 0 multas
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+        $filas = $service->generarFilasRelacionCobranza($distribuidora, $relacionActual);
+
+        // Leo tiene 2 filas (estuvo en corte 1 y corte 2)
+        $filasLeo = array_values(array_filter($filas, fn($f) => $f['cliente'] === 'Leo'));
+        $this->assertCount(2, $filasLeo);
+        $this->assertEquals(1, $filasLeo[0]['numero']);
+        $this->assertEquals('1/8', $filasLeo[0]['numero_pago']);
+        $this->assertEquals(950.00, $filasLeo[0]['total']);
+        $this->assertEquals(2, $filasLeo[1]['numero']);
+        $this->assertEquals('2/8', $filasLeo[1]['numero_pago']);
+        $this->assertEquals(300.00, $filasLeo[1]['recargos']);
+        $this->assertEquals(2181.25, $filasLeo[1]['total']);
+
+        // Maria Garcia tiene ÚNICAMENTE 1 fila (asignada en el ciclo actual, 0 multas, con bonificación de comisión)
+        $filasMaria = array_values(array_filter($filas, fn($f) => $f['cliente'] === 'Maria Garcia'));
+        $this->assertCount(1, $filasMaria);
+        $this->assertEquals(1, $filasMaria[0]['numero']);
+        $this->assertEquals('1/8', $filasMaria[0]['numero_pago']);
+        $this->assertEquals(18.75, $filasMaria[0]['comision']);
+        $this->assertEquals(950.00, $filasMaria[0]['pago']);
+        $this->assertEquals(0.00, $filasMaria[0]['recargos']);
+        $this->assertEquals(931.25, $filasMaria[0]['total']);
+    }
+
+    public function test_simular_corte_marca_fecha_exacta_y_segundo_vale_posterior_no_se_ve_afectado()
+    {
+        Configuracion::actual()->update(['comision_cobre' => 3.00]);
+
+        $distribuidora = \App\Models\User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'limite_credito' => 50000.00,
+            'categoria_distribuidor' => 'cobre',
+            'multas' => 0.00,
+        ]);
+
+        $clienteLeo = $this->crearClienteTest('Leo', $distribuidora);
+        $clienteMaria = $this->crearClienteTest('Maria Garcia', $distribuidora);
+
+        $producto = \App\Models\ProductoVale::firstOrCreate(['clave' => 'VALE-5K-EXACT-TEST'], [
+            'nombre' => '5/8',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $service = app(\App\Services\CorteCobranzaService::class);
+
+        // 1. Leo es creado y cobrado en caja a las 12:00:00
+        $t1 = \Carbon\Carbon::parse('2026-08-28 12:00:00');
+        \Carbon\Carbon::setTestNow($t1);
+
+        $prestamoLeo = \App\Models\Prestamo::create([
+            'referencia' => 'VALE-LEO-EXACT',
+            'cliente_id' => $clienteLeo->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 7600.00,
+            'adeudo_pendiente' => 7600.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'entregado_at' => $t1,
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+
+        // 2. Se presiona el botón "Simular Corte" a las 12:05:00
+        $t2 = \Carbon\Carbon::parse('2026-08-28 12:05:00');
+        \Carbon\Carbon::setTestNow($t2);
+        $service->simularSiguienteCorte();
+
+        // Leo recibió su multa por no pagar en corte 1
+        $prestamoLeo->refresh();
+        $this->assertEquals(300.00, floatval($prestamoLeo->multas));
+
+        // 3. Después del corte, a las 12:10:00 se asigna y cobra vale a Maria Garcia
+        $t3 = \Carbon\Carbon::parse('2026-08-28 12:10:00');
+        \Carbon\Carbon::setTestNow($t3);
+
+        $prestamoMaria = \App\Models\Prestamo::create([
+            'referencia' => 'VALE-MARIA-EXACT',
+            'cliente_id' => $clienteMaria->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 7600.00,
+            'adeudo_pendiente' => 7600.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'entregado_at' => $t3,
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+
+        // 4. Se genera la relación de cobranza en el ciclo activo
+        $filas = $service->generarFilasRelacionCobranza($distribuidora);
+
+        // Leo tiene 2 filas (estuvo antes del corte)
+        $filasLeo = array_values(array_filter($filas, fn($f) => $f['cliente'] === 'Leo'));
+        $this->assertCount(2, $filasLeo);
+        $this->assertEquals(1, $filasLeo[0]['numero']);
+        $this->assertEquals('1/8', $filasLeo[0]['numero_pago']);
+        $this->assertEquals(950.00, $filasLeo[0]['total']);
+        $this->assertEquals(2, $filasLeo[1]['numero']);
+        $this->assertEquals('2/8', $filasLeo[1]['numero_pago']);
+        $this->assertEquals(300.00, $filasLeo[1]['recargos']);
+        $this->assertEquals(2181.25, $filasLeo[1]['total']);
+
+        // Maria Garcia tiene ÚNICAMENTE 1 fila limpia (entregada posterior al corte)
+        $filasMaria = array_values(array_filter($filas, fn($f) => $f['cliente'] === 'Maria Garcia'));
+        $this->assertCount(1, $filasMaria);
+        $this->assertEquals(1, $filasMaria[0]['numero']);
+        $this->assertEquals('1/8', $filasMaria[0]['numero_pago']);
+        $this->assertEquals(18.75, $filasMaria[0]['comision']);
+        $this->assertEquals(950.00, $filasMaria[0]['pago']);
+        $this->assertEquals(0.00, $filasMaria[0]['recargos']);
+        $this->assertEquals(931.25, $filasMaria[0]['total']);
+
+        \Carbon\Carbon::setTestNow(); // reset
     }
 }

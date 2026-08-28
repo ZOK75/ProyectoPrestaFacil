@@ -80,28 +80,28 @@
         <div class="md:col-span-2 space-y-6">
             
             <!-- Datos Personales y Dirección -->
-            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm space-y-6">
                 <div>
-                    <h2 class="text-base font-bold text-slate-900 mb-3" style="color: #0f172a !important;">Información del Solicitante</h2>
+                    <h2 class="text-base font-bold text-white mb-3">Información del Solicitante</h2>
                     <div class="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                            <span class="block text-xs font-medium text-slate-500" style="color: #64748b !important;">Nombre Completo</span>
-                            <span class="text-slate-900 font-semibold" style="color: #0f172a !important;">{{ $solicitud->nombres }} {{ $solicitud->apellidos }}</span>
+                            <span class="block text-xs text-slate-500">Nombre Completo</span>
+                            <span class="text-slate-200 font-semibold">{{ $solicitud->nombres }} {{ $solicitud->apellidos }}</span>
                         </div>
                         <div>
-                            <span class="block text-xs font-medium text-slate-500" style="color: #64748b !important;">Número de Teléfono</span>
-                            <span class="text-slate-900 font-mono" style="color: #0f172a !important;">{{ $solicitud->telefono }}</span>
+                            <span class="block text-xs text-slate-500">Número de Teléfono</span>
+                            <span class="text-slate-200 font-mono">{{ $solicitud->telefono }}</span>
                         </div>
                         <div>
-                            <span class="block text-xs font-medium text-slate-500" style="color: #64748b !important;">CURP</span>
-                            <span class="text-slate-900 font-mono uppercase font-semibold" style="color: #0f172a !important;">{{ $solicitud->curp }}</span>
+                            <span class="block text-xs text-slate-500">CURP</span>
+                            <span class="text-slate-200 font-mono uppercase font-semibold">{{ $solicitud->curp }}</span>
                         </div>
                         <div>
-                            <span class="block text-xs font-medium text-slate-500" style="color: #64748b !important;">RFC</span>
-                            <span class="text-slate-900 font-mono uppercase font-semibold" style="color: #0f172a !important;">{{ $solicitud->rfc }}</span>
+                            <span class="block text-xs text-slate-500">RFC</span>
+                            <span class="text-slate-200 font-mono uppercase font-semibold">{{ $solicitud->rfc }}</span>
                         </div>
                         <div>
-                            <span class="block text-xs font-medium text-slate-500" style="color: #64748b !important;">Fecha de Nacimiento</span>
+                            <span class="block text-xs text-slate-500">Fecha de Nacimiento</span>
                             @php
                                 $fechaNac = $solicitud->fecha_nacimiento;
                                 $fechaNacStr = 'No registrada';
@@ -111,37 +111,37 @@
                                         : \Carbon\Carbon::parse($fechaNac)->format('d/m/Y');
                                 }
                             @endphp
-                            <span class="text-slate-900 font-semibold" style="color: #0f172a !important;">{{ $fechaNacStr }}</span>
+                            <span class="text-slate-200 font-semibold">{{ $fechaNacStr }}</span>
                         </div>
                         <div>
-                            <span class="block text-xs font-medium text-slate-500" style="color: #64748b !important;">Lugar de Nacimiento</span>
-                            <span class="text-slate-900" style="color: #0f172a !important;">{{ $solicitud->lugar_nacimiento ?? 'No proporcionado' }}</span>
+                            <span class="block text-xs text-slate-500">Lugar de Nacimiento</span>
+                            <span class="text-slate-200">{{ $solicitud->lugar_nacimiento ?? 'No proporcionado' }}</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="pt-6 border-t border-slate-200">
-                    <h2 class="text-base font-bold text-slate-900 mb-3" style="color: #0f172a !important;">Dirección Domiciliaria</h2>
+                <div class="pt-6 border-t border-slate-800/60">
+                    <h2 class="text-base font-bold text-white mb-3">Dirección Domiciliaria</h2>
                     <div class="grid grid-cols-2 gap-4 text-sm">
                         <div class="col-span-2">
-                            <span class="block text-xs font-medium text-slate-500" style="color: #64748b !important;">Calle y Número</span>
-                            <span class="text-slate-900" style="color: #0f172a !important;">{{ $solicitud->calle }}</span>
+                            <span class="block text-xs text-slate-500">Calle y Número</span>
+                            <span class="text-slate-200">{{ $solicitud->calle }}</span>
                         </div>
                         <div>
-                            <span class="block text-xs font-medium text-slate-500" style="color: #64748b !important;">Colonia</span>
-                            <span class="text-slate-900" style="color: #0f172a !important;">{{ $solicitud->colonia }}</span>
+                            <span class="block text-xs text-slate-500">Colonia</span>
+                            <span class="text-slate-200">{{ $solicitud->colonia }}</span>
                         </div>
                         <div>
-                            <span class="block text-xs font-medium text-slate-500" style="color: #64748b !important;">Código Postal</span>
-                            <span class="text-slate-900 font-mono" style="color: #0f172a !important;">{{ $solicitud->codigo_postal }}</span>
+                            <span class="block text-xs text-slate-500">Código Postal</span>
+                            <span class="text-slate-200 font-mono">{{ $solicitud->codigo_postal }}</span>
                         </div>
                         <div>
-                            <span class="block text-xs font-medium text-slate-500" style="color: #64748b !important;">Ciudad o Municipio</span>
-                            <span class="text-slate-900" style="color: #0f172a !important;">{{ $solicitud->ciudad }}</span>
+                            <span class="block text-xs text-slate-500">Ciudad o Municipio</span>
+                            <span class="text-slate-200">{{ $solicitud->ciudad }}</span>
                         </div>
                         <div>
-                            <span class="block text-xs font-medium text-slate-500" style="color: #64748b !important;">Estado</span>
-                            <span class="text-slate-900" style="color: #0f172a !important;">{{ $solicitud->estado_republica }}</span>
+                            <span class="block text-xs text-slate-500">Estado</span>
+                            <span class="text-slate-200">{{ $solicitud->estado_republica }}</span>
                         </div>
                     </div>
                 </div>

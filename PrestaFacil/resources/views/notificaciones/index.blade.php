@@ -128,7 +128,7 @@
                                 </svg>
                                 Abrir PDF
                             </a>
-                        @elseif(isset($notif->data['url']) && !empty($notif->data['url']) && !Auth::user()->esCajero())
+                        @elseif(isset($notif->data['url']) && !empty($notif->data['url']))
                             @php
                                 $actionUrl = $notif->data['url'];
                                 $parsedPath = parse_url($actionUrl, PHP_URL_PATH);

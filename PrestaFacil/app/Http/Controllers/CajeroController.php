@@ -491,10 +491,22 @@ class CajeroController extends Controller
                 $montoRestante -= $pagoCapital;
             }
 
+            $fechaInicioPrestamo = $prestamo->entregado_at ?? $prestamo->created_at;
+            $cortesPosteriores = 0;
+            if ($distribuidora && $fechaInicioPrestamo) {
+                $cortesPosteriores = \App\Models\RelacionCobranza::where('distribuidora_id', $distribuidora->id)
+                    ->whereNotNull('fecha_corte')
+                    ->where('fecha_corte', '<=', now())
+                    ->where('fecha_corte', '>=', $fechaInicioPrestamo)
+                    ->count();
+            }
+            $totalQuincenasPrestamo = intval($prestamo->pagos_totales ?: ($prestamo->productoVale?->plazo_quincenas ?: 8));
+            $quincenaActual = min($totalQuincenasPrestamo, max($prestamo->pagos_realizados + 1, $cortesPosteriores + 1));
+
             $pago = PagoPrestamo::create([
                 'prestamo_id' => $prestamo->id,
                 'folio_pago' => 'PAG-' . strtoupper(uniqid()),
-                'numero_quincena' => $prestamo->pagos_realizados + 1,
+                'numero_quincena' => $quincenaActual,
                 'monto_abonado' => $request->monto_abonado,
                 'metodo_pago' => $request->metodo_pago,
                 'observaciones' => $request->observaciones,

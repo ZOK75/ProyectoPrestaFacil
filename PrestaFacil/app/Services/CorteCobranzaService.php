@@ -254,12 +254,39 @@ class CorteCobranzaService
                             ->with('productoVale')
                             ->get();
 
+                        $porcentajeComision = floatval($dist->obtenerPorcentajeGanancia() ?? 0.0);
                         $multaTotalPeriodo = 0.0;
                         foreach ($prestamosActivos as $prestamo) {
-                            $multaVale = $prestamo->multaConfigurada();
-                            if ($multaVale > 0) {
-                                $prestamo->increment('multas', $multaVale);
-                                $multaTotalPeriodo += $multaVale;
+                            $totalQuincenas = max(1, intval($prestamo->pagos_totales ?: ($prestamo->productoVale?->plazo_quincenas ?: 8)));
+                            $cuotaBruta = floatval($prestamo->cuota_quincenal ?: ($prestamo->monto_prestamo / $totalQuincenas));
+                            $comision = (($porcentajeComision / 100) * floatval($prestamo->monto_prestamo)) / $totalQuincenas;
+                            $cuotaNeta = $cuotaBruta - $comision;
+
+                            $fechaInicioPrestamo = $prestamo->entregado_at ?? $prestamo->created_at;
+                            $cortesPrevios = 0;
+                            if ($fechaInicioPrestamo) {
+                                $cortesPrevios = RelacionCobranza::where('distribuidora_id', $dist->id)
+                                    ->when($relacion?->id, function ($q) use ($relacion) {
+                                        $q->where('id', '!=', $relacion->id);
+                                    })
+                                    ->whereNotNull('fecha_corte')
+                                    ->where('fecha_corte', '<=', $ahora)
+                                    ->where('fecha_corte', '>=', $fechaInicioPrestamo)
+                                    ->count();
+                            }
+                            $cortesHastaEste = $cortesPrevios + 1;
+
+                            $totalAbonadoAlVale = floatval($prestamo->pagos()->sum('monto_abonado'));
+                            $montoEsperadoAlCorriente = $cortesHastaEste * $cuotaNeta;
+
+                            $estaAlCorrienteEsteVale = $prestamo->estaPagado() || ($totalAbonadoAlVale >= ($montoEsperadoAlCorriente - 0.01));
+
+                            if (!$estaAlCorrienteEsteVale) {
+                                $multaVale = $prestamo->multaConfigurada();
+                                if ($multaVale > 0) {
+                                    $prestamo->increment('multas', $multaVale);
+                                    $multaTotalPeriodo += $multaVale;
+                                }
                             }
                         }
 
@@ -479,12 +506,39 @@ class CorteCobranzaService
 
                 // Solo aplicar multas si NO se liquidó este corte
                 if (!$fueLiquidadoEsteCorte) {
+                    $porcentajeComision = floatval($dist->obtenerPorcentajeGanancia() ?? 0.0);
                     foreach ($prestamosActivos as $prestamo) {
-                        $multaVale = $prestamo->multaConfigurada();
-                        if ($multaVale > 0) {
-                            $prestamo->increment('multas', $multaVale);
-                            $multaTotalEsteCiclo += $multaVale;
-                            $resultados['multas_aplicadas']++;
+                        $totalQuincenas = max(1, intval($prestamo->pagos_totales ?: ($prestamo->productoVale?->plazo_quincenas ?: 8)));
+                        $cuotaBruta = floatval($prestamo->cuota_quincenal ?: ($prestamo->monto_prestamo / $totalQuincenas));
+                        $comision = (($porcentajeComision / 100) * floatval($prestamo->monto_prestamo)) / $totalQuincenas;
+                        $cuotaNeta = $cuotaBruta - $comision;
+
+                        $fechaInicioPrestamo = $prestamo->entregado_at ?? $prestamo->created_at;
+                        $cortesPrevios = 0;
+                        if ($fechaInicioPrestamo) {
+                            $cortesPrevios = RelacionCobranza::where('distribuidora_id', $dist->id)
+                                ->when($relacionActual?->id, function ($q) use ($relacionActual) {
+                                    $q->where('id', '!=', $relacionActual->id);
+                                })
+                                ->whereNotNull('fecha_corte')
+                                ->where('fecha_corte', '<=', $ahora)
+                                ->where('fecha_corte', '>=', $fechaInicioPrestamo)
+                                ->count();
+                        }
+                        $cortesHastaEste = $cortesPrevios + 1;
+
+                        $totalAbonadoAlVale = floatval($prestamo->pagos()->sum('monto_abonado'));
+                        $montoEsperadoAlCorriente = $cortesHastaEste * $cuotaNeta;
+
+                        $estaAlCorrienteEsteVale = $prestamo->estaPagado() || ($totalAbonadoAlVale >= ($montoEsperadoAlCorriente - 0.01));
+
+                        if (!$estaAlCorrienteEsteVale) {
+                            $multaVale = $prestamo->multaConfigurada();
+                            if ($multaVale > 0) {
+                                $prestamo->increment('multas', $multaVale);
+                                $multaTotalEsteCiclo += $multaVale;
+                                $resultados['multas_aplicadas']++;
+                            }
                         }
                     }
 
@@ -543,7 +597,8 @@ class CorteCobranzaService
                 } else {
                     if ($relacionActual) {
                         $relacionActual->update([
-                            'corte_notificado_at' => $relacionActual->corte_notificado_at ?? $ahora,
+                            'fecha_corte' => $ahora,
+                            'corte_notificado_at' => $ahora,
                         ]);
                     }
                 }
@@ -708,24 +763,27 @@ class CorteCobranzaService
             // Cortes transcurridos para este préstamo específico (solo cortes cerrados posteriores a su entrega/activación + el corte activo)
             $fechaInicioPrestamo = $p->entregado_at ?? $p->created_at;
             $relacionActualId = $relacion?->id;
-            $cortesCerradosPosteriores = 0;
-
+            $relacionesCerradas = collect();
             if ($fechaInicioPrestamo) {
-                $cortesCerradosPosteriores = RelacionCobranza::where('distribuidora_id', $distribuidora->id)
+                $relacionesCerradas = RelacionCobranza::where('distribuidora_id', $distribuidora->id)
                     ->when($relacionActualId, function ($q) use ($relacionActualId) {
                         $q->where('id', '!=', $relacionActualId);
                     })
                     ->whereNotNull('fecha_corte')
                     ->where('fecha_corte', '<=', $fechaCorteRef)
                     ->where('fecha_corte', '>=', $fechaInicioPrestamo)
-                    ->count();
+                    ->orderBy('fecha_corte', 'asc')
+                    ->get();
             }
 
+            $cortesCerradosPosteriores = $relacionesCerradas->count();
             $cortesTranscurridos = $cortesCerradosPosteriores + 1;
 
             $pagosRealizados = intval($p->pagos_realizados);
             $adeudoArrastre = 0.0;
             $contadorFilaCliente = 1;
+            $pagosPrestamo = $p->pagos->sortBy('created_at');
+            $abonosConsumidos = 0.0;
 
             for ($corteNum = 1; $corteNum <= $cortesTranscurridos; $corteNum++) {
                 $esExcedidoPlazo = ($corteNum > $totalQuincenas);
@@ -736,70 +794,93 @@ class CorteCobranzaService
                 $comisionFila = $esExcedidoPlazo ? 0.00 : $comision;
                 $cuotaNetaFila = $esExcedidoPlazo ? 0.00 : $cuotaNeta;
 
-                // Abonos asociados a este corte
-                $abonoEsteCorte = 0.0;
-                $pagosEnEsteCorte = $p->pagos->filter(function($pago) use ($corteNum) {
-                    return intval($pago->numero_quincena) === $corteNum;
-                });
-                if ($pagosEnEsteCorte->isNotEmpty()) {
-                    $abonoEsteCorte = floatval($pagosEnEsteCorte->sum('monto_abonado'));
-                } elseif ($pagosRealizados >= $corteNum) {
-                    $abonoEsteCorte = $cuotaNetaFila;
-                }
-
-                // Recargos
-                $recargosFila = 0.00;
-                if ($corteNum > 1 && ($adeudoArrastre > 0 || $tieneRetraso)) {
-                    $recargosFila = ($multasAcumuladas > 0) ? min($multasAcumuladas, $multaVale) : $multaVale;
-                    if ($recargosFila <= 0) {
-                        $recargosFila = 20.00;
-                    }
-                }
-
-                // Total Fila y arrastre de adeudo para cortes subsecuentes
                 $totalFila = 0.00;
-                if ($corteNum === 1) {
-                    if ($abonoEsteCorte >= $cuotaNetaFila && $cuotaNetaFila > 0) {
-                        $excedente = $abonoEsteCorte - $cuotaNetaFila;
-                        $totalFila = $cuotaNetaFila;
-                        $adeudoArrastre = -$excedente;
-                    } elseif ($abonoEsteCorte > 0) {
-                        // Pago parcial (faltante respecto a cuota neta + comisión perdida)
-                        $faltante = $cuotaBrutaFila - $abonoEsteCorte;
-                        $totalFila = $cuotaBrutaFila;
-                        $adeudoArrastre = $faltante;
-                    } else {
-                        // Impago en corte 1
-                        if ($corteNum < $cortesTranscurridos || $tieneRetraso) {
-                            $totalFila = $cuotaBrutaFila;
-                            $adeudoArrastre = $cuotaBrutaFila;
-                        } else {
-                            $totalFila = $cuotaNetaFila;
-                            $adeudoArrastre = 0.00;
+                $abonoEsteCorte = 0.00;
+                $recargosFila = 0.00;
+
+                if ($corteNum < $cortesTranscurridos) {
+                    // CORTES HISTÓRICOS CERRADOS PREVIOS
+                    $relCerrada = $relacionesCerradas[$corteNum - 1] ?? null;
+                    $fechaCortePasada = $relCerrada ? $relCerrada->fecha_corte : null;
+
+                    // Pagos realizados durante o asociados a este corte histórico
+                    $pagosHistoricos = $pagosPrestamo->filter(function($pago) use ($corteNum) {
+                        return intval($pago->numero_quincena) === $corteNum;
+                    });
+                    if ($pagosHistoricos->isEmpty()) {
+                        $pagosHistoricos = $pagosPrestamo->filter(function($pago) use ($fechaCortePasada, $corteNum, $cuotaBrutaFila) {
+                            $sinQuincena = (intval($pago->numero_quincena) === 0 || $pago->numero_quincena === null);
+                            $coincideFecha = $fechaCortePasada && $pago->created_at <= $fechaCortePasada->copy()->endOfDay();
+                            return $sinQuincena && $coincideFecha;
+                        });
+                    }
+
+                    $abonoEsteCorte = floatval($pagosHistoricos->sum('monto_abonado'));
+                    $abonosConsumidos += $abonoEsteCorte;
+
+                    if ($corteNum > 1 && $adeudoArrastre > 0) {
+                        $recargosFila = ($multasAcumuladas > 0) ? min($multasAcumuladas, $multaVale) : $multaVale;
+                        if ($recargosFila <= 0) {
+                            $recargosFila = 300.00;
                         }
                     }
-                } else {
-                    // Cortes subsecuentes (2/8 a 8/8 y post-límite 9/8...)
-                    // pago - comision(actual) + (adeudo anterior) + recargos
-                    $exigibleCorte = $cuotaNetaFila + $recargosFila + $adeudoArrastre;
 
-                    if ($abonoEsteCorte >= $exigibleCorte && $exigibleCorte > 0) {
-                        $excedente = $abonoEsteCorte - $exigibleCorte;
-                        $totalFila = max(0.0, $exigibleCorte - $abonoEsteCorte);
-                        $adeudoArrastre = -$excedente;
-                    } elseif ($abonoEsteCorte > 0) {
-                        $faltante = $exigibleCorte - $abonoEsteCorte;
-                        $totalFila = $faltante;
-                        $adeudoArrastre = $faltante;
-                    } else {
-                        if ($relacion && $corteNum === $cortesTranscurridos && $relacion->estaLiquidada()) {
-                            $totalFila = 0.00;
+                    if ($corteNum === 1) {
+                        if ($abonoEsteCorte > $cuotaNetaFila && $cuotaNetaFila > 0) {
+                            $excedente = round($abonoEsteCorte - $cuotaNetaFila, 2);
+                            $totalFila = -$excedente;
+                            $adeudoArrastre = -$excedente;
+                        } elseif ($abonoEsteCorte == $cuotaNetaFila && $cuotaNetaFila > 0) {
+                            $totalFila = $cuotaNetaFila;
                             $adeudoArrastre = 0.00;
+                        } elseif ($abonoEsteCorte > 0) {
+                            $faltante = $cuotaBrutaFila - $abonoEsteCorte;
+                            $totalFila = $cuotaBrutaFila;
+                            $adeudoArrastre = $faltante;
+                        } else {
+                            $totalFila = $cuotaBrutaFila;
+                            $adeudoArrastre = $cuotaBrutaFila;
+                        }
+                    } else {
+                        $exigibleCorte = $adeudoArrastre + $cuotaNetaFila + $recargosFila;
+                        if ($abonoEsteCorte > $exigibleCorte && $exigibleCorte > 0) {
+                            $excedente = round($abonoEsteCorte - $exigibleCorte, 2);
+                            $totalFila = -$excedente;
+                            $adeudoArrastre = -$excedente;
+                        } elseif ($abonoEsteCorte == $exigibleCorte && $exigibleCorte > 0) {
+                            $totalFila = ($adeudoArrastre == 0) ? $cuotaNetaFila : 0.00;
+                            $adeudoArrastre = 0.00;
+                        } elseif ($abonoEsteCorte > 0) {
+                            $faltante = max(0.0, round($exigibleCorte - $abonoEsteCorte, 2));
+                            $totalFila = $faltante;
+                            $adeudoArrastre = $faltante;
                         } else {
                             $totalFila = $exigibleCorte;
                             $adeudoArrastre = $exigibleCorte;
                         }
                     }
+                } else {
+                    // CORTE ACTIVO ACTUAL
+                    // Todos los abonos disponibles no consumidos en cortes históricos previos se aplican en este corte
+                    $totalAbonadoAlPrestamo = floatval($pagosPrestamo->sum('monto_abonado'));
+                    $abonoEsteCorte = max(0.0, $totalAbonadoAlPrestamo - $abonosConsumidos);
+
+                    if ($corteNum > 1 && $adeudoArrastre > 0) {
+                        $recargosFila = ($multasAcumuladas > 0) ? min($multasAcumuladas, $multaVale) : $multaVale;
+                        if ($recargosFila <= 0) {
+                            $recargosFila = 300.00;
+                        }
+                    }
+
+                    if ($corteNum === 1) {
+                        $exigibleCorte = $cuotaNetaFila;
+                    } else {
+                        $exigibleCorte = $adeudoArrastre + $cuotaNetaFila + $recargosFila;
+                    }
+
+                    $diferencia = round($exigibleCorte - $abonoEsteCorte, 2);
+                    $totalFila = $diferencia;
+                    $adeudoArrastre = $diferencia;
                 }
 
                 $totalFila = round($totalFila, 2);

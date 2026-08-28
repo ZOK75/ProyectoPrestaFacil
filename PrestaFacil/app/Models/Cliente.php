@@ -42,6 +42,14 @@ class Cliente extends Model
     ];
 
     /**
+     * Nombre completo del cliente.
+     */
+    public function getNombreCompletoAttribute(): string
+    {
+        return trim("{$this->nombre} " . ($this->apellido_paterno ?? '') . " " . ($this->apellido_materno ?? ''));
+    }
+
+    /**
      * Usuario que registró al cliente.
      */
     public function createdBy(): BelongsTo

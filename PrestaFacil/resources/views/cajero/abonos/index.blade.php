@@ -80,9 +80,9 @@
 
                 $cuotaBruta = $totalPagosSum;
                 $comisionDist = $totalComisionesSum;
-                $cuotaNeta = max(0.0, $cuotaBruta - $comisionDist);
                 $multasAcum = $totalRecargosSum;
-                $totalRelacion = floor(max(0.0, $totalGeneralSum));
+                $cuotaNeta = max(0.0, $totalGeneralSum - $multasAcum);
+                $totalRelacion = max(0.0, $totalGeneralSum);
                 $adeudoGlobal = $dist->totalAdeudoGlobal();
             @endphp
             <div class="bg-slate-900 border border-slate-800 hover:border-emerald-500/30 rounded-2xl p-5 shadow-xl transition-all space-y-4" x-data="{ expanded: true }">
@@ -151,37 +151,37 @@
                     <div class="space-y-2">
                         @forelse($dist->prestamos as $prestamo)
                             @php
-                                $filasPrestamo = array_filter($filasDist, fn($f) => $f['prestamo_id'] == $prestamo->id);
+                                $filasPrestamo = array_values(array_filter($filasDist, fn($f) => $f['prestamo_id'] == $prestamo->id));
                                 $cuotaBrutaVale = 0;
                                 $comisionVale = 0;
                                 $multaPrestamo = 0;
                                 $totalExigibleVale = 0;
 
-                                foreach($filasPrestamo as $fp) {
-                                    $cuotaBrutaVale += floatval($fp['pago']);
-                                    $comisionVale += floatval($fp['comision']);
-                                    $multaPrestamo += floatval($fp['recargos']);
-                                }
-
                                 if (!empty($filasPrestamo)) {
                                     $ultimaFilaVale = end($filasPrestamo);
                                     $totalExigibleVale = floatval($ultimaFilaVale['total']);
+
+                                    foreach($filasPrestamo as $fp) {
+                                        $cuotaBrutaVale += floatval($fp['pago']);
+                                        $comisionVale += floatval($fp['comision']);
+                                        $multaPrestamo += floatval($fp['recargos']);
+                                    }
+                                    $cuotaNetaVale = max(0.0, $totalExigibleVale - $multaPrestamo);
                                 } else {
                                     $cuotaBrutaVale = floatval($prestamo->cuota_quincenal);
                                     $comisionVale = $prestamo->comisionDistribuidorPorQuincena();
                                     $multaPrestamo = floatval($prestamo->multas ?? 0.0);
                                     $totalExigibleVale = $prestamo->totalExigibleQuincenalNeto();
+                                    $cuotaNetaVale = max(0.0, $cuotaBrutaVale - $comisionVale);
                                 }
 
-                                $cuotaNetaVale = max(0.0, $cuotaBrutaVale - $comisionVale);
-                                $totalExigibleVale = floor(max(0.0, $totalExigibleVale));
                                 $saldoCapital = floatval($prestamo->adeudo_pendiente);
                             @endphp
                             <div class="bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
                                 <div class="space-y-0.5">
                                     <div class="flex items-center gap-2">
                                         <span class="font-mono text-xs font-black text-indigo-400">{{ $prestamo->referencia }}</span>
-                                        <span class="text-xs font-bold text-white">{{ $prestamo->cliente?->nombre_completo ?? 'Cliente #'.$prestamo->cliente_id }}</span>
+                                        <span class="text-xs font-bold text-white">{{ $prestamo->cliente?->nombre_completo ?? $prestamo->cliente?->nombre ?? 'Cliente #'.$prestamo->cliente_id }}</span>
                                     </div>
                                     <div class="text-[11px] text-slate-400">
                                         Producto: <strong class="text-slate-300">{{ $prestamo->productoVale?->nombre ?? 'Vale Estándar' }}</strong>
@@ -193,21 +193,22 @@
 
                                 <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0">
                                     <div class="text-right text-xs">
-                                        <div class="font-bold text-white font-mono">Cuota Neta: ${{ number_format($cuotaNetaVale, 2) }}</div>
-                                        @if($comisionVale > 0)
-                                            <div class="text-[10px] text-indigo-400 font-mono">Com: -${{ number_format($comisionVale, 2) }}</div>
-                                        @endif
-                                        @if($multaPrestamo > 0)
-                                            <div class="text-[11px] font-bold text-rose-400 font-mono">Multa: +${{ number_format($multaPrestamo, 2) }}</div>
-                                        @endif
-                                        <div class="text-[10px] text-slate-500 font-mono">Saldo: ${{ number_format($saldoCapital, 2) }}</div>
+                                        <div class="text-[10px] text-slate-400 uppercase font-semibold">Total a Cobrar:</div>
+                                        <div class="font-black text-emerald-400 font-mono text-sm">${{ number_format($totalExigibleVale, 2) }}</div>
+                                        <div class="text-[10px] text-slate-400 font-mono">
+                                            Cuota: ${{ number_format($cuotaNetaVale, 2) }}
+                                            @if($multaPrestamo > 0)
+                                                <span class="text-rose-400 font-bold"> + ${{ number_format($multaPrestamo, 2) }} recargos</span>
+                                            @endif
+                                        </div>
+                                        <div class="text-[10px] text-slate-500 font-mono">Saldo pendiente: ${{ number_format($saldoCapital, 2) }}</div>
                                     </div>
 
                                     <button type="button"
                                             @click="valeSeleccionado = {
                                                 id: '{{ $prestamo->id }}',
                                                 referencia: '{{ $prestamo->referencia }}',
-                                                cliente: '{{ addslashes($prestamo->cliente?->nombre_completo ?? '') }}',
+                                                cliente: '{{ addslashes($prestamo->cliente?->nombre_completo ?? $prestamo->cliente?->nombre ?? 'Cliente') }}',
                                                 producto: '{{ addslashes($prestamo->productoVale?->nombre ?? 'Vale') }}',
                                                 distribuidora: '{{ addslashes($dist->name) }}',
                                                 cuotaBruta: {{ $cuotaBrutaVale }},
@@ -256,33 +257,25 @@
                 
                 <div class="bg-slate-950 rounded-xl p-3 border border-slate-800 text-xs space-y-1.5">
                     <div class="flex justify-between">
-                        <span class="text-slate-400">Cuota Quincenal Bruta:</span>
-                        <span class="text-slate-300 font-mono font-bold" x-text="'$' + Number(valeSeleccionado?.cuotaBruta).toFixed(2)"></span>
-                    </div>
-                    <div class="flex justify-between" x-show="valeSeleccionado?.comision > 0">
-                        <span class="text-indigo-400">(-) Comisión Distribuidora:</span>
-                        <span class="text-indigo-300 font-mono font-bold" x-text="'-$' + Number(valeSeleccionado?.comision).toFixed(2)"></span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-300 font-semibold">(=) Cuota Neta a Pagar:</span>
-                        <span class="text-emerald-400 font-mono font-bold" x-text="'$' + Math.floor(Number(valeSeleccionado?.cuotaNeta || 0)).toFixed(2)"></span>
+                        <span class="text-slate-400">Cuota Quincenal Neta:</span>
+                        <span class="text-slate-200 font-mono font-bold" x-text="'$' + Number(valeSeleccionado?.cuotaNeta || 0).toFixed(2)"></span>
                     </div>
                     <div class="flex justify-between" x-show="valeSeleccionado?.multas > 0">
-                        <span class="text-rose-400">(+) Multas del Vale:</span>
-                        <span class="text-rose-400 font-mono font-bold" x-text="'$' + Number(valeSeleccionado?.multas).toFixed(2)"></span>
+                        <span class="text-rose-400">(+) Multas / Recargos:</span>
+                        <span class="text-rose-400 font-mono font-bold" x-text="'$' + Number(valeSeleccionado?.multas || 0).toFixed(2)"></span>
                     </div>
                     <div class="flex justify-between border-t border-slate-800 pt-1.5 font-bold">
                         <span class="text-white">Total a Cobrar (Relación):</span>
-                        <span class="text-emerald-400 font-mono font-black text-sm" x-text="'$' + Math.floor(Number(valeSeleccionado?.totalExigible || 0)).toFixed(2)"></span>
+                        <span class="text-emerald-400 font-mono font-black text-sm" x-text="'$' + Number(valeSeleccionado?.totalExigible || 0).toFixed(2)"></span>
                     </div>
                 </div>
 
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 uppercase">Monto a Abonar al Vale ($)</label>
                     <input type="number" name="monto_abonado" step="0.01" min="0.01" required placeholder="0.00"
-                        :value="Math.min(Number(valeSeleccionado?.saldo || 0) + Number(valeSeleccionado?.multas || 0), Math.floor(Number(valeSeleccionado?.totalExigible || 0))).toFixed(2)"
+                        :value="Number(valeSeleccionado?.totalExigible || 0).toFixed(2)"
                         class="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 px-3 text-emerald-400 font-mono text-xl font-black mt-1 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-center">
-                    <span class="text-[10px] text-slate-500 block mt-0.5">Monto sugerido ajustado al saldo pendiente del vale.</span>
+                    <span class="text-[10px] text-slate-500 block mt-0.5">Monto total sugerido según la Relación de Cobranza.</span>
                 </div>
 
                 <div>
@@ -324,24 +317,16 @@
                 
                 <div class="bg-slate-950 rounded-xl p-3 border border-slate-800 text-xs space-y-1.5">
                     <div class="flex justify-between">
-                        <span class="text-slate-400">Cuota Quincenal Bruta:</span>
-                        <span class="text-slate-300 font-mono font-bold" x-text="'$' + Number(distSeleccionada?.cuotaBruta).toFixed(2)"></span>
-                    </div>
-                    <div class="flex justify-between" x-show="distSeleccionada?.comision > 0">
-                        <span class="text-indigo-400">(-) Comisión Distribuidora:</span>
-                        <span class="text-indigo-300 font-mono font-bold" x-text="'-$' + Number(distSeleccionada?.comision).toFixed(2)"></span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-300 font-semibold">(=) Cuota Neta a Cobrar:</span>
-                        <span class="text-emerald-400 font-mono font-bold" x-text="'$' + Math.floor(Number(distSeleccionada?.cuotaNeta || 0)).toFixed(2)"></span>
+                        <span class="text-slate-400">Cuota Quincenal Neta Total:</span>
+                        <span class="text-slate-200 font-mono font-bold" x-text="'$' + Number(distSeleccionada?.cuotaNeta || 0).toFixed(2)"></span>
                     </div>
                     <div class="flex justify-between" x-show="distSeleccionada?.multas > 0">
                         <span class="text-rose-400">(+) Multas Acumuladas:</span>
-                        <span class="text-rose-400 font-mono font-bold" x-text="'$' + Number(distSeleccionada?.multas).toFixed(2)"></span>
+                        <span class="text-rose-400 font-mono font-bold" x-text="'$' + Number(distSeleccionada?.multas || 0).toFixed(2)"></span>
                     </div>
                     <div class="flex justify-between border-t border-slate-800 pt-1.5 font-bold">
                         <span class="text-white">Total a Cobrar (Relación):</span>
-                        <span class="text-emerald-400 font-mono font-black text-sm" x-text="'$' + Math.floor(Number(distSeleccionada?.totalRelacion || 0)).toFixed(2)"></span>
+                        <span class="text-emerald-400 font-mono font-black text-sm" x-text="'$' + Number(distSeleccionada?.totalRelacion || 0).toFixed(2)"></span>
                     </div>
                 </div>
 
@@ -355,9 +340,9 @@
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 uppercase">Monto a Abonar ($)</label>
                     <input type="number" name="monto_abonado" step="0.01" min="0.01" required placeholder="0.00"
-                        :value="Math.floor(Number(distSeleccionada?.totalRelacion || 0)).toFixed(2)"
+                        :value="Number(distSeleccionada?.totalRelacion || 0).toFixed(2)"
                         class="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 px-3 text-indigo-300 font-mono text-xl font-black mt-1 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-center">
-                    <span class="text-[10px] text-slate-500 block mt-0.5">Monto neto sugerido según la Relación de Cobranza (Cuota menos comisión).</span>
+                    <span class="text-[10px] text-slate-500 block mt-0.5">Monto total sugerido según la Relación de Cobranza.</span>
                 </div>
 
                 <div>

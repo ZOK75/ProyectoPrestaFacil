@@ -913,12 +913,12 @@ class CobranzaValesIndividualesTest extends TestCase
 
         $responseCorte2 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $responseCorte2->assertOk();
-        $responseCorte2->assertSee('1,271.00');
+        $responseCorte2->assertSee('1,251.25');
 
-        // 2. En Corte 2: Abona y liquida el total con recargos ($2,181.00)
+        // 2. En Corte 2: Abona y liquida el total con recargos ($1,251.25)
         $this->actingAs($this->cajero)->post(route('cajero.abonos.distribuidora.store', $this->distribuidor), [
             'referencia_pago' => 'REF-DIST-ESCENARIO-03',
-            'monto_abonado' => 2181.00,
+            'monto_abonado' => 1251.25,
             'metodo_pago' => 'efectivo',
         ]);
 

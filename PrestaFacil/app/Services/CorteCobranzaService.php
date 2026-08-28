@@ -726,24 +726,24 @@ class CorteCobranzaService
                     }
                 } else {
                     // Cortes subsecuentes (2/8, 3/8...)
-                    $exigible = $cuotaNeta + $adeudoArrastre + $recargosFila;
+                    $exigibleCorte = $cuotaNeta + $recargosFila;
 
-                    if ($abonoEsteCorte >= $exigible) {
-                        $excedente = $abonoEsteCorte - $exigible;
+                    if ($abonoEsteCorte >= $exigibleCorte) {
+                        $excedente = $abonoEsteCorte - $exigibleCorte;
                         $totalFila = ($excedente > 0) ? -$excedente : 0.00;
                     } elseif ($abonoEsteCorte > 0) {
-                        $faltante = $exigible - $abonoEsteCorte;
+                        $faltante = $exigibleCorte - $abonoEsteCorte;
                         $totalFila = $faltante;
                     } else {
-                        if ($relacion && $corteNum === $cortesTranscurridos && ($relacion->estaLiquidada() || $montoAbonadoPeriodo >= $exigible)) {
+                        if ($relacion && $corteNum === $cortesTranscurridos && ($relacion->estaLiquidada() || $montoAbonadoPeriodo >= $exigibleCorte)) {
                             $totalFila = 0.00;
                         } else {
-                            $totalFila = $exigible;
+                            $totalFila = $exigibleCorte;
                         }
                     }
                 }
 
-                $adeudoArrastre = $totalFila;
+                $totalFila = round($totalFila, 2);
 
                 // Agregar fila al reporte
                 if ($totalFila != 0.00 || $corteNum === $cortesTranscurridos || $cortesTranscurridos === 1) {

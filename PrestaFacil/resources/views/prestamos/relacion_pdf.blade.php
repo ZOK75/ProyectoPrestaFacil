@@ -88,13 +88,18 @@
             $totalComisionesSum = 0;
             $totalPagosSum = 0;
             $totalRecargosSum = 0;
-            $totalGeneralSum = 0;
-
+            $filasPorPrestamo = [];
             foreach($filas as $f) {
                 $totalComisionesSum += floatval($f['comision']);
                 $totalPagosSum += floatval($f['pago']);
                 $totalRecargosSum += floatval($f['recargos']);
-                $totalGeneralSum += floatval($f['total']);
+                $filasPorPrestamo[$f['prestamo_id']][] = $f;
+            }
+
+            $totalGeneralSum = 0;
+            foreach($filasPorPrestamo as $prestamoId => $filasP) {
+                $ultimaFila = end($filasP);
+                $totalGeneralSum += max(0.0, floatval($ultimaFila['total']));
             }
             $totalGeneralSum = floor($totalGeneralSum);
 

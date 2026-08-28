@@ -64,13 +64,18 @@
                 $totalComisionesSum = 0;
                 $totalPagosSum = 0;
                 $totalRecargosSum = 0;
-                $totalGeneralSum = 0;
-
+                $filasPorPrestamo = [];
                 foreach($filasDist as $f) {
                     $totalComisionesSum += floatval($f['comision']);
                     $totalPagosSum += floatval($f['pago']);
                     $totalRecargosSum += floatval($f['recargos']);
-                    $totalGeneralSum += floatval($f['total']);
+                    $filasPorPrestamo[$f['prestamo_id']][] = $f;
+                }
+
+                $totalGeneralSum = 0;
+                foreach($filasPorPrestamo as $prestamoId => $filasP) {
+                    $ultimaFila = end($filasP);
+                    $totalGeneralSum += max(0.0, floatval($ultimaFila['total']));
                 }
 
                 $cuotaBruta = $totalPagosSum;
@@ -156,10 +161,12 @@
                                     $cuotaBrutaVale += floatval($fp['pago']);
                                     $comisionVale += floatval($fp['comision']);
                                     $multaPrestamo += floatval($fp['recargos']);
-                                    $totalExigibleVale += floatval($fp['total']);
                                 }
 
-                                if (empty($filasPrestamo)) {
+                                if (!empty($filasPrestamo)) {
+                                    $ultimaFilaVale = end($filasPrestamo);
+                                    $totalExigibleVale = floatval($ultimaFilaVale['total']);
+                                } else {
                                     $cuotaBrutaVale = floatval($prestamo->cuota_quincenal);
                                     $comisionVale = $prestamo->comisionDistribuidorPorQuincena();
                                     $multaPrestamo = floatval($prestamo->multas ?? 0.0);

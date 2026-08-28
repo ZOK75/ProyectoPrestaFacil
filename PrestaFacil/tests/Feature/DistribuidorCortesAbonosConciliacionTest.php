@@ -986,18 +986,20 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $service = app(CorteCobranzaService::class);
         $filas = $service->generarFilasRelacionCobranza($distribuidora);
         $this->assertCount(2, $filas);
-        // Fila 1 (Corte 1 / 1/8): 1010.00
+        // Fila 1 (Corte 1 / 1/8): 1010.00 (impago)
+        $this->assertEquals(1, $filas[0]['numero']);
         $this->assertEquals('1/8', $filas[0]['numero_pago']);
         $this->assertEquals(1010.00, $filas[0]['pago']);
         $this->assertEquals(1010.00, $filas[0]['total']);
 
-        // Fila 2 (Corte 2 / 2/8): 1020.00 (1000 cuota neta + 20 recargos)
+        // Fila 2 (Corte 2 / 2/8): 2030.00 (1000 cuota neta + 20 recargos + 1010 adeudo anterior)
+        $this->assertEquals(2, $filas[1]['numero']);
         $this->assertEquals('2/8', $filas[1]['numero_pago']);
         $this->assertEquals(20.00, $filas[1]['recargos']);
-        $this->assertEquals(1020.00, $filas[1]['total']);
+        $this->assertEquals(2030.00, $filas[1]['total']);
 
-        // Suma de ambas filas: 1010.00 + 1020.00 = 2030.00
-        $this->assertEquals(2030.00, $filas[0]['total'] + $filas[1]['total']);
+        // Último valor del vale: 2030.00
+        $this->assertEquals(2030.00, $filas[1]['total']);
     }
 
     public function test_relacion_cobranza_pago_parcial_y_excedente()
@@ -1107,17 +1109,141 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
 
         // Buscar filas del cliente excedente
         $filasExcedente = array_values(array_filter($filas, fn($f) => $f['cliente'] === 'Cliente Excedente'));
-        $this->assertEquals(-10.00, $filasExcedente[0]['total']);
-        $this->assertEquals(1000.00, $filasExcedente[1]['total']);
-        // Suma neta del cliente excedente: -10 + 1000 = 990.00
-        $this->assertEquals(990.00, $filasExcedente[0]['total'] + $filasExcedente[1]['total']);
+        $this->assertEquals(1, $filasExcedente[0]['numero']);
+        $this->assertEquals(1000.00, $filasExcedente[0]['total']);
+        $this->assertEquals(2, $filasExcedente[1]['numero']);
+        $this->assertEquals(990.00, $filasExcedente[1]['total']); // 1000 - 10 excedente
 
         // Buscar filas del cliente parcial
         $filasParcial = array_values(array_filter($filas, fn($f) => $f['cliente'] === 'Cliente Parcial'));
-        $this->assertEquals(20.00, $filasParcial[0]['total']); // 10 restante + 10 comision
-        $this->assertEquals(1020.00, $filasParcial[1]['total']); // 1000 cuota neta + 20 recargos
-        // Suma neta del cliente parcial: 20 + 1020 = 1040.00
-        $this->assertEquals(1040.00, $filasParcial[0]['total'] + $filasParcial[1]['total']);
+        $this->assertEquals(1, $filasParcial[0]['numero']);
+        $this->assertEquals(1010.00, $filasParcial[0]['total']); // 1010 cuota bruta
+        $this->assertEquals(2, $filasParcial[1]['numero']);
+        $this->assertEquals(1040.00, $filasParcial[1]['total']); // 1000 cuota neta + 20 recargos + 20 adeudo anterior
+    }
+
+    public function test_relacion_cobranza_dos_clientes_juan_atrasado_y_jose_al_corriente_total_3030()
+    {
+        Configuracion::actual()->update(['comision_cobre' => 1.00]); // 1% de 8000 / 8 = $10.00 exactos de comision por quincena
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+        ]);
+
+        $clienteJuan = $this->crearClienteTest('Juan', $distribuidora);
+        $clienteJose = $this->crearClienteTest('Jose', $distribuidora);
+
+        $producto = ProductoVale::firstOrCreate(['clave' => 'VALE-1010'], [
+            'nombre' => 'vale 1',
+            'monto_prestamo' => 8000.00,
+            'plazo_quincenas' => 8,
+            'cuota_quincenal' => 1010.00,
+            'multa' => 20.00,
+            'comision_distribuidor' => 10.00,
+            'activo' => true,
+        ]);
+
+        // Prestamo Juan: no pagó corte 1 (arrastra adeudo de $1010)
+        $prestamoJuan = Prestamo::create([
+            'referencia' => 'VALE-JUAN',
+            'cliente_id' => $clienteJuan->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 8000.00,
+            'cuota_quincenal' => 1010.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 8080.00,
+            'adeudo_pendiente' => 8080.00,
+            'multas' => 20.00,
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+        $prestamoJuan->timestamps = false;
+        $prestamoJuan->created_at = now()->subDays(30);
+        $prestamoJuan->save();
+        $prestamoJuan->timestamps = true;
+
+        // Prestamo Jose: sólo 1 corte transcurrido y pagará a tiempo ($1000)
+        $prestamoJose = Prestamo::create([
+            'referencia' => 'VALE-JOSE',
+            'cliente_id' => $clienteJose->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 8000.00,
+            'cuota_quincenal' => 1010.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 8080.00,
+            'adeudo_pendiente' => 8080.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+        $prestamoJose->timestamps = false;
+        $prestamoJose->created_at = now()->subDays(5);
+        $prestamoJose->save();
+        $prestamoJose->timestamps = true;
+
+        // Cortes de la distribuidora: Corte 1 (hace 15 días) y Corte 2 (hoy)
+        RelacionCobranza::create([
+            'distribuidora_id' => $distribuidora->id,
+            'fecha_corte' => now()->subDays(15),
+            'fecha_limite_pago' => now()->subDays(10),
+            'monto_total_periodo' => 1010.00,
+            'monto_pagado' => 0.00,
+            'adeudo_pendiente' => 1010.00,
+            'estado_pago' => 'pago_atrasado',
+        ]);
+
+        RelacionCobranza::create([
+            'distribuidora_id' => $distribuidora->id,
+            'fecha_corte' => now(),
+            'fecha_limite_pago' => now()->addDays(5),
+            'monto_total_periodo' => 3030.00,
+            'monto_pagado' => 0.00,
+            'adeudo_pendiente' => 3030.00,
+            'estado_pago' => 'pendiente',
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+        $filas = $service->generarFilasRelacionCobranza($distribuidora);
+
+        // Filas de Jose (orden alfabético: Jose antes de Juan)
+        $filasJose = array_values(array_filter($filas, fn($f) => $f['cliente'] === 'Jose'));
+        $this->assertCount(1, $filasJose);
+        $this->assertEquals(1, $filasJose[0]['numero']);
+        $this->assertEquals('1/8', $filasJose[0]['numero_pago']);
+        $this->assertEquals(10.00, round($filasJose[0]['comision'], 2));
+        $this->assertEquals(1010.00, $filasJose[0]['pago']);
+        $this->assertEquals(0.00, $filasJose[0]['recargos']);
+        $this->assertEquals(1000.00, round($filasJose[0]['total'], 2));
+
+        // Filas de Juan
+        $filasJuan = array_values(array_filter($filas, fn($f) => $f['cliente'] === 'Juan'));
+        $this->assertCount(2, $filasJuan);
+        // Juan Corte 1: 1, vale 1, Juan, 1/8, 10.00, 1010.00, 00.00, 1010.00
+        $this->assertEquals(1, $filasJuan[0]['numero']);
+        $this->assertEquals('1/8', $filasJuan[0]['numero_pago']);
+        $this->assertEquals(10.00, round($filasJuan[0]['comision'], 2));
+        $this->assertEquals(1010.00, $filasJuan[0]['pago']);
+        $this->assertEquals(0.00, $filasJuan[0]['recargos']);
+        $this->assertEquals(1010.00, round($filasJuan[0]['total'], 2));
+
+        // Juan Corte 2: 2, vale 1, Juan, 2/8, 10.00, 1010.00, 20.00, 2030.00
+        $this->assertEquals(2, $filasJuan[1]['numero']);
+        $this->assertEquals('2/8', $filasJuan[1]['numero_pago']);
+        $this->assertEquals(10.00, round($filasJuan[1]['comision'], 2));
+        $this->assertEquals(1010.00, $filasJuan[1]['pago']);
+        $this->assertEquals(20.00, $filasJuan[1]['recargos']);
+        $this->assertEquals(2030.00, round($filasJuan[1]['total'], 2));
+
+        // Suma de últimos valores: Jose ($1000.00) + Juan ($2030.00) = $3030.00
+        $ultimoJose = end($filasJose)['total'];
+        $ultimoJuan = end($filasJuan)['total'];
+        $this->assertEquals(3030.00, round($ultimoJose + $ultimoJuan, 2));
     }
 
     public function test_relacion_cobranza_caso_usuario_imagen_totales_exactos()
@@ -1187,22 +1313,23 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertCount(2, $filas);
 
         // Fila 1 (Corte 1 / 1/8): 950.00 (impago)
+        $this->assertEquals(1, $filas[0]['numero']);
         $this->assertEquals('1/8', $filas[0]['numero_pago']);
         $this->assertEquals(18.75, $filas[0]['comision']);
         $this->assertEquals(950.00, $filas[0]['pago']);
         $this->assertEquals(0.00, $filas[0]['recargos']);
         $this->assertEquals(950.00, $filas[0]['total']);
 
-        // Fila 2 (Corte 2 / 2/8): 1231.25 (931.25 cuota neta + 300 recargos)
+        // Fila 2 (Corte 2 / 2/8): 2181.25 (931.25 cuota neta + 300 recargos + 950 adeudo anterior)
+        $this->assertEquals(2, $filas[1]['numero']);
         $this->assertEquals('2/8', $filas[1]['numero_pago']);
         $this->assertEquals(18.75, $filas[1]['comision']);
         $this->assertEquals(950.00, $filas[1]['pago']);
         $this->assertEquals(300.00, $filas[1]['recargos']);
-        $this->assertEquals(1231.25, $filas[1]['total']);
+        $this->assertEquals(2181.25, $filas[1]['total']);
 
-        // Suma de ambos totales: 950.00 + 1231.25 = 2181.25
-        $sumaTotales = $filas[0]['total'] + $filas[1]['total'];
-        $this->assertEquals(2181.25, $sumaTotales);
+        // Último valor del vale: 2181.25
+        $this->assertEquals(2181.25, $filas[1]['total']);
     }
 
     public function test_historico_cortes_accesible_para_gerentes_y_administrador()

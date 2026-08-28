@@ -913,7 +913,7 @@ class CobranzaValesIndividualesTest extends TestCase
 
         $responseCorte2 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $responseCorte2->assertOk();
-        $responseCorte2->assertSee('1,231.25');
+        $responseCorte2->assertSee('1,251.25');
         $responseCorte2->assertSee('1,251.00');
 
         // 2. En Corte 2: Abona y liquida el total con recargos ($1,251.00)

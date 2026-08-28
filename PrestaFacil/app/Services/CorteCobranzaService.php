@@ -677,6 +677,7 @@ class CorteCobranzaService
 
             $pagosRealizados = intval($p->pagos_realizados);
             $adeudoArrastre = 0.0;
+            $contadorFilaCliente = 1;
 
             for ($corteNum = 1; $corteNum <= $cortesTranscurridos; $corteNum++) {
                 $esExcedidoPlazo = ($corteNum > $totalQuincenas);
@@ -707,68 +708,81 @@ class CorteCobranzaService
                     }
                 }
 
-                // Total Fila
+                // Total Fila y arrastre de adeudo para cortes subsecuentes
                 $totalFila = 0.00;
                 if ($corteNum === 1) {
-                    if ($abonoEsteCorte >= $cuotaNetaFila) {
+                    if ($abonoEsteCorte >= $cuotaNetaFila && $cuotaNetaFila > 0) {
                         $excedente = $abonoEsteCorte - $cuotaNetaFila;
-                        $totalFila = ($excedente > 0) ? -$excedente : 0.00;
+                        $totalFila = $cuotaNetaFila;
+                        $adeudoArrastre = -$excedente;
                     } elseif ($abonoEsteCorte > 0) {
-                        // Pago parcial (faltante + comisión perdida)
-                        $faltante = $cuotaNetaFila - $abonoEsteCorte;
-                        $totalFila = $faltante + $comisionFila;
+                        // Pago parcial (faltante respecto a cuota neta + comisión perdida)
+                        $faltante = $cuotaBrutaFila - $abonoEsteCorte;
+                        $totalFila = $cuotaBrutaFila;
+                        $adeudoArrastre = $faltante;
                     } else {
                         // Impago en corte 1
                         if ($corteNum < $cortesTranscurridos || $tieneRetraso) {
                             $totalFila = $cuotaBrutaFila;
+                            $adeudoArrastre = $cuotaBrutaFila;
                         } else {
-                            if ($relacion && ($relacion->estaLiquidada() || $montoAbonadoPeriodo >= $cuotaNetaFila)) {
-                                $totalFila = 0.00;
-                            } else {
-                                $totalFila = $cuotaNetaFila;
-                            }
+                            $totalFila = $cuotaNetaFila;
+                            $adeudoArrastre = 0.00;
                         }
                     }
+                } elseif ($esExcedidoPlazo) {
+                    // Cortes post-límite (ej. 9/8, 10/8...): llevan SOLO las multas
+                    $exigibleCorte = $recargosFila;
+                    if ($abonoEsteCorte >= $exigibleCorte && $exigibleCorte > 0) {
+                        $totalFila = 0.00;
+                    } elseif ($abonoEsteCorte > 0) {
+                        $totalFila = $exigibleCorte - $abonoEsteCorte;
+                    } else {
+                        $totalFila = $exigibleCorte;
+                    }
                 } else {
-                    // Cortes subsecuentes (2/8, 3/8... o post-límite 8/8)
-                    $exigibleCorte = $cuotaNetaFila + $recargosFila;
+                    // Cortes subsecuentes regulares (2/8 a 8/8)
+                    // pago - comision(actual) + (adeudo anterior) + recargos
+                    $exigibleCorte = $cuotaNetaFila + $recargosFila + $adeudoArrastre;
 
-                    if ($abonoEsteCorte >= $exigibleCorte) {
+                    if ($abonoEsteCorte >= $exigibleCorte && $exigibleCorte > 0) {
                         $excedente = $abonoEsteCorte - $exigibleCorte;
-                        $totalFila = ($excedente > 0) ? -$excedente : 0.00;
+                        $totalFila = max(0.0, $exigibleCorte - $abonoEsteCorte);
+                        $adeudoArrastre = -$excedente;
                     } elseif ($abonoEsteCorte > 0) {
                         $faltante = $exigibleCorte - $abonoEsteCorte;
                         $totalFila = $faltante;
+                        $adeudoArrastre = $faltante;
                     } else {
-                        if ($relacion && $corteNum === $cortesTranscurridos && ($relacion->estaLiquidada() || $montoAbonadoPeriodo >= $exigibleCorte)) {
+                        if ($relacion && $corteNum === $cortesTranscurridos && $relacion->estaLiquidada()) {
                             $totalFila = 0.00;
+                            $adeudoArrastre = 0.00;
                         } else {
                             $totalFila = $exigibleCorte;
+                            $adeudoArrastre = $exigibleCorte;
                         }
                     }
                 }
 
                 $totalFila = round($totalFila, 2);
 
-                // Agregar fila al reporte
-                if ($totalFila != 0.00 || $corteNum === $cortesTranscurridos || $cortesTranscurridos === 1) {
-                    $filas[] = [
-                        'numero' => $contadorFila++,
-                        'prestamo_id' => $p->id,
-                        'referencia' => $p->referencia,
-                        'producto' => $p->productoVale?->nombre ?: ($p->productoVale?->clave ?: 'Vale 1'),
-                        'cliente' => $p->cliente?->nombre_completo ?: ($p->cliente?->nombre ?: 'Sin Cliente'),
-                        'numero_pago' => $numeroPagoTexto,
-                        'corte_num' => $corteNum,
-                        'total_quincenas' => $totalQuincenas,
-                        'comision' => $comisionFila,
-                        'pago' => $cuotaBrutaFila,
-                        'cuota_neta' => $cuotaNetaFila,
-                        'recargos' => $recargosFila,
-                        'abono' => $abonoEsteCorte,
-                        'total' => $totalFila,
-                    ];
-                }
+                // Agregar fila al reporte con numeración por cliente
+                $filas[] = [
+                    'numero' => $contadorFilaCliente++,
+                    'prestamo_id' => $p->id,
+                    'referencia' => $p->referencia,
+                    'producto' => $p->productoVale?->nombre ?: ($p->productoVale?->clave ?: 'Vale 1'),
+                    'cliente' => $p->cliente?->nombre_completo ?: ($p->cliente?->nombre ?: 'Sin Cliente'),
+                    'numero_pago' => $numeroPagoTexto,
+                    'corte_num' => $corteNum,
+                    'total_quincenas' => $totalQuincenas,
+                    'comision' => $comisionFila,
+                    'pago' => $cuotaBrutaFila,
+                    'cuota_neta' => $cuotaNetaFila,
+                    'recargos' => $recargosFila,
+                    'abono' => $abonoEsteCorte,
+                    'total' => $totalFila,
+                ];
             }
         }
 

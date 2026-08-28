@@ -409,14 +409,19 @@ class CoordinadorController extends Controller
             ['solicitud_id' => $solicitud->id, 'limite_nuevo' => $request->limite_nuevo]
         );
 
-        $gerentes = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente General', 'Administrador']))
-            ->where(function($q) use ($coordinador, $distribuidor) {
-                $sucursalId = $distribuidor->sucursal_id ?? $coordinador->sucursal_id;
-                $q->where('sucursal_id', $sucursalId)
-                  ->orWhereHas('rol', fn($r) => $r->whereIn('nombre', ['Gerente General', 'Administrador']));
-            })
-            ->where('activo', true)
-            ->get();
+        $sucursalId = $distribuidor->sucursal_id ?? $coordinador->sucursal_id;
+        $gerentes = User::where('activo', true)
+            ->with('rol')
+            ->get()
+            ->filter(function($u) use ($sucursalId) {
+                if ($u->esGerenteGeneral() || $u->esAdministrador()) {
+                    return true;
+                }
+                if ($u->esGerenteSucursal() && $sucursalId && $u->sucursal_id == $sucursalId) {
+                    return true;
+                }
+                return false;
+            });
 
         foreach ($gerentes as $gerente) {
             $url = $gerente->esGerenteGeneral() ? route('gerente-general.dashboard') : route('gerente-sucursal.dashboard');
@@ -490,14 +495,19 @@ class CoordinadorController extends Controller
             ['solicitud_id' => $solicitud->id, 'categoria_nueva' => $request->categoria_nueva]
         );
 
-        $gerentes = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente General', 'Administrador']))
-            ->where(function($q) use ($coordinador, $distribuidor) {
-                $sucursalId = $distribuidor->sucursal_id ?? $coordinador->sucursal_id;
-                $q->where('sucursal_id', $sucursalId)
-                  ->orWhereHas('rol', fn($r) => $r->whereIn('nombre', ['Gerente General', 'Administrador']));
-            })
-            ->where('activo', true)
-            ->get();
+        $sucursalId = $distribuidor->sucursal_id ?? $coordinador->sucursal_id;
+        $gerentes = User::where('activo', true)
+            ->with('rol')
+            ->get()
+            ->filter(function($u) use ($sucursalId) {
+                if ($u->esGerenteGeneral() || $u->esAdministrador()) {
+                    return true;
+                }
+                if ($u->esGerenteSucursal() && $sucursalId && $u->sucursal_id == $sucursalId) {
+                    return true;
+                }
+                return false;
+            });
 
         foreach ($gerentes as $gerente) {
             $url = $gerente->esGerenteGeneral() ? route('gerente-general.dashboard') : route('gerente-sucursal.dashboard');
@@ -596,7 +606,7 @@ class CoordinadorController extends Controller
             ['transferencia_id' => $transferencia->id]
         );
 
-        // Enviar Notificación al Coordinador Receptor con enlace directo de revisión
+        // 1. Enviar Notificación al Coordinador Receptor con enlace directo de revisión
         NotificacionCajero::enviar(
             $receptor->id,
             'transferencia_distribuidora',
@@ -610,8 +620,50 @@ class CoordinadorController extends Controller
             ]
         );
 
+        // 2. Notificar a los Gerentes de Sucursal (Origen y Destino)
+        $gerentesSucursal = User::where('activo', true)
+            ->with('rol')
+            ->get()
+            ->filter(fn($u) => $u->esGerenteSucursal() && in_array($u->sucursal_id, array_filter([$sucursalOrigenId, $sucursalDestinoId])));
+
+        foreach ($gerentesSucursal as $gs) {
+            NotificacionCajero::enviar(
+                $gs->id,
+                'solicitud_transferencia',
+                'Aviso: Traspaso de Distribuidora Iniciado',
+                "El coordinador {$emisor->name} ha iniciado el traspaso de la distribuidora {$distribuidor->name} hacia el coordinador {$receptor->name} (Sucursal: " . ($receptor->sucursal?->nombre ?? 'N/A') . ").",
+                [
+                    'transferencia_id' => $transferencia->id,
+                    'url' => route('gerente-sucursal.dashboard'),
+                    'entidad_tipo' => 'solicitud_transferencia',
+                    'entidad_id' => $transferencia->id,
+                ]
+            );
+        }
+
+        // 3. Notificar a Gerente General / Dirección General
+        $gerentesGenerales = User::where('activo', true)
+            ->with('rol')
+            ->get()
+            ->filter(fn($u) => $u->esGerenteGeneral() || $u->esAdministrador());
+
+        foreach ($gerentesGenerales as $gg) {
+            NotificacionCajero::enviar(
+                $gg->id,
+                'solicitud_transferencia',
+                'Aviso: Traspaso de Distribuidora Iniciado',
+                "El coordinador {$emisor->name} ha iniciado el traspaso de la distribuidora {$distribuidor->name} hacia el coordinador {$receptor->name} (Sucursal: " . ($receptor->sucursal?->nombre ?? 'N/A') . ").",
+                [
+                    'transferencia_id' => $transferencia->id,
+                    'url' => route('gerente-general.dashboard'),
+                    'entidad_tipo' => 'solicitud_transferencia',
+                    'entidad_id' => $transferencia->id,
+                ]
+            );
+        }
+
         return redirect()->route('coordinador.dashboard')
-            ->with('success', "Solicitud de transferencia enviada exitosamente a {$receptor->name}. Se le ha notificado para su revisión.");
+            ->with('success', "Solicitud de transferencia de la distribuidora {$distribuidor->name} iniciada y notificada a los Gerentes y al Coordinador receptor.");
     }
 
     /**

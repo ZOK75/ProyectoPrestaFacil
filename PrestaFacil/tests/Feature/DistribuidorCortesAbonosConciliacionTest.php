@@ -841,4 +841,108 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertEquals('pago_anticipado', $relacion->estado_pago);
         $this->assertEquals(9, $relacion->puntos_ganados);
     }
+
+    public function test_relacion_cobranza_formato_nuevo_orden_cliente_y_calculo_filas()
+    {
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'referencia_pago_distribuidor' => 'REF-DIST-00000099',
+            'categoria_distribuidor' => 'cobre',
+            'activo' => true,
+        ]);
+
+        $clienteB = \App\Models\Cliente::create([
+            'nombre' => 'Bernardo Ramirez',
+            'curp' => substr('CURP' . strtoupper(bin2hex(random_bytes(7))), 0, 18),
+            'fecha_nacimiento' => '1990-01-01',
+            'lugar_nacimiento' => 'Torreón',
+            'calle' => 'Calle B',
+            'colonia' => 'Centro',
+            'codigo_postal' => '27000',
+            'ciudad' => 'Torreón',
+            'estado' => 'Coahuila',
+            'activo' => true,
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+
+        $clienteA = \App\Models\Cliente::create([
+            'nombre' => 'Alicia Alvarez',
+            'curp' => substr('CURP' . strtoupper(bin2hex(random_bytes(7))), 0, 18),
+            'fecha_nacimiento' => '1992-02-02',
+            'lugar_nacimiento' => 'Torreón',
+            'calle' => 'Calle A',
+            'colonia' => 'Centro',
+            'codigo_postal' => '27000',
+            'ciudad' => 'Torreón',
+            'estado' => 'Coahuila',
+            'activo' => true,
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-1000-' . uniqid(),
+            'nombre' => 'Vale 1',
+            'monto_prestamo' => 1000.00,
+            'costo_seguro' => 0.00,
+            'comision_apertura' => 0.00,
+            'tasa_interes_quincenal' => 0.00,
+            'plazo_quincenas' => 8,
+            'cuota_quincenal' => 1000.00,
+            'multa_diaria' => 20.00,
+            'activo' => true,
+        ]);
+
+        // Préstamo para Bernardo
+        Prestamo::create([
+            'referencia' => 'VAL-BERN-01',
+            'cliente_id' => $clienteB->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 1000.00,
+            'cuota_quincenal' => 1000.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 8000.00,
+            'adeudo_pendiente' => 8000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+        ]);
+
+        // Préstamo para Alicia
+        Prestamo::create([
+            'referencia' => 'VAL-ALIC-01',
+            'cliente_id' => $clienteA->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 1000.00,
+            'cuota_quincenal' => 1000.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 8000.00,
+            'adeudo_pendiente' => 8000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+        ]);
+
+        $response = $this->actingAs($distribuidora)->get(route('prestamos.relacion-pdf'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Relación de Cobranza');
+        $response->assertSee('Número de Pago');
+        $response->assertSee('1/8');
+
+        // Alicia debe aparecer antes que Bernardo (orden alfabético por cliente)
+        $content = $response->getContent();
+        $posAlicia = strpos($content, 'Alicia Alvarez');
+        $posBernardo = strpos($content, 'Bernardo Ramirez');
+
+        $this->assertNotFalse($posAlicia);
+        $this->assertNotFalse($posBernardo);
+        $this->assertLessThan($posBernardo, $posAlicia, 'Los clientes deben mostrarse en orden alfabético.');
+    }
 }

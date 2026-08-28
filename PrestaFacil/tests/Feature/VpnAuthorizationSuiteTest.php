@@ -260,4 +260,59 @@ class VpnAuthorizationSuiteTest extends TestCase
 
         $this->assertNotEquals('no tienes autorizacion para completar el proceso', session('error'));
     }
+
+    public function test_proceso_morosidad_bloqueado_sin_vpn()
+    {
+        $gerente = $this->crearOperador('Gerente de Sucursal');
+        $distribuidor = $this->crearOperador('Distribuidor');
+
+        $response = $this->actingAs($gerente)
+            ->from('http://prestafacil.uk/gerente-sucursal/dashboard')
+            ->post("http://prestafacil.uk/distribuidores/{$distribuidor->id}/decidir-morosidad", [
+                'accion' => 'quitar',
+                'motivo' => 'Regularización autorizada',
+            ]);
+
+        $response->assertStatus(302);
+        $response->assertSessionHas('error', 'no tienes autorizacion para completar el proceso');
+    }
+
+    public function test_proceso_traspaso_coordinador_bloqueado_sin_vpn()
+    {
+        $gerenteA = $this->crearOperador('Gerente de Sucursal');
+        $gerenteB = $this->crearOperador('Gerente de Sucursal');
+        $coordinador = $this->crearOperador('Coordinador');
+        $coordinador->update(['sucursal_id' => $gerenteA->sucursal_id]);
+
+        $response = $this->actingAs($gerenteA)
+            ->from('http://prestafacil.uk/gerente-sucursal/dashboard')
+            ->post("http://prestafacil.uk/gerente-sucursal/coordinadores/traspasar", [
+                'coordinador_id' => $coordinador->id,
+                'gerente_receptor_id' => $gerenteB->id,
+                'motivo' => 'Transferencia por cobertura',
+            ]);
+
+        $response->assertStatus(302);
+        $response->assertSessionHas('error', 'no tienes autorizacion para completar el proceso');
+    }
+
+    public function test_proceso_creacion_usuario_bloqueado_sin_vpn()
+    {
+        $gerente = $this->crearOperador('Gerente General');
+        $rolDist = Rol::firstOrCreate(['nombre' => 'Distribuidor']);
+
+        $response = $this->actingAs($gerente)
+            ->from('http://prestafacil.uk/usuarios/create')
+            ->post("http://prestafacil.uk/usuarios", [
+                'name' => 'Nuevo Usuario Prueba',
+                'email' => 'nuevo_usuario_' . uniqid() . '@test.com',
+                'password' => 'Password12345!',
+                'password_confirmation' => 'Password12345!',
+                'rol_id' => $rolDist->id,
+                'sucursal_id' => $gerente->sucursal_id,
+            ]);
+
+        $response->assertStatus(302);
+        $response->assertSessionHas('error', 'no tienes autorizacion para completar el proceso');
+    }
 }

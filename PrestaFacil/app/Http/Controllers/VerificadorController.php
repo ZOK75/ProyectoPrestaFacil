@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Rol;
 use App\Models\SolicitudDistribuidor;
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -134,6 +135,95 @@ class VerificadorController extends Controller
             'checks' => $request->checks ?? [],
             'fecha_verificacion' => now()->toDateTimeString(),
         ];
+
+        $camposComparar = [
+            'nombres' => 'Nombres',
+            'apellidos' => 'Apellidos',
+            'telefono' => 'Teléfono',
+            'fecha_nacimiento' => 'Fecha de Nacimiento',
+            'lugar_nacimiento' => 'Lugar de Nacimiento',
+            'curp' => 'CURP',
+            'rfc' => 'RFC',
+            'calle' => 'Calle y Número',
+            'colonia' => 'Colonia',
+            'codigo_postal' => 'Código Postal',
+            'ciudad' => 'Ciudad / Municipio',
+            'estado_republica' => 'Estado',
+            'datos_casa' => 'Datos de Casa',
+            'datos_vehiculos' => 'Datos de Vehículos',
+            'referencias_laborales' => 'Referencias Laborales',
+            'datos_familiares' => 'Datos Familiares',
+        ];
+
+        $cambios = [];
+        $datosAntes = [];
+        $datosDespues = [];
+
+        foreach ($camposComparar as $campo => $etiqueta) {
+            $orig = $solicitud->{$campo};
+            $nuevo = $datosVerificacion[$campo] ?? null;
+
+            $origVal = $orig;
+            $nuevoVal = $nuevo;
+
+            if ($origVal instanceof \Carbon\Carbon || $origVal instanceof \DateTimeInterface) {
+                $origVal = $origVal->format('Y-m-d');
+            } elseif (is_string($origVal) && preg_match('/^\d{4}-\d{2}-\d{2}/', $origVal)) {
+                $origVal = substr($origVal, 0, 10);
+            }
+
+            if ($nuevoVal instanceof \Carbon\Carbon || $nuevoVal instanceof \DateTimeInterface) {
+                $nuevoVal = $nuevoVal->format('Y-m-d');
+            } elseif (is_string($nuevoVal) && preg_match('/^\d{4}-\d{2}-\d{2}/', $nuevoVal)) {
+                $nuevoVal = substr($nuevoVal, 0, 10);
+            }
+
+            $modificado = false;
+            if (is_array($origVal) || is_array($nuevoVal)) {
+                $modificado = json_encode($origVal) !== json_encode($nuevoVal);
+            } else {
+                $modificado = trim((string)$origVal) !== trim((string)$nuevoVal);
+            }
+
+            if ($modificado) {
+                $cambios[$campo] = [
+                    'campo' => $etiqueta,
+                    'antes' => $origVal,
+                    'despues' => $nuevoVal,
+                ];
+                $datosAntes[$campo] = $origVal;
+                $datosDespues[$campo] = $nuevoVal;
+            }
+        }
+
+        $nombresCampos = array_column($cambios, 'campo');
+        $detalleModificaciones = count($cambios) > 0 
+            ? " (Campos modificados: " . implode(', ', $nombresCampos) . ")"
+            : " (Sin cambios a los datos originales)";
+
+        AuditService::registrar(
+            'VERIFICACION_SOLICITUD_DISTRIBUIDOR',
+            "Verificador {$verificador->name} verificó y dictaminó como " . strtoupper($request->dictamen_verificador) . " la solicitud de '{$solicitud->nombre_completo}' (CURP: {$solicitud->curp})" . $detalleModificaciones,
+            [
+                'entidad_tipo' => 'solicitudes_distribuidores',
+                'entidad_id' => $solicitud->id,
+                'user_id' => $verificador->id,
+                'user_rol' => $verificador->rol?->nombre ?? 'Verificador',
+                'sucursal_id' => $solicitud->sucursal_id,
+                'antes' => [
+                    'dictamen_verificador' => $solicitud->dictamen_verificador,
+                    'estado' => $solicitud->estado,
+                    'campos' => $datosAntes,
+                ],
+                'despues' => [
+                    'dictamen_verificador' => $request->dictamen_verificador,
+                    'comentarios_verificador' => $request->comentarios_verificador,
+                    'estado' => 'en espera',
+                    'campos' => $datosDespues,
+                    'detalle_cambios' => $cambios,
+                ],
+            ]
+        );
 
         $solicitud->update([
             'dictamen_verificador' => $request->dictamen_verificador,

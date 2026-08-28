@@ -113,4 +113,98 @@ class TraspasosYReasignacionesTest extends TestCase
             'cliente_id' => $cliente->id,
         ]);
     }
+
+    public function test_traspaso_distribuidora_notifica_a_coordinador_receptor_y_gerentes()
+    {
+        $rolGG = Rol::where('nombre', 'Gerente General')->first();
+        $rolGS = Rol::where('nombre', 'Gerente de Sucursal')->first();
+        $rolCoord = Rol::where('nombre', 'Coordinador')->first();
+        $rolDist = Rol::where('nombre', 'Distribuidor')->first();
+
+        $sucursalA = Sucursal::create(['nombre' => 'Sucursal Norte A', 'activo' => true]);
+        $sucursalB = Sucursal::create(['nombre' => 'Sucursal Sur B', 'activo' => true]);
+
+        $gg = User::factory()->create(['rol_id' => $rolGG->id]);
+        $gerenteA = User::factory()->create(['rol_id' => $rolGS->id, 'sucursal_id' => $sucursalA->id]);
+        $gerenteB = User::factory()->create(['rol_id' => $rolGS->id, 'sucursal_id' => $sucursalB->id]);
+        $coordA = User::factory()->create(['rol_id' => $rolCoord->id, 'sucursal_id' => $sucursalA->id]);
+        $coordB = User::factory()->create(['rol_id' => $rolCoord->id, 'sucursal_id' => $sucursalB->id]);
+        $dist = User::factory()->create(['rol_id' => $rolDist->id, 'sucursal_id' => $sucursalA->id, 'coordinador_id' => $coordA->id]);
+
+        $response = $this->actingAs($coordA)->post(route('coordinador.distribuidores.solicitar-transferencia', $dist), [
+            'coordinador_receptor_id' => $coordB->id,
+            'motivo' => 'Cambio de domicilio a la zona sur',
+        ]);
+
+        $response->assertRedirect(route('coordinador.dashboard'));
+        $this->assertDatabaseHas('solicitudes_transferencias', [
+            'distribuidor_id' => $dist->id,
+            'coordinador_emisor_id' => $coordA->id,
+            'coordinador_receptor_id' => $coordB->id,
+            'estado' => 'pendiente_coordinador',
+        ]);
+
+        // Notificación al coordinador receptor
+        $this->assertDatabaseHas('notificaciones_cajero', [
+            'user_id' => $coordB->id,
+            'tipo' => 'transferencia_distribuidora',
+        ]);
+
+        // Notificación a Gerentes de Sucursal (Origen y Destino)
+        $this->assertDatabaseHas('notificaciones_cajero', [
+            'user_id' => $gerenteA->id,
+            'tipo' => 'solicitud_transferencia',
+        ]);
+        $this->assertDatabaseHas('notificaciones_cajero', [
+            'user_id' => $gerenteB->id,
+            'tipo' => 'solicitud_transferencia',
+        ]);
+
+        // Notificación al Gerente General
+        $this->assertDatabaseHas('notificaciones_cajero', [
+            'user_id' => $gg->id,
+            'tipo' => 'solicitud_transferencia',
+        ]);
+    }
+
+    public function test_traspaso_coordinador_notifica_a_gerente_receptor_y_gerente_general()
+    {
+        $rolGG = Rol::where('nombre', 'Gerente General')->first();
+        $rolGS = Rol::where('nombre', 'Gerente de Sucursal')->first();
+        $rolCoord = Rol::where('nombre', 'Coordinador')->first();
+
+        $sucursalA = Sucursal::create(['nombre' => 'Sucursal Norte A2', 'activo' => true]);
+        $sucursalB = Sucursal::create(['nombre' => 'Sucursal Sur B2', 'activo' => true]);
+
+        $gg = User::factory()->create(['rol_id' => $rolGG->id]);
+        $gerenteA = User::factory()->create(['rol_id' => $rolGS->id, 'sucursal_id' => $sucursalA->id]);
+        $gerenteB = User::factory()->create(['rol_id' => $rolGS->id, 'sucursal_id' => $sucursalB->id]);
+        $coord = User::factory()->create(['rol_id' => $rolCoord->id, 'sucursal_id' => $sucursalA->id]);
+
+        $response = $this->actingAs($gerenteA)->post(route('gerente-sucursal.coordinadores.traspasar'), [
+            'coordinador_id' => $coord->id,
+            'gerente_receptor_id' => $gerenteB->id,
+            'motivo' => 'Transferencia por apertura de nueva sucursal',
+        ]);
+
+        $response->assertSessionHas('success');
+        $this->assertDatabaseHas('solicitudes_transferencia_coordinadores', [
+            'coordinador_id' => $coord->id,
+            'gerente_emisor_id' => $gerenteA->id,
+            'gerente_receptor_id' => $gerenteB->id,
+            'estado' => 'pendiente_gerente_receptor',
+        ]);
+
+        // Notificación al Gerente Receptor
+        $this->assertDatabaseHas('notificaciones_cajero', [
+            'user_id' => $gerenteB->id,
+            'tipo' => 'solicitud_traspaso_coordinador',
+        ]);
+
+        // Notificación al Gerente General
+        $this->assertDatabaseHas('notificaciones_cajero', [
+            'user_id' => $gg->id,
+            'tipo' => 'solicitud_traspaso_coordinador',
+        ]);
+    }
 }

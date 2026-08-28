@@ -146,12 +146,14 @@ class User extends Authenticatable
 
     public function esGerenteGeneral(): bool
     {
-        return strtolower($this->rol?->nombre ?? '') === 'gerente general';
+        $nombre = strtolower(trim($this->rol?->nombre ?? ''));
+        return in_array($nombre, ['gerente general', 'gerente_general', 'director general', 'direccion general']);
     }
 
     public function esAdministrador(): bool
     {
-        return strtolower($this->rol?->nombre ?? '') === 'administrador';
+        $nombre = strtolower(trim($this->rol?->nombre ?? ''));
+        return in_array($nombre, ['administrador', 'admin']);
     }
 
     public function esAdminGeneralOAdmin(): bool
@@ -171,7 +173,8 @@ class User extends Authenticatable
 
     public function esGerenteSucursal(): bool
     {
-        return strtolower($this->rol?->nombre ?? '') === 'gerente de sucursal';
+        $nombre = strtolower(trim($this->rol?->nombre ?? ''));
+        return in_array($nombre, ['gerente de sucursal', 'gerente_de_sucursal', 'gerente sucursal', 'gerente_sucursal']);
     }
 
     public function esDistribuidor(): bool

@@ -264,6 +264,45 @@ class UserController extends Controller
         $datosAntes = $usuario->makeHidden('password')->toArray();
         $usuario->update($data);
 
+        // Notificaciones automáticas si cambió límite de crédito o categoría de distribuidor
+        if ($usuario->esDistribuidor()) {
+            if (isset($data['limite_credito']) && floatval($data['limite_credito']) != floatval($datosAntes['limite_credito'] ?? 0)) {
+                \App\Models\NotificacionCajero::enviar(
+                    $usuario->id,
+                    'solicitud_credito_aprobada',
+                    'Línea de Crédito Actualizada',
+                    "La Gerencia ({$operador->name}) ha actualizado tu límite de crédito a $" . number_format($usuario->limite_credito, 2) . "."
+                );
+
+                if ($usuario->coordinador_id) {
+                    \App\Models\NotificacionCajero::enviar(
+                        $usuario->coordinador_id,
+                        'solicitud_credito_aprobada',
+                        'Línea de Crédito de Distribuidora Actualizada',
+                        "La Gerencia ({$operador->name}) ha actualizado el límite de crédito de {$usuario->name} a $" . number_format($usuario->limite_credito, 2) . "."
+                    );
+                }
+            }
+
+            if (isset($data['categoria_distribuidor']) && strtolower($data['categoria_distribuidor']) !== strtolower($datosAntes['categoria_distribuidor'] ?? '')) {
+                \App\Models\NotificacionCajero::enviar(
+                    $usuario->id,
+                    'solicitud_categoria_aprobada',
+                    'Categoría de Distribuidor Actualizada',
+                    "La Gerencia ({$operador->name}) ha actualizado tu nivel a Categoría " . strtoupper($usuario->categoria_distribuidor) . "."
+                );
+
+                if ($usuario->coordinador_id) {
+                    \App\Models\NotificacionCajero::enviar(
+                        $usuario->coordinador_id,
+                        'solicitud_categoria_aprobada',
+                        'Categoría de Distribuidora Actualizada',
+                        "La Gerencia ({$operador->name}) ha actualizado a {$usuario->name} a Categoría " . strtoupper($usuario->categoria_distribuidor) . "."
+                    );
+                }
+            }
+        }
+
         AuditService::registrar(
             'ACTUALIZACION_USUARIO',
             "Usuario '{$usuario->name}' actualizado por " . ($operador->name ?? 'Usuario'),

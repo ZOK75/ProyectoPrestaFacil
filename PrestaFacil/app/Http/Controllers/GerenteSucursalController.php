@@ -41,8 +41,9 @@ class GerenteSucursalController extends Controller
 
         // Solicitudes pendientes de incremento de crédito para distribuidores de su sucursal
         $solicitudesCreditoPendientes = \App\Models\SolicitudCredito::where('estado', 'pendiente')
-            ->whereHas('distribuidor', function ($q) use ($sucursalId) {
-                $q->where('sucursal_id', $sucursalId);
+            ->where(function ($q) use ($sucursalId) {
+                $q->whereHas('distribuidor', fn($d) => $d->where('sucursal_id', $sucursalId))
+                  ->orWhereHas('coordinador', fn($c) => $c->where('sucursal_id', $sucursalId));
             })
             ->with(['distribuidor', 'coordinador'])
             ->orderBy('created_at', 'desc')
@@ -50,8 +51,9 @@ class GerenteSucursalController extends Controller
 
         // Solicitudes pendientes de cambio de categoría para distribuidores de su sucursal
         $solicitudesCategoriaPendientes = \App\Models\SolicitudCategoria::where('estado', 'pendiente')
-            ->whereHas('distribuidor', function ($q) use ($sucursalId) {
-                $q->where('sucursal_id', $sucursalId);
+            ->where(function ($q) use ($sucursalId) {
+                $q->whereHas('distribuidor', fn($d) => $d->where('sucursal_id', $sucursalId))
+                  ->orWhereHas('coordinador', fn($c) => $c->where('sucursal_id', $sucursalId));
             })
             ->with(['distribuidor', 'coordinador'])
             ->orderBy('created_at', 'desc')
@@ -521,7 +523,28 @@ class GerenteSucursalController extends Controller
             ['transferencia_id' => $transferencia->id]
         );
 
-        return back()->with('success', "Se ha enviado la solicitud de traspaso del coordinador {$coordinador->name} al Gerente {$gerenteReceptor->name}.");
+        // Notificar al Gerente General de la solicitud de traspaso entre sucursales
+        $gerentesGenerales = User::where('activo', true)
+            ->with('rol')
+            ->get()
+            ->filter(fn($u) => $u->esGerenteGeneral() || $u->esAdministrador());
+
+        foreach ($gerentesGenerales as $gg) {
+            \App\Models\NotificacionCajero::enviar(
+                $gg->id,
+                'solicitud_traspaso_coordinador',
+                'Aviso: Traspaso de Coordinador Iniciado',
+                "El Gerente {$gerenteEmisor->name} ({$gerenteEmisor->sucursal?->nombre}) ha solicitado transferir al coordinador {$coordinador->name} a la sucursal de {$gerenteReceptor->name} ({$gerenteReceptor->sucursal?->nombre}).",
+                [
+                    'transferencia_id' => $transferencia->id,
+                    'url' => route('gerente-general.dashboard'),
+                    'entidad_tipo' => 'solicitud_traspaso_coordinador',
+                    'entidad_id' => $transferencia->id,
+                ]
+            );
+        }
+
+        return back()->with('success', "Se ha enviado la solicitud de traspaso del coordinador {$coordinador->name} al Gerente {$gerenteReceptor->name} y se ha notificado a Dirección General.");
     }
 
     /**
@@ -608,14 +631,14 @@ class GerenteSucursalController extends Controller
     }
 
     /**
-     * Dictamen Gerencial de Morosidad (Gerente General, Gerente de Sucursal o Administrador):
+     * Dictamen Gerencial de Morosidad (Exclusivo Gerente General o Gerente de Sucursal):
      * Marca o desmarca a una distribuidora en estado de morosidad.
      */
     public function decidirMorosidad(Request $request, User $distribuidor)
     {
         $gerente = Auth::user();
-        if (!$gerente->esGerenteGeneral() && !$gerente->esGerenteSucursal() && !$gerente->esAdministrador()) {
-            abort(403, 'No estás autorizado para gestionar el estado de morosidad.');
+        if (!$gerente->esGerenteGeneral() && !$gerente->esGerenteSucursal()) {
+            abort(403, 'Acceso denegado: Únicamente el Gerente General y el Gerente de Sucursal están autorizados para gestionar o retirar el estado de morosidad.');
         }
 
         if ($gerente->esGerenteSucursal() && $distribuidor->sucursal_id !== $gerente->sucursal_id) {

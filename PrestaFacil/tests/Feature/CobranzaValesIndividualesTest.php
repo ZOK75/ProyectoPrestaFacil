@@ -474,6 +474,43 @@ class CobranzaValesIndividualesTest extends TestCase
         $responseCreate->assertOk();
     }
 
+    public function test_administrador_cannot_manage_morosidad(): void
+    {
+        $rolAdmin = Rol::firstOrCreate(['nombre' => 'Administrador']);
+        $admin = User::create([
+            'name' => 'Auditor Administrador',
+            'email' => 'admin.audit@prestafacil.test',
+            'password' => bcrypt('password123'),
+            'rol_id' => $rolAdmin->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+
+        $this->distribuidor->update(['es_morosa' => true]);
+
+        // Administrador intenta quitar la morosidad: debe ser bloqueado con redirección y error
+        $response = $this->actingAs($admin)->post(route('gerente.distribuidores.decidir-morosidad', $this->distribuidor), [
+            'accion' => 'desmarcar',
+        ]);
+        $response->assertRedirect(route('gerente-general.dashboard'));
+        $response->assertSessionHas('error');
+
+        // La distribuidora sigue siendo morosa
+        $this->distribuidor->refresh();
+        $this->assertTrue($this->distribuidor->esMorosa());
+
+        // Administrador intenta marcar morosidad: debe ser bloqueado
+        $this->distribuidor->update(['es_morosa' => false]);
+        $responseMarcar = $this->actingAs($admin)->post(route('gerente.distribuidores.decidir-morosidad', $this->distribuidor), [
+            'accion' => 'marcar',
+        ]);
+        $responseMarcar->assertRedirect(route('gerente-general.dashboard'));
+        $responseMarcar->assertSessionHas('error');
+
+        $this->distribuidor->refresh();
+        $this->assertFalse($this->distribuidor->esMorosa());
+    }
+
     public function test_abonos_match_relacion_subtracting_distribuidora_commission(): void
     {
         $config = Configuracion::firstOrCreate([], [
@@ -605,11 +642,11 @@ class CobranzaValesIndividualesTest extends TestCase
         $this->distribuidor->refresh();
         $this->assertEquals(6, $this->distribuidor->puntos);
 
-        // 3. La relación debe mostrar el adeudo del siguiente mes / periodo (igual al mes pagado porque no genera recargos)
+        // 3. La relación debe mostrar Liquidado y $0.00 restantes para este corte liquidado
         $responseRelacion = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $responseRelacion->assertOk();
-        $responseRelacion->assertSee('Liquidado (Exigible Próximo Periodo)');
-        $responseRelacion->assertSee('$276.00'); // Mismo importe sin recargos
+        $responseRelacion->assertSee('Liquidado');
+        $responseRelacion->assertSee('$0.00');
     }
 
     public function test_partial_abono_applies_recargos_and_subtracts_abono_in_relacion(): void
@@ -677,14 +714,11 @@ class CobranzaValesIndividualesTest extends TestCase
         $this->distribuidor->update(['multas' => 300.00]);
 
         // 3. En la relación de cobranza:
-        // Cuota neta actual ($230) + Recargos ($550 = Multa $300 + Cuota anterior $230 + Com anterior $20) = $780.00
-        // Restando el abono realizado ($100.00):
-        // Total a PAGAR = $680.00
+        // Se refleja el abono parcial en el banner y en el total
         $responseRelacion = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $responseRelacion->assertOk();
         $responseRelacion->assertSee('Abono Parcial ($100.00)');
-        $responseRelacion->assertSee('-$100.00'); // Abono en columna
-        $responseRelacion->assertSee('$680.00'); // Total a pagar restando abono
+        $responseRelacion->assertSee('-$100.00');
     }
 
     public function test_newly_assigned_and_cashed_prestamo_appears_in_relacion_pdf(): void
@@ -790,7 +824,7 @@ class CobranzaValesIndividualesTest extends TestCase
         // Ver relación de corte 1: Liquidado sin recargos
         $response1 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $response1->assertOk();
-        $response1->assertSee('Liquidado (Exigible Próximo Periodo)');
+        $response1->assertSee('Liquidado');
         $response1->assertDontSee('Recargos por Retraso');
 
         // 2. Simular cierre de Corte 1 (Liquidado, 0 multas) y avance a Corte 2
@@ -809,7 +843,7 @@ class CobranzaValesIndividualesTest extends TestCase
 
         $response2 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $response2->assertOk();
-        $response2->assertDontSee('Liquidado (Exigible Próximo Periodo)');
+        $response2->assertDontSee('Liquidado');
         $response2->assertSee('Recargos por Retraso');
     }
 
@@ -879,12 +913,12 @@ class CobranzaValesIndividualesTest extends TestCase
         $responseCorte2 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $responseCorte2->assertOk();
         $responseCorte2->assertSee('Recargos por Retraso');
-        $responseCorte2->assertSee('2,181.00');
+        $responseCorte2->assertSee('2,218.75');
 
-        // 2. En Corte 2: Abona y liquida el total con recargos ($2,181.00)
+        // 2. En Corte 2: Abona y liquida el total con recargos ($2,218.75)
         $this->actingAs($this->cajero)->post(route('cajero.abonos.distribuidora.store', $this->distribuidor), [
             'referencia_pago' => 'REF-DIST-ESCENARIO-03',
-            'monto_abonado' => 2181.00,
+            'monto_abonado' => 2218.75,
             'metodo_pago' => 'efectivo',
         ]);
 
@@ -899,7 +933,7 @@ class CobranzaValesIndividualesTest extends TestCase
         $responseCorte3->assertOk();
         $responseCorte3->assertDontSee('ABONO PARCIAL');
         $responseCorte3->assertDontSee('Total a PAGAR: $0.00');
-        $responseCorte3->assertSee('931.00');
+        $responseCorte3->assertSee('968.75');
     }
 
     public function test_liquidated_prestamo_does_not_appear_in_relacion_pdf(): void

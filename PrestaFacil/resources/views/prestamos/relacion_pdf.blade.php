@@ -98,52 +98,80 @@
 
             $montoAbonadoPeriodo = floatval($relacion ? $relacion->monto_pagado : 0.0);
             $esAbonoParcial = (!$periodoLiquidado && $montoAbonadoPeriodo > 0);
-            $montoAbonadoRestante = $montoAbonadoPeriodo;
 
+            // 1. Calcular valores base por cada fila
+            $filasCalculadas = [];
             $totalComisionesSum = 0;
             $totalPagosSum = 0;
             $totalRecargosSum = 0;
-            $totalAbonosSum = 0;
             $totalGeneralSum = 0;
+            $exigibleTotalBase = 0;
 
-            foreach($prestamos as $p) {
+            foreach($prestamos as $index => $p) {
                 $totalPagos = max(1, intval($p->pagos_totales));
                 $comisionRow = (($porcentajeComision / 100) * floatval($p->monto_prestamo)) / $totalPagos;
-                $pagoRow = floatval($p->cuota_quincenal) - $comisionRow;
-                
+                $pagoRow = floatval($p->cuota_quincenal);
+                $multaRow = floatval($p->multas ?? 0.0);
+                $tieneRetraso = ($multaRow > 0);
+                $multaValeRow = $p->multaConfigurada() > 0 ? $p->multaConfigurada() : 300.00;
+                $cortesVencidosRow = ($tieneRetraso && $multaValeRow > 0) ? max(1, intval(round($multaRow / $multaValeRow))) : ($tieneRetraso ? 1 : 0);
+
+                $recargosRow = $multaRow;
+                $atrasosRow = $tieneRetraso ? ($cortesVencidosRow * $pagoRow) : 0.00;
+
+                // Formato número de pago: 1/8, 2/8...
                 if ($periodoLiquidado) {
-                    // Si el periodo actual fue liquidado en su totalidad:
-                    // La relación muestra el adeudo del SIGUIENTE periodo (sin recargos porque no genera recargos al estar al corriente)
-                    $recargosRow = 0.00;
-                    $abonoFila = 0.00;
-                    $totalFila = floor($pagoRow);
+                    $numPago = max(1, intval($p->pagos_realizados));
                 } else {
-                    // Multas acumuladas y cálculo de cortes vencidos
-                    $multaRow = floatval($p->multas ?? 0.0);
-                    $tieneRetraso = ($multaRow > 0);
-                    $multaValeRow = $p->multaConfigurada() > 0 ? $p->multaConfigurada() : 300.00;
-                    $cortesVencidosRow = ($tieneRetraso && $multaValeRow > 0) ? max(1, intval(round($multaRow / $multaValeRow))) : ($tieneRetraso ? 1 : 0);
-                    
-                    $pagoTotalFilaAnterior = $cortesVencidosRow * $pagoRow;
-                    $comisionAnteriorRow = $cortesVencidosRow * $comisionRow;
-                    // Recargos: si se retrasa un pago: multas acumuladas + pagos anteriores adeudados + comisiones anteriores
-                    $recargosRow = $tieneRetraso ? ($multaRow + $pagoTotalFilaAnterior + $comisionAnteriorRow) : 0.00;
-                    
-                    // Si se abonó un monto menor al total, se hacen los recargos y se les resta el abono
-                    $exigibleBrutoFila = $pagoRow + $recargosRow;
-                    $abonoFila = min($montoAbonadoRestante, $exigibleBrutoFila);
-                    $montoAbonadoRestante -= $abonoFila;
-                    
-                    $totalFila = floor(max(0, $exigibleBrutoFila - $abonoFila));
+                    $numPago = min($totalPagos, max(1, intval($p->pagos_realizados) + 1));
                 }
+                $formatoPago = "{$numPago}/{$totalPagos}";
+
+                // Base exigible de este vale en este corte
+                $exigibleFila = $pagoRow + $comisionRow + $recargosRow + $atrasosRow;
+
+                $filasCalculadas[] = [
+                    'prestamo' => $p,
+                    'producto' => $p->productoVale->nombre ?? $p->productoVale->clave ?? ('Vale ' . ($index + 1)),
+                    'cliente' => $p->cliente->nombre_completo ?? $p->cliente->nombre,
+                    'formato_pago' => $formatoPago,
+                    'comision' => $comisionRow,
+                    'pago' => $pagoRow,
+                    'recargos' => $recargosRow,
+                    'exigible_fila' => $exigibleFila,
+                ];
 
                 $totalComisionesSum += $comisionRow;
                 $totalPagosSum += $pagoRow;
                 $totalRecargosSum += $recargosRow;
-                $totalAbonosSum += $abonoFila;
-                $totalGeneralSum += $totalFila;
+                $exigibleTotalBase += $exigibleFila;
             }
-            $totalGeneralSum = floor($totalGeneralSum);
+
+            // 2. Distribuir abonos o liquidaciones entre las filas para obtener el total restante
+            $montoAbonadoRestante = $montoAbonadoPeriodo;
+            $filasFinales = [];
+
+            foreach($filasCalculadas as $idx => $f) {
+                if ($periodoLiquidado) {
+                    // Si el periodo actual fue liquidado en su totalidad:
+                    $totalFila = 0.00;
+                } elseif ($montoAbonadoPeriodo > 0) {
+                    if ($idx === count($filasCalculadas) - 1) {
+                        // En la última fila, aplicar todo el saldo restante del abono (incluso si produce saldo negativo/excedente)
+                        $totalFila = $f['exigible_fila'] - $montoAbonadoRestante;
+                    } else {
+                        $abonoFila = min($montoAbonadoRestante, $f['exigible_fila']);
+                        $montoAbonadoRestante -= $abonoFila;
+                        $totalFila = $f['exigible_fila'] - $abonoFila;
+                    }
+                } else {
+                    $totalFila = $f['exigible_fila'];
+                }
+
+                $totalGeneralSum += $totalFila;
+                $f['total'] = $totalFila;
+                $filasFinales[] = $f;
+            }
         @endphp
 
         <!-- Banner de Fechas y Total a PAGAR -->
@@ -174,7 +202,7 @@
                         <span class="font-bold text-slate-900">Estado:</span>
                         @if($periodoLiquidado)
                             <span class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase">
-                                Liquidado (Exigible Próximo Periodo) @if($relacion->puntos_ganados > 0) (+{{ $relacion->puntos_ganados }} pts) @endif
+                                Liquidado (Al Corriente) @if($relacion->puntos_ganados > 0) (+{{ $relacion->puntos_ganados }} pts) @endif
                             </span>
                         @elseif($relacion->esPagoAtrasado())
                             <span class="px-2 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 uppercase">
@@ -194,15 +222,15 @@
             </div>
 
             <div class="text-left sm:text-right border-t sm:border-t-0 sm:border-l border-slate-300 pt-2 sm:pt-0 sm:pl-4 space-y-0.5">
-                <span class="text-[11px] uppercase font-bold text-slate-500 block">Subtotal Pagos (Cuotas - Comisiones): ${{ number_format($totalPagosSum, 2) }}</span>
+                <span class="text-[11px] uppercase font-bold text-slate-500 block">Subtotal Pagos (Cuotas Base): ${{ number_format($totalPagosSum, 2) }}</span>
                 <span class="text-[11px] uppercase font-bold text-indigo-600 block">Total Comisiones (Cat. {{ ucfirst($distribuidora->categoria_distribuidor ?? 'Cobre') }} {{ $porcentajeComision }}%): ${{ number_format($totalComisionesSum, 2) }}</span>
                 @if($totalRecargosSum > 0)
                     <span class="text-[11px] uppercase font-bold text-rose-600 block">Recargos por Retraso: +${{ number_format($totalRecargosSum, 2) }}</span>
                 @endif
-                @if($totalAbonosSum > 0)
-                    <span class="text-[11px] uppercase font-bold text-emerald-600 block">(-) Abonos Realizados en el Periodo: -${{ number_format($totalAbonosSum, 2) }}</span>
+                @if($montoAbonadoPeriodo > 0)
+                    <span class="text-[11px] uppercase font-bold text-emerald-600 block">(-) Abonos Realizados en el Periodo: -${{ number_format($montoAbonadoPeriodo, 2) }}</span>
                 @endif
-                <span class="text-xl font-black text-slate-900 block">Total a PAGAR{{ $periodoLiquidado ? ' (Próximo Periodo)' : '' }}: ${{ number_format($totalGeneralSum, 2) }}</span>
+                <span class="text-xl font-black text-slate-900 block">Total a PAGAR: ${{ number_format($totalGeneralSum, 2) }}</span>
             </div>
         </div>
 
@@ -214,79 +242,42 @@
                         <th class="border-r border-slate-900 px-2 py-2 text-center w-8">#</th>
                         <th class="border-r border-slate-900 px-3 py-2">Producto</th>
                         <th class="border-r border-slate-900 px-3 py-2">Cliente</th>
-                        <th class="border-r border-slate-900 px-3 py-2 text-center">Pagos Realizados</th>
+                        <th class="border-r border-slate-900 px-3 py-2 text-center">Número de Pago</th>
                         <th class="border-r border-slate-900 px-3 py-2 text-right">Comisión</th>
                         <th class="border-r border-slate-900 px-3 py-2 text-right">Pago</th>
                         <th class="border-r border-slate-900 px-3 py-2 text-right">Recargos</th>
-                        @if($esAbonoParcial)
-                            <th class="border-r border-slate-900 px-3 py-2 text-right text-emerald-800">Abono</th>
-                        @endif
                         <th class="px-3 py-2 text-right">Total</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-900">
-                    @php
-                        $montoAbonadoRestanteLoop = $montoAbonadoPeriodo;
-                    @endphp
-                    @forelse($prestamos as $index => $p)
-                        @php
-                            $totalPagos = max(1, intval($p->pagos_totales));
-                            $comision = (($porcentajeComision / 100) * floatval($p->monto_prestamo)) / $totalPagos;
-                            $pago = floatval($p->cuota_quincenal) - $comision;
-                            
-                            if ($periodoLiquidado) {
-                                $recargos = 0.00;
-                                $abonoFila = 0.00;
-                                $totalFila = floor($pago);
-                            } else {
-                                $multa = floatval($p->multas ?? 0.0);
-                                $tieneRetraso = ($multa > 0);
-                                $multaVale = $p->multaConfigurada() > 0 ? $p->multaConfigurada() : 300.00;
-                                $cortesVencidos = ($tieneRetraso && $multaVale > 0) ? max(1, intval(round($multa / $multaVale))) : ($tieneRetraso ? 1 : 0);
-                                
-                                $pagoTotalFilaAnterior = $cortesVencidos * $pago;
-                                $comisionAnterior = $cortesVencidos * $comision;
-                                $recargos = $tieneRetraso ? ($multa + $pagoTotalFilaAnterior + $comisionAnterior) : 0.00;
-                                
-                                $exigibleBruto = $pago + $recargos;
-                                $abonoFila = min($montoAbonadoRestanteLoop, $exigibleBruto);
-                                $montoAbonadoRestanteLoop -= $abonoFila;
-                                
-                                $totalFila = floor(max(0, $exigibleBruto - $abonoFila));
-                            }
-                        @endphp
+                    @forelse($filasFinales as $index => $fila)
                         <tr>
                             <td class="border-r border-slate-900 px-2 py-2.5 text-center font-bold">{{ $index + 1 }}</td>
                             <td class="border-r border-slate-900 px-3 py-2.5 font-semibold">
-                                {{ $p->productoVale->nombre ?? $p->productoVale->clave }}
+                                {{ $fila['producto'] }}
                             </td>
                             <td class="border-r border-slate-900 px-3 py-2.5 font-medium">
-                                {{ $p->cliente->nombre_completo ?? $p->cliente->nombre }}
+                                {{ $fila['cliente'] }}
                             </td>
-                            <td class="border-r border-slate-900 px-3 py-2.5 text-center font-bold">
-                                {{ $p->pagos_realizados }}/{{ $p->pagos_totales }}
+                            <td class="border-r border-slate-900 px-3 py-2.5 text-center font-bold font-mono">
+                                {{ $fila['formato_pago'] }}
                             </td>
                             <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-indigo-900 font-semibold">
-                                ${{ number_format($comision, 2) }}
+                                ${{ number_format($fila['comision'], 2) }}
                             </td>
                             <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono font-bold">
-                                ${{ number_format($pago, 2) }}
+                                ${{ number_format($fila['pago'], 2) }}
                             </td>
-                            <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono font-bold {{ $recargos > 0 ? 'text-rose-700' : 'text-slate-500' }}">
-                                ${{ number_format($recargos, 2) }}
+                            <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono font-bold {{ $fila['recargos'] > 0 ? 'text-rose-700' : 'text-slate-500' }}">
+                                ${{ number_format($fila['recargos'], 2) }}
                             </td>
-                            @if($esAbonoParcial)
-                                <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono font-bold text-emerald-700">
-                                    -${{ number_format($abonoFila, 2) }}
-                                </td>
-                            @endif
-                            <td class="px-3 py-2.5 text-right font-mono font-black text-slate-950">
-                                ${{ number_format($totalFila, 2) }}
+                            <td class="px-3 py-2.5 text-right font-mono font-black {{ $fila['total'] < 0 ? 'text-emerald-700' : ($fila['total'] > 0 ? 'text-slate-950' : 'text-slate-500') }}">
+                                ${{ number_format($fila['total'], 2) }}
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $esAbonoParcial ? 9 : 8 }}" class="px-4 py-8 text-center text-slate-500 font-medium italic">
+                            <td colspan="8" class="px-4 py-8 text-center text-slate-500 font-medium italic">
                                 No se encontraron clientes con préstamos activos para este periodo.
                             </td>
                         </tr>
@@ -298,9 +289,6 @@
                         <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-indigo-900">${{ number_format($totalComisionesSum, 2) }}</td>
                         <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-slate-900">${{ number_format($totalPagosSum, 2) }}</td>
                         <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-rose-700">${{ number_format($totalRecargosSum, 2) }}</td>
-                        @if($esAbonoParcial)
-                            <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-emerald-700">-${{ number_format($totalAbonosSum, 2) }}</td>
-                        @endif
                         <td class="px-3 py-2.5 text-right font-mono text-slate-950 text-sm">${{ number_format($totalGeneralSum, 2) }}</td>
                     </tr>
                 </tfoot>

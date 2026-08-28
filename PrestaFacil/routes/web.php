@@ -139,20 +139,25 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/dashboard', [GerenteSucursalController::class, 'index'])
             ->name('gerente-sucursal.dashboard');
         Route::post('/solicitudes-distribuidoras/{solicitud}/decidir', [GerenteSucursalController::class, 'decidirSolicitudConCuenta'])
-            
+            ->middleware('require.vpn')
             ->name('gerente-sucursal.solicitudes.decidir');
         Route::post('/coordinadores/traspasar', [GerenteSucursalController::class, 'solicitarTraspasoCoordinador'])
+            ->middleware('require.vpn')
             ->name('gerente-sucursal.coordinadores.traspasar');
         Route::post('/coordinadores/traspaso/{transferencia}/decidir', [GerenteSucursalController::class, 'decidirTraspasoCoordinador'])
+            ->middleware('require.vpn')
             ->name('gerente-sucursal.coordinadores.traspaso.decidir');
+    });
+
+    // Morosidad de Distribuidoras (Decisión EXCLUSIVA de Gerencia: General y Sucursal, NO Administrador)
+    Route::middleware(['role:gerente_de_sucursal,gerente_general'])->group(function () {
+        Route::post('distribuidores/{distribuidor}/decidir-morosidad', [GerenteSucursalController::class, 'decidirMorosidad'])
+            ->middleware('require.vpn')
+            ->name('gerente.distribuidores.decidir-morosidad');
     });
 
     // Comparación, Dictamen y Transferencias (Gerente de Sucursal o Gerente General / Administrador)
     Route::middleware(['role:gerente_de_sucursal,gerente_general,administrador'])->group(function () {
-        // Morosidad de Distribuidoras (Decisión de Gerencia)
-        Route::post('distribuidores/{distribuidor}/decidir-morosidad', [GerenteSucursalController::class, 'decidirMorosidad'])
-            ->name('gerente.distribuidores.decidir-morosidad');
-
         // Vista comparativa y decisión directa
         Route::get('/solicitudes-distribuidoras/{solicitud}/comparar', [GerenteSucursalController::class, 'compararSolicitudDistribuidor'])
             ->name('gerente.solicitudes.comparar');
@@ -171,6 +176,7 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('require.vpn')
             ->name('gerente-sucursal.transferencias.decidir');
         Route::post('/gerente/conciliaciones/{conciliacion}/decidir', [GerenteSucursalController::class, 'decidirConciliacionGerencia'])
+            ->middleware('require.vpn')
             ->name('gerente.conciliaciones.decidir');
     });
 
@@ -282,7 +288,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:gerente_general,gerente_de_sucursal,administrador'])->group(function () {
         Route::get('usuarios', [UserController::class, 'index'])->name('usuarios.index');
         Route::get('usuarios/create', [UserController::class, 'create'])->name('usuarios.create');
-        Route::post('usuarios', [UserController::class, 'store'])->name('usuarios.store');
+        Route::post('usuarios', [UserController::class, 'store'])->middleware('require.vpn')->name('usuarios.store');
         Route::get('usuarios/{usuario}', [UserController::class, 'show'])->name('usuarios.show');
         Route::get('usuarios/{usuario}/edit', [UserController::class, 'edit'])->name('usuarios.edit');
         Route::put('usuarios/{usuario}', [UserController::class, 'update'])->middleware('require.vpn')->name('usuarios.update');

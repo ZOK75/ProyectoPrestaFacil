@@ -717,30 +717,81 @@
     <!-- Main Content Container -->
     <main class="flex-grow w-full mx-auto px-3 sm:px-6 lg:px-8 py-5">
         @if(session('success'))
-            <div class="max-w-md mx-auto mb-4 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-between shadow-lg shadow-emerald-950/20">
+            <div class="max-w-xl mx-auto mb-4 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 flex items-center justify-between shadow-sm">
                 <div class="flex items-center gap-2.5">
                     <div class="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0">
-                        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
                     </div>
-                    <span class="text-xs sm:text-sm font-medium">{{ session('success') }}</span>
+                    <span class="text-xs sm:text-sm font-semibold">{{ session('success') }}</span>
                 </div>
-                <button onclick="this.parentElement.remove()" class="text-emerald-400/60 hover:text-emerald-400 text-lg leading-none">&times;</button>
+                <button onclick="this.parentElement.remove()" class="text-emerald-600/60 hover:text-emerald-700 text-lg leading-none font-bold">&times;</button>
             </div>
         @endif
 
         @if(session('error'))
-            <div class="max-w-md mx-auto mb-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-between shadow-lg shadow-rose-950/20">
+            <div class="max-w-xl mx-auto mb-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 flex items-center justify-between shadow-sm">
                 <div class="flex items-center gap-2.5">
                     <div class="w-7 h-7 rounded-lg bg-rose-500/20 flex items-center justify-center shrink-0">
-                        <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                         </svg>
                     </div>
-                    <span class="text-xs sm:text-sm font-medium">{{ session('error') }}</span>
+                    <span class="text-xs sm:text-sm font-semibold">{{ session('error') }}</span>
                 </div>
-                <button onclick="this.parentElement.remove()" class="text-rose-400/60 hover:text-rose-400 text-lg leading-none">&times;</button>
+                <button onclick="this.parentElement.remove()" class="text-rose-600/60 hover:text-rose-700 text-lg leading-none font-bold">&times;</button>
+            </div>
+        @endif
+
+        @if(session('info'))
+            <div class="max-w-xl mx-auto mb-4 p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-700 flex items-center justify-between shadow-sm">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-7 h-7 rounded-lg bg-sky-500/20 flex items-center justify-center shrink-0">
+                        <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <span class="text-xs sm:text-sm font-semibold">{{ session('info') }}</span>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-sky-600/60 hover:text-sky-700 text-lg leading-none font-bold">&times;</button>
+            </div>
+        @endif
+
+        @if(session('warning'))
+            <div class="max-w-xl mx-auto mb-4 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 flex items-center justify-between shadow-sm">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+                        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <span class="text-xs sm:text-sm font-semibold">{{ session('warning') }}</span>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-amber-700/60 hover:text-amber-800 text-lg leading-none font-bold">&times;</button>
+            </div>
+        @endif
+
+        @if($errors->any())
+            <div class="max-w-xl mx-auto mb-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 shadow-sm">
+                <div class="flex items-start justify-between">
+                    <div class="flex items-start gap-2.5">
+                        <div class="w-7 h-7 rounded-lg bg-rose-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                            <svg class="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <span class="text-xs sm:text-sm font-bold block mb-1">Por favor verifica los siguientes errores:</span>
+                            <ul class="list-disc list-inside text-xs space-y-0.5 text-rose-800">
+                                @foreach($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="text-rose-600/60 hover:text-rose-700 text-lg leading-none font-bold">&times;</button>
+                </div>
             </div>
         @endif
 

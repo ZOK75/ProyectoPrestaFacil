@@ -33,7 +33,6 @@
                         <th class="p-4 font-semibold">Teléfono</th>
                         <th class="p-4 font-semibold">Fecha de Registro</th>
                         <th class="p-4 font-semibold">Estado</th>
-                        <th class="p-4 font-semibold text-right">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800">
@@ -62,31 +61,10 @@
                                     <span class="px-2.5 py-1 rounded-md text-xs font-bold border bg-indigo-500/20 text-indigo-300 border-indigo-500/30">{{ ucfirst($solicitud->estado) }}</span>
                                 @endif
                             </td>
-                            <td class="p-4 text-right">
-                                <div class="flex items-center justify-end gap-3">
-                                    <a href="{{ route('coordinador.solicitudes.show', $solicitud) }}" 
-                                       x-data="{ clicked: false }" @click="clicked = true" :class="{ 'pointer-events-none opacity-50': clicked }"
-                                       class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-medium transition">
-                                        Ver Detalle
-                                    </a>
-                                    @if($solicitud->estado === 'en espera')
-                                        <form novalidate action="{{ route('coordinador.solicitudes.enviar-verificacion', $solicitud) }}" method="POST" class="inline">
-                                            @csrf
-                                            <button type="submit" 
-                                                x-data="{ clicked: false }" 
-                                                @click="if(confirm('¿Confirmas que los datos son legítimos y deseas enviar la solicitud a verificación presencial?')) { clicked = true; return true; } else { return false; }" 
-                                                :class="{ 'pointer-events-none opacity-50': clicked }"
-                                                class="px-3 py-1.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 rounded-lg text-xs font-medium transition">
-                                                Validar y Enviar
-                                            </button>
-                                        </form>
-                                    @endif
-                                </div>
-                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="p-8 text-center text-slate-500 text-sm">
+                            <td colspan="4" class="p-8 text-center text-slate-500 text-sm">
                                 No se encontraron solicitudes registradas para tu sucursal.
                             </td>
                         </tr>

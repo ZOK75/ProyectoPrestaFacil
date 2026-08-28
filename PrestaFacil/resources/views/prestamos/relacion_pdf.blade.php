@@ -96,7 +96,7 @@
                 $totalRecargosSum += floatval($f['recargos']);
                 $totalGeneralSum += floatval($f['total']);
             }
-            $totalGeneralSum = round($totalGeneralSum, 2);
+            $totalGeneralSum = floor($totalGeneralSum);
 
             $tieneMultasPendientes = (floatval($distribuidora->multas ?? 0.0) > 0);
             $periodoLiquidado = (!$tieneMultasPendientes && $relacion && ($relacion->adeudo_pendiente <= 0 || floatval($relacion->monto_pagado) >= floatval($relacion->monto_total_periodo)) && in_array($relacion->estado_pago, ['pago_anticipado', 'pago_a_tiempo', 'liquidado']));

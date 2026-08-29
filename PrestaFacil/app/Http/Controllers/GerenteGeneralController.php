@@ -6,20 +6,12 @@ use App\Models\Configuracion;
 use App\Models\ProductoVale;
 use App\Models\Sucursal;
 use App\Models\User;
-use App\Services\CorteCobranzaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class GerenteGeneralController extends Controller
 {
-    protected CorteCobranzaService $corteService;
-
-    public function __construct(CorteCobranzaService $corteService)
-    {
-        $this->corteService = $corteService;
-    }
-
     /**
      * Dashboard Gerente General:
      * - Supervisión corporativa de sucursales, personal, catálogo de vales y reglas financieras.
@@ -27,9 +19,6 @@ class GerenteGeneralController extends Controller
     public function index(Request $request): View
     {
         $operador = Auth::user()->load('rol');
-
-        // Ejecutar procesamiento automático de cortes a nivel nacional
-        $this->corteService->verificarYProcesarCortesYVencimientos();
 
         $sucursales = Sucursal::with(['usuarios.rol'])
             ->where('activo', true)
@@ -100,18 +89,10 @@ class GerenteGeneralController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Histórico de Relaciones/Cortes de Cobranza (PDFs) a nivel corporativo
-        $cortesQuery = \App\Models\RelacionCobranza::with(['distribuidora.sucursal']);
-
-        if ($request->filled('sucursal_id')) {
-            $sucursalFiltro = $request->input('sucursal_id');
-            $cortesQuery->whereHas('distribuidora', function ($q) use ($sucursalFiltro) {
-                $q->where('sucursal_id', $sucursalFiltro)
-                  ->orWhereHas('coordinador', fn($c) => $c->where('sucursal_id', $sucursalFiltro));
-            });
-        }
-
-        $cortesRealizados = $cortesQuery->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
+        // Histórico de Relaciones/Cortes de Cobranza (PDFs)
+        $cortesRealizados = \App\Models\RelacionCobranza::with('distribuidora.sucursal')
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
 
         return view('gerente-general.dashboard', compact(
             'operador',

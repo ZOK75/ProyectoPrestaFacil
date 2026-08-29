@@ -813,16 +813,26 @@
 
     <!-- SECCIÓN: Histórico de Cortes de Cobranza (PDFs) -->
     <div class="bg-slate-900 border border-slate-800 rounded-3xl shadow-xl overflow-hidden mb-6">
-        <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+        <div class="p-6 border-b border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <h2 class="text-base font-bold text-white flex items-center gap-2">
                 <svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
                 Histórico de Cortes de Cobranza (PDFs)
             </h2>
-            <a href="{{ route('prestamos.relacion-pdf') }}" target="_blank" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition">
-                Generar Relación General &rarr;
-            </a>
+            <div class="flex items-center gap-3">
+                <form method="GET" action="{{ route('gerente-general.dashboard') }}" class="flex items-center gap-2">
+                    <select name="sucursal_id" onchange="this.form.submit()" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500">
+                        <option value="">Todas las sucursales</option>
+                        @foreach($sucursales as $suc)
+                            <option value="{{ $suc->id }}" {{ request('sucursal_id') == $suc->id ? 'selected' : '' }}>{{ $suc->nombre }}</option>
+                        @endforeach
+                    </select>
+                </form>
+                <a href="{{ route('prestamos.relacion-pdf') }}" target="_blank" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition">
+                    Generar Relación General &rarr;
+                </a>
+            </div>
         </div>
 
         @if(isset($cortesRealizados) && $cortesRealizados->count() > 0)

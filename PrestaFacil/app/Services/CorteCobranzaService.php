@@ -47,10 +47,8 @@ class CorteCobranzaService
             // ─────────────────────────────────────────────────────────────
             if ($config->fecha_corte && $ahora->greaterThanOrEqualTo($config->fecha_corte)) {
                 foreach ($distribuidoras as $dist) {
-                    // REGLA 1: Solo procesar cortes ocurridos después de la fecha de alta del distribuidor
-                    if ($dist->created_at && $dist->created_at->startOfDay()->greaterThan($config->fecha_corte)) {
-                        continue;
-                    }
+                    // Garantizar relación de cobranza para cada distribuidora activa en cualquier sucursal
+                    $fechaCorteRef = $config->fecha_corte ?? $ahora;
 
                     $totalProductos = floatval(Prestamo::where('created_by_user_id', $dist->id)
                         ->where(function($q) {

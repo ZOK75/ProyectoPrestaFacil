@@ -50,8 +50,8 @@ class PrestamoController extends Controller
     {
         $operador = $this->operador();
 
-        if ($redirect = $this->verificarBloqueoGerencial($operador)) {
-            return $redirect;
+        if ($operador && ($operador->esGerenteGeneral() || $operador->esGerenteSucursal())) {
+            return redirect()->route('dashboard');
         }
 
         // Ejecución automática reactiva con hora del servidor

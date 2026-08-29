@@ -7,8 +7,8 @@
 
     <!-- Volver -->
     <div class="flex items-center justify-between">
-        <a href="{{ route('prestamos.index') }}" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1">
-            &larr; Volver a préstamos
+        <a href="{{ Auth::user() && (Auth::user()->esGerenteSucursal() || Auth::user()->esGerenteGeneral() || Auth::user()->esAdministrador()) ? route('dashboard') : route('prestamos.index') }}" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1">
+            &larr; Volver
         </a>
         <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
             {{ Auth::user()->esAdministrador() ? 'Modo Auditoría' : 'Cuenta Móvil' }}
@@ -118,8 +118,8 @@
             </div>
         @endif
 
-        <!-- Botón de Cobro Móvil (Exclusivo para Caja/Cajero, oculto para Distribuidor y Administrador) -->
-        @if($prestamo->esActivo() && !$prestamo->estaPagado() && (!Auth::check() || (!Auth::user()->esDistribuidor() && !Auth::user()->esAdministrador())))
+        <!-- Botón de Cobro Móvil (Exclusivo para Caja/Cajero) -->
+        @if($prestamo->esActivo() && !$prestamo->estaPagado() && Auth::check() && Auth::user()->esCajero())
             <div>
                 <a href="{{ route('prestamos.pago', $prestamo) }}" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold text-center shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-1.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

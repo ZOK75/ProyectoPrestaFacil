@@ -58,7 +58,7 @@ class SolicitudDistribuidorCuentaController extends Controller
         // Crear el usuario distribuidor
         $user = User::create([
             'name' => $solicitud->nombre_completo,
-            'email' => $request->email,
+            'email' => strtolower(trim($request->email)),
             'password' => Hash::make($request->password),
             'rol_id' => $rolDistribuidor->id,
             'sucursal_id' => $solicitud->sucursal_id,

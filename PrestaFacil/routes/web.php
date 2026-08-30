@@ -315,7 +315,7 @@ Route::middleware(['auth'])->group(function () {
     // ──────────────────────────────────────────
     // 9. PRÉSTAMOS, VALES Y COBRANZA (Distribuidores, Cajeros y Administrador)
     // ──────────────────────────────────────────
-    Route::middleware(['role:distribuidor,cajero,administrador,gerente_general,gerente_de_sucursal'])->group(function () {
+    Route::middleware(['role:distribuidor,cajero,administrador,gerente_general,gerente_de_sucursal,coordinador,verificador'])->group(function () {
         Route::get('prestamos-relacion-pdf/{corte_id?}', [PrestamoController::class, 'relacionCobranza'])->name('prestamos.relacion-pdf');
         Route::get('prestamos/{prestamo}', [PrestamoController::class, 'show'])->name('prestamos.show');
     });

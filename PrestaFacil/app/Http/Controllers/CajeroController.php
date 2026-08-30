@@ -159,6 +159,25 @@ class CajeroController extends Controller
                 );
             }
 
+            // 3. Notificar a Gerentes
+            $gerentes = \App\Models\User::whereHas('rol', function ($q) {
+                $q->where('nombre', 'like', '%gerente%');
+            })->get();
+
+            foreach ($gerentes as $gerente) {
+                NotificacionCajero::enviar(
+                    $gerente->id,
+                    'prestamo_cobrado',
+                    'Préstamo Cobrado en Ventanilla',
+                    "El cliente {$prestamo->cliente->nombre} cobró el prevale {$prestamo->referencia} por $" . number_format($prestamo->monto_prestamo, 2) . " en la sucursal {$nombreSucursal}.",
+                    [
+                        'url' => route('prestamos.show', $prestamo),
+                        'entidad_tipo' => 'prestamos',
+                        'entidad_id' => $prestamo->id,
+                    ]
+                );
+            }
+
             AuditService::registrar('ENTREGA_PREVALE', "Prevale {$prestamo->referencia} entregado/cobrado", [
                 'entidad_tipo' => 'prestamos',
                 'entidad_id' => $prestamo->id,
@@ -278,6 +297,25 @@ class CajeroController extends Controller
                     'prestamo_cobrado',
                     'Vale Cobrado por Cliente',
                     "El cliente {$prestamo->cliente->nombre} (Distribuidora: {$prestamo->createdBy->name}) cobró el vale {$prestamo->referencia} por $" . number_format($prestamo->monto_prestamo, 2) . " en la sucursal {$nombreSucursal}.",
+                    [
+                        'url' => route('prestamos.show', $prestamo),
+                        'entidad_tipo' => 'prestamos',
+                        'entidad_id' => $prestamo->id,
+                    ]
+                );
+            }
+
+            // 3. Notificar a Gerentes
+            $gerentes = \App\Models\User::whereHas('rol', function ($q) {
+                $q->where('nombre', 'like', '%gerente%');
+            })->get();
+
+            foreach ($gerentes as $gerente) {
+                NotificacionCajero::enviar(
+                    $gerente->id,
+                    'prestamo_cobrado',
+                    'Vale Cobrado en Ventanilla',
+                    "El cliente {$prestamo->cliente->nombre} cobró el vale {$prestamo->referencia} por $" . number_format($prestamo->monto_prestamo, 2) . " en la sucursal {$nombreSucursal}.",
                     [
                         'url' => route('prestamos.show', $prestamo),
                         'entidad_tipo' => 'prestamos',

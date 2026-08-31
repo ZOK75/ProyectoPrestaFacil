@@ -20,14 +20,14 @@ class ExportErrorPages extends Command
      *
      * @var string
      */
-    protected $description = 'Exporta las vistas de errores (500, 502, 503, 504) a HTML estático en la carpeta public para ser servidas por Nginx.';
+    protected $description = 'Exporta las vistas de errores (413, 500, 502, 503, 504) a HTML estático en la carpeta public para ser servidas por Nginx.';
 
     /**
      * Execute the console command.
      */
     public function handle()
     {
-        $errors = [500, 502, 503, 504];
+        $errors = [413, 500, 502, 503, 504];
         
         $this->info('Exportando páginas de error estáticas...');
 

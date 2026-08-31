@@ -39,6 +39,9 @@ return new class extends Migration
             if (!Schema::hasColumn('conciliaciones', 'conciliado_at')) {
                 $table->timestamp('conciliado_at')->nullable()->after('resolved_at');
             }
+            if (!Schema::hasColumn('conciliaciones', 'prestamos_asignados')) {
+                $table->json('prestamos_asignados')->nullable()->after('pago_prestamo_id');
+            }
         });
     }
 

@@ -47,9 +47,26 @@
 
             @if($conciliacion->prestamo)
                 <div>
-                    <span class="text-[10px] font-bold text-slate-500 uppercase block">Préstamo / Cliente</span>
+                    <span class="text-[10px] font-bold text-slate-500 uppercase block">Préstamo Principal / Cliente</span>
                     <span class="font-mono text-indigo-300 font-bold block">{{ $conciliacion->prestamo->referencia }}</span>
-                    <span class="text-slate-300">{{ $conciliacion->prestamo->cliente->nombre ?? '' }}</span>
+                    <span class="text-slate-300">{{ $conciliacion->prestamo->cliente->nombre_completo ?? $conciliacion->prestamo->cliente->nombre ?? '' }}</span>
+                </div>
+            @endif
+
+            @if(!empty($conciliacion->prestamos_asignados))
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block">Vales Ligados por Folio:</span>
+                    <div class="space-y-1">
+                        @foreach($conciliacion->prestamos_asignados as $item)
+                            <div class="flex justify-between items-center text-[11px] font-mono bg-slate-900/60 p-2 rounded-lg border border-slate-800/80">
+                                <div>
+                                    <span class="text-white font-bold block">{{ $item['folio'] ?? 'Vale' }}</span>
+                                    <span class="text-slate-400 text-[10px] font-sans">{{ $item['cliente'] ?? 'Cliente' }}</span>
+                                </div>
+                                <span class="text-emerald-400 font-bold text-xs">${{ number_format($item['monto'] ?? 0, 2) }}</span>
+                            </div>
+                        @endforeach
+                    </div>
                 </div>
             @endif
 
@@ -80,10 +97,10 @@
                 <p class="text-slate-300 bg-slate-950 p-3 rounded-xl border border-slate-800 leading-relaxed">{{ $conciliacion->motivo }}</p>
             </div>
             
-            @if($conciliacion->evidencia_path)
+            @if($conciliacion->evidencia_path || $conciliacion->comprobante_path)
                 <div>
                     <span class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Evidencia / Ficha Adjunta</span>
-                    <a href="{{ Storage::url($conciliacion->evidencia_path) }}" target="_blank" class="text-cyan-400 text-xs font-bold hover:underline flex items-center gap-1.5 p-2.5 bg-slate-950 rounded-xl border border-slate-800">
+                    <a href="{{ route('conciliaciones.archivo', $conciliacion) }}" target="_blank" class="text-cyan-400 text-xs font-bold hover:underline flex items-center gap-1.5 p-2.5 bg-slate-950 rounded-xl border border-slate-800">
                         <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                         Ver Documento de Evidencia
                     </a>

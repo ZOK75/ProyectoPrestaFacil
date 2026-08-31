@@ -151,6 +151,7 @@ Route::middleware(['auth'])->group(function () {
     // Morosidad de Distribuidoras (Decisión EXCLUSIVA de Gerencia: General y Sucursal, NO Administrador)
     Route::middleware(['role:gerente_de_sucursal,gerente_general'])->group(function () {
         Route::post('distribuidores/{distribuidor}/decidir-morosidad', [GerenteSucursalController::class, 'decidirMorosidad'])
+            ->middleware('require.vpn')
             ->name('gerente.distribuidores.decidir-morosidad');
     });
 
@@ -173,6 +174,12 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/gerente-sucursal/transferencias/{transferencia}/decidir', [GerenteSucursalController::class, 'decidirTransferencia'])
             ->middleware('require.vpn')
             ->name('gerente-sucursal.transferencias.decidir');
+
+        // Apartado de Conciliaciones de Gerencia
+        Route::get('/gerente/conciliaciones', [GerenteSucursalController::class, 'indexConciliacionesGerencia'])
+            ->name('gerente.conciliaciones.index');
+        Route::get('/gerente/conciliaciones/{conciliacion}', [GerenteSucursalController::class, 'showConciliacionGerencia'])
+            ->name('gerente.conciliaciones.show');
         Route::post('/gerente/conciliaciones/{conciliacion}/decidir', [GerenteSucursalController::class, 'decidirConciliacionGerencia'])
             ->middleware('require.vpn')
             ->name('gerente.conciliaciones.decidir');
@@ -266,6 +273,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:coordinador,administrador'])->prefix('autorizaciones')->group(function () {
         Route::get('/', [AutorizacionController::class, 'index'])->name('autorizaciones.index');
         Route::get('/{solicitud}', [AutorizacionController::class, 'show'])->name('autorizaciones.show');
+        Route::get('/{solicitud}/archivo', [AutorizacionController::class, 'verArchivo'])->name('autorizaciones.archivo');
         Route::post('/{solicitud}/aprobar', [AutorizacionController::class, 'aprobar'])->middleware('require.vpn')->name('autorizaciones.aprobar');
         Route::post('/{solicitud}/rechazar', [AutorizacionController::class, 'rechazar'])->middleware('require.vpn')->name('autorizaciones.rechazar');
     });
@@ -286,11 +294,11 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:gerente_general,gerente_de_sucursal,administrador'])->group(function () {
         Route::get('usuarios', [UserController::class, 'index'])->name('usuarios.index');
         Route::get('usuarios/create', [UserController::class, 'create'])->name('usuarios.create');
-        Route::post('usuarios', [UserController::class, 'store'])->name('usuarios.store');
+        Route::post('usuarios', [UserController::class, 'store'])->middleware('require.vpn')->name('usuarios.store');
         Route::get('usuarios/{usuario}', [UserController::class, 'show'])->name('usuarios.show');
         Route::get('usuarios/{usuario}/edit', [UserController::class, 'edit'])->name('usuarios.edit');
-        Route::put('usuarios/{usuario}', [UserController::class, 'update'])->name('usuarios.update');
-        Route::patch('usuarios/{usuario}', [UserController::class, 'update']);
+        Route::put('usuarios/{usuario}', [UserController::class, 'update'])->middleware('require.vpn')->name('usuarios.update');
+        Route::patch('usuarios/{usuario}', [UserController::class, 'update'])->middleware('require.vpn');
         Route::delete('usuarios/{usuario}', [UserController::class, 'destroy'])->name('usuarios.destroy');
     });
 
@@ -325,6 +333,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware(['role:distribuidor,cajero,administrador,gerente_general,gerente_de_sucursal,coordinador,verificador'])->group(function () {
         Route::get('prestamos/{prestamo}', [PrestamoController::class, 'show'])->name('prestamos.show');
+        Route::get('conciliaciones/{conciliacion}/archivo', [GerenteSucursalController::class, 'verArchivoConciliacion'])->name('conciliaciones.archivo');
     });
 
     // ──────────────────────────────────────────

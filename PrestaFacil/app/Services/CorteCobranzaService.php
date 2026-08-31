@@ -701,6 +701,153 @@ class CorteCobranzaService
     }
 
     /**
+     * Procesa y aplica una conciliación aprobada por la coordinación/gerencia,
+     * distribuyendo el pago bancario a los préstamos ligados por su folio y
+     * aplicando el efecto retroactivo de limpieza de multas, preservación de comisión
+     * y otorgamiento de puntos si la fecha de pago fue previa a un corte ya realizado.
+     */
+    public function aplicarConciliacionAprobada(Conciliacion $conciliacion, User $autorizador): void
+    {
+        $fechaPago = $conciliacion->fecha_pago ? \Carbon\Carbon::parse($conciliacion->fecha_pago) : now();
+        $config = Configuracion::actual();
+
+        // 1. Obtener los préstamos asignados a la conciliación
+        $prestamosAsignados = $conciliacion->prestamos_asignados ?: [];
+        if (empty($prestamosAsignados) && $conciliacion->prestamo_id) {
+            $prestamosAsignados = [[
+                'prestamo_id' => $conciliacion->prestamo_id,
+                'folio' => $conciliacion->prestamo?->referencia,
+                'monto' => floatval($conciliacion->monto_corregido),
+            ]];
+        }
+
+        foreach ($prestamosAsignados as $item) {
+            $prestamoId = $item['prestamo_id'] ?? null;
+            if (!$prestamoId && !empty($item['folio'])) {
+                $p = Prestamo::where('referencia', $item['folio'])->first();
+                $prestamoId = $p?->id;
+            }
+
+            if (!$prestamoId) {
+                continue;
+            }
+
+            $prestamo = Prestamo::find($prestamoId);
+            if (!$prestamo) {
+                continue;
+            }
+
+            $distribuidora = $prestamo->createdBy ?? ($conciliacion->distribuidora_id ? User::find($conciliacion->distribuidora_id) : null);
+            $montoAbonado = floatval($item['monto'] ?? $conciliacion->monto_corregido);
+            if ($montoAbonado <= 0) {
+                continue;
+            }
+
+            // 2. Evaluar efecto retroactivo frente a cortes históricos cerrados
+            if ($distribuidora) {
+                $relacionesHistoricas = RelacionCobranza::where('distribuidora_id', $distribuidora->id)
+                    ->whereNotNull('fecha_corte')
+                    ->where('fecha_corte', '>=', $fechaPago->copy()->startOfDay())
+                    ->get();
+
+                $porcentajeComision = floatval($distribuidora->obtenerPorcentajeGanancia() ?? 0.0);
+                $totalQuincenas = max(1, intval($prestamo->pagos_totales ?: ($prestamo->productoVale?->plazo_quincenas ?: 8)));
+                $cuotaBruta = floatval($prestamo->cuota_quincenal ?: ($prestamo->monto_prestamo / $totalQuincenas));
+                $comision = (($porcentajeComision / 100) * floatval($prestamo->monto_prestamo)) / $totalQuincenas;
+                $cuotaNeta = $cuotaBruta - $comision;
+
+                $cubreCuotaNeta = (floor($montoAbonado) >= floor($cuotaNeta) || abs($montoAbonado - $cuotaNeta) < 0.99);
+
+                foreach ($relacionesHistoricas as $relHistorica) {
+                    $fechaLimiteCorte = $relHistorica->fecha_limite_pago ?? $relHistorica->fecha_corte->copy()->addDays(5);
+                    $esFechaPreviaAlCorte = $fechaPago->lte($fechaLimiteCorte->copy()->endOfDay());
+
+                    if ($esFechaPreviaAlCorte && $cubreCuotaNeta) {
+                        // Revertir multas generadas indebidamente
+                        $multaVale = floatval($prestamo->multaConfigurada() ?: 300.00);
+                        $multaRevertir = 0.0;
+                        if ($prestamo->multas > 0) {
+                            $multaRevertir = min(floatval($prestamo->multas), $multaVale);
+                            $prestamo->decrement('multas', $multaRevertir);
+
+                            if ($distribuidora->multas > 0) {
+                                $distribuidora->decrement('multas', min($multaRevertir, floatval($distribuidora->multas)));
+                            }
+                            if ($distribuidora->conteo_retrasos > 0) {
+                                $distribuidora->decrement('conteo_retrasos');
+                            }
+                        }
+
+                        // Sellar la relación histórica como pago a tiempo
+                        $relHistorica->monto_pagado = floatval($relHistorica->monto_pagado) + $montoAbonado;
+                        if ($multaRevertir > 0) {
+                            $relHistorica->monto_total_periodo = max(0.0, floatval($relHistorica->monto_total_periodo) - $multaRevertir);
+                        }
+                        if ($relHistorica->multa_aplicada > 0) {
+                            $relHistorica->decrement('multa_aplicada', min(floatval($relHistorica->multa_aplicada), $multaRevertir > 0 ? $multaRevertir : $multaVale));
+                        }
+                        $relHistorica->adeudo_pendiente = max(0.0, floatval($relHistorica->monto_total_periodo) - floatval($relHistorica->monto_pagado));
+                        
+                        if (floor($relHistorica->monto_pagado) >= floor($relHistorica->monto_total_periodo) || abs($relHistorica->monto_pagado - $relHistorica->monto_total_periodo) < 0.99) {
+                            $relHistorica->adeudo_pendiente = 0.00;
+                            $relHistorica->estado_pago = 'pago_a_tiempo';
+                            $relHistorica->liquidado_at = $fechaPago;
+                        }
+                        $relHistorica->save();
+
+                        // Otorgar puntos ganados si no se habían otorgado
+                        if (intval($relHistorica->puntos_ganados) <= 0) {
+                            $totalProductos = floatval(Prestamo::where('created_by_user_id', $distribuidora->id)
+                                ->whereIn('estado', ['activo', 'finalizado'])
+                                ->sum('monto_prestamo'));
+                            $puntosGanados = $config->calcularPuntosPorMonto($totalProductos);
+                            if ($puntosGanados > 0) {
+                                $distribuidora->increment('puntos', $puntosGanados);
+                                $relHistorica->update(['puntos_ganados' => $puntosGanados]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Crear el PagoPrestamo
+            $pago = PagoPrestamo::create([
+                'prestamo_id' => $prestamo->id,
+                'folio_pago' => 'CONC-' . strtoupper(uniqid()),
+                'numero_quincena' => min(intval($prestamo->pagos_totales ?: 8), $prestamo->pagos_realizados + 1),
+                'monto_abonado' => $montoAbonado,
+                'metodo_pago' => $conciliacion->metodo_pago ?? 'transferencia',
+                'observaciones' => "Conciliación #{$conciliacion->id}: " . ($conciliacion->motivo ?? 'Abono conciliado'),
+                'registrado_por_user_id' => $conciliacion->solicitante_id ?? $autorizador->id,
+                'created_at' => $fechaPago,
+                'updated_at' => now(),
+            ]);
+
+            // 4. Amortizar préstamo
+            $pagoCapital = min($montoAbonado, floatval($prestamo->adeudo_pendiente));
+            $prestamo->increment('pagos_recibidos', $pagoCapital);
+            $prestamo->decrement('adeudo_pendiente', $pagoCapital);
+            $prestamo->increment('pagos_realizados');
+
+            if ($prestamo->adeudo_pendiente <= 0 && ($prestamo->multas ?? 0) <= 0) {
+                $prestamo->update(['estado' => 'finalizado']);
+            }
+
+            // Si es para el corte actual, actualizar relación activa
+            if ($distribuidora) {
+                $this->actualizarRelacionPorAbono($distribuidora, 0.0);
+            }
+
+            AuditService::registrar('CONCILIACION_APLICADA', "Conciliación #{$conciliacion->id} aplicada a vale {$prestamo->referencia} por \${$montoAbonado}", [
+                'conciliacion_id' => $conciliacion->id,
+                'prestamo_id' => $prestamo->id,
+                'monto' => $montoAbonado,
+                'fecha_pago' => $fechaPago->toDateString(),
+            ]);
+        }
+    }
+
+    /**
      * Genera las filas de la Relación de Cobranza agrupadas en orden por cliente,
      * mostrando la progresión quincenal (1/N a N/N), comisiones, recargos y saldos.
      *

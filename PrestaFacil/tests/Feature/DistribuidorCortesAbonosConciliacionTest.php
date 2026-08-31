@@ -2812,4 +2812,337 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
 
         \Carbon\Carbon::setTestNow();
     }
+
+    public function test_conciliacion_multiple_vales_por_folio_con_efecto_retroactivo_remueve_multas_conserva_comision_y_otorga_puntos()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-08-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        Configuracion::actual()->update([
+            'comision_oro' => 1.50,
+            'comision_plata' => 1.50,
+            'comision_cobre' => 1.50,
+            'multa_mora_distribuidora' => 300.00,
+            'fecha_corte' => $tiempoInicial->copy()->addDays(5),
+            'fecha_limite_pago' => $tiempoInicial->copy()->addDays(10),
+            'meta_colocacion_mensual' => 1000.00,
+            'puntos_por_meta' => 100,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'puntos' => 0,
+        ]);
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+        ]);
+        $coordinador = User::factory()->create([
+            'rol_id' => $this->rolCoordinador->id,
+            'sucursal_id' => $this->sucursal->id,
+        ]);
+
+        $cliente1 = $this->crearClienteTest('Leo Conciliado', $distribuidora);
+        $cliente2 = $this->crearClienteTest('Maria Conciliada', $distribuidora);
+
+        $productoVale = ProductoVale::firstOrCreate(['clave' => 'VALE-8Q-CONC'], [
+            'nombre' => '5/8',
+            'monto_prestamo' => 10000.00,
+            'plazo_quincenas' => 8,
+            'cuota_quincenal' => 950.00,
+            'multa' => 300.00,
+            'comision_distribuidor' => 1.50,
+            'activo' => true,
+        ]);
+
+        $prestamo1 = Prestamo::create([
+            'referencia' => 'VALE-LEO-001',
+            'cliente_id' => $cliente1->id,
+            'producto_vale_id' => $productoVale->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 10000.00,
+            'cuota_quincenal' => 950.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 7600.00,
+            'adeudo_pendiente' => 7600.00,
+            'multas' => 0,
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+            'created_at' => $tiempoInicial,
+        ]);
+
+        $prestamo2 = Prestamo::create([
+            'referencia' => 'VALE-MARIA-002',
+            'cliente_id' => $cliente2->id,
+            'producto_vale_id' => $productoVale->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 10000.00,
+            'cuota_quincenal' => 950.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 7600.00,
+            'adeudo_pendiente' => 7600.00,
+            'multas' => 0,
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+            'created_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // Avanzar el tiempo más allá del corte sin registrar pago -> Genera atraso y multas
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(6));
+        $service->simularSiguienteCorte();
+
+        $prestamo1->refresh();
+        $prestamo2->refresh();
+        $distribuidora->refresh();
+
+        $this->assertEquals(300.00, floatval($prestamo1->multas), 'Leo debe tener 300 de multa por corte vencido');
+        $this->assertEquals(300.00, floatval($prestamo2->multas), 'Maria debe tener 300 de multa por corte vencido');
+        $this->assertEquals(600.00, floatval($distribuidora->multas), 'Distribuidora acumula 600 de multas');
+
+        // Ahora el cajero registra una conciliación de pago bancario que ocurrió el día 3 (antes del corte del día 5)
+        // cubriendo ambos vales ($931.25 a Leo y $931.25 a Maria = $1,862.50)
+        $responseSolicitud = $this->actingAs($cajero)->post(route('cajero.conciliaciones.store'), [
+            'distribuidora_id' => $distribuidora->id,
+            'referencia_original' => 'REF-ERRONEA-BANCO',
+            'referencia_conciliacion' => 'REF-CORRECTA-BANCO',
+            'fecha_pago' => $tiempoInicial->copy()->addDays(3)->toDateString(),
+            'monto_original' => 1862.50,
+            'monto_corregido' => 1862.50,
+            'motivo' => 'Ficha bancaria con referencia errónea pagada a tiempo el día 3.',
+            'prestamos_asignados' => [
+                ['prestamo_id' => $prestamo1->id, 'folio' => $prestamo1->referencia, 'monto' => 931.25],
+                ['prestamo_id' => $prestamo2->id, 'folio' => $prestamo2->referencia, 'monto' => 931.25],
+            ],
+        ]);
+
+        $responseSolicitud->assertSessionHasNoErrors();
+        $responseSolicitud->assertSessionHas('success');
+
+        $conciliacion = \App\Models\Conciliacion::where('referencia_conciliacion', 'REF-CORRECTA-BANCO')->first();
+        $this->assertNotNull($conciliacion);
+        $this->assertCount(2, $conciliacion->prestamos_asignados);
+
+        $solicitudAut = SolicitudAutorizacion::where('entidad_id', $conciliacion->id)->first();
+        $this->assertNotNull($solicitudAut);
+
+        // El Coordinador aprueba la conciliación
+        $responseAprobar = $this->actingAs($coordinador)->post(route('autorizaciones.aprobar', $solicitudAut), [
+            'observaciones' => 'Comprobante cotejado con estado de cuenta bancario.',
+        ]);
+        $responseAprobar->assertRedirect(route('autorizaciones.index'));
+
+        // Verificaciones del efecto retroactivo
+        $prestamo1->refresh();
+        $prestamo2->refresh();
+        $distribuidora->refresh();
+
+        // 1. Multas revertidas a 0.00
+        $this->assertEquals(0.00, floatval($prestamo1->multas), 'Multas de Leo deben ser 0 tras conciliación a tiempo');
+        $this->assertEquals(0.00, floatval($prestamo2->multas), 'Multas de Maria deben ser 0 tras conciliación a tiempo');
+        $this->assertEquals(0.00, floatval($distribuidora->multas), 'Multas de Distribuidora deben ser 0');
+
+        // 2. Pagos creados
+        $this->assertEquals(1, $prestamo1->pagos_realizados);
+        $this->assertEquals(931.25, floatval($prestamo1->pagos_recibidos));
+        $this->assertEquals(1, $prestamo2->pagos_realizados);
+        $this->assertEquals(931.25, floatval($prestamo2->pagos_recibidos));
+
+        // 3. Puntos acreditados
+        $this->assertGreaterThan(0, $distribuidora->puntos, 'Distribuidora debe recibir sus puntos por haber pagado a tiempo');
+
+        // 4. Relación histórica liquidada
+        $relacionCorte1 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)->oldest('fecha_corte')->first();
+        $this->assertEquals('pago_a_tiempo', $relacionCorte1->estado_pago);
+        $this->assertEquals(0.00, floatval($relacionCorte1->adeudo_pendiente));
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    public function test_conciliacion_notifica_a_gerentes_crea_logs_y_permite_decision_gerencial()
+    {
+        $rolGG = Rol::firstOrCreate(['nombre' => 'Gerente General']);
+        $rolGS = Rol::firstOrCreate(['nombre' => 'Gerente de Sucursal']);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+        ]);
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+        ]);
+        $gerenteGeneral = User::factory()->create([
+            'rol_id' => $rolGG->id,
+            'sucursal_id' => $this->sucursal->id,
+        ]);
+        $gerenteSucursal = User::factory()->create([
+            'rol_id' => $rolGS->id,
+            'sucursal_id' => $this->sucursal->id,
+        ]);
+
+        $cliente = $this->crearClienteTest('Cliente Conciliacion Gerente', $distribuidora);
+        $productoVale = ProductoVale::firstOrCreate(['clave' => 'VALE-8Q-GER'], [
+            'nombre' => '5/8',
+            'monto_prestamo' => 10000.00,
+            'plazo_quincenas' => 8,
+            'cuota_quincenal' => 950.00,
+            'multa' => 300.00,
+            'comision_distribuidor' => 1.50,
+            'activo' => true,
+        ]);
+        $prestamo = Prestamo::create([
+            'referencia' => 'VALE-GER-001',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 10000.00,
+            'cuota_quincenal' => 950.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 7600.00,
+            'adeudo_pendiente' => 7600.00,
+            'multas' => 0,
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+        ]);
+
+        // 1. El Cajero solicita la conciliación
+        $response = $this->actingAs($cajero)->post(route('cajero.conciliaciones.store'), [
+            'distribuidora_id' => $distribuidora->id,
+            'referencia_original' => 'REF-BANCO-ERR-1',
+            'referencia_conciliacion' => 'REF-BANCO-CORR-1',
+            'fecha_pago' => now()->toDateString(),
+            'monto_original' => 931.25,
+            'monto_corregido' => 931.25,
+            'motivo' => 'Depósito bancario no acreditado a tiempo.',
+            'prestamos_asignados' => [
+                ['prestamo_id' => $prestamo->id, 'folio' => $prestamo->referencia, 'monto' => 931.25],
+            ],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success');
+
+        $conciliacion = \App\Models\Conciliacion::where('referencia_conciliacion', 'REF-BANCO-CORR-1')->first();
+        $this->assertNotNull($conciliacion);
+
+        // 2. Verificar Notificaciones a Gerente General y Gerente de Sucursal
+        $notifGG = NotificacionCajero::where('user_id', $gerenteGeneral->id)
+            ->where('tipo', 'conciliacion_solicitada_gerente')
+            ->first();
+        $this->assertNotNull($notifGG, 'El Gerente General debe recibir notificación de la solicitud');
+
+        $notifGS = NotificacionCajero::where('user_id', $gerenteSucursal->id)
+            ->where('tipo', 'conciliacion_solicitada_gerente')
+            ->first();
+        $this->assertNotNull($notifGS, 'El Gerente de Sucursal debe recibir notificación de la solicitud');
+
+        // 3. Verificar Log 1: Solicitud de Conciliación
+        $logSolicitud = \App\Models\AuditLog::where('tipo_operacion', 'CONCILIACION_SOLICITADA')
+            ->where('entidad_id', $conciliacion->id)
+            ->first();
+        $this->assertNotNull($logSolicitud, 'Debe crearse un log de auditoría al solicitar la conciliación');
+        $this->assertEquals($cajero->id, $logSolicitud->user_id);
+
+        // 4. El Gerente de Sucursal aprueba la conciliación
+        $responseAprobar = $this->actingAs($gerenteSucursal)
+            ->post(route('gerente.conciliaciones.decidir', $conciliacion), [
+                'accion' => 'aprobar',
+                'observaciones' => 'Aprobado tras cotejo con estado de cuenta de sucursal',
+            ]);
+
+        $responseAprobar->assertSessionHas('success');
+
+        $conciliacion->refresh();
+        $this->assertEquals('conciliado', $conciliacion->estado);
+        $this->assertEquals($gerenteSucursal->id, $conciliacion->autorizador_id);
+
+        // 5. Verificar Log 2: Validación de la Conciliación
+        $logValidacion = \App\Models\AuditLog::where('tipo_operacion', 'CONCILIACION_VALIDADA')
+            ->where('entidad_id', $conciliacion->id)
+            ->first();
+        $this->assertNotNull($logValidacion, 'Debe crearse un log de auditoría al validar/aprobar la conciliación');
+        $this->assertEquals($gerenteSucursal->id, $logValidacion->autorizador_id);
+
+        // 6. Verificar notificación al Cajero
+        $notifCajero = NotificacionCajero::where('user_id', $cajero->id)
+            ->where('tipo', 'conciliacion_aprobada')
+            ->first();
+        $this->assertNotNull($notifCajero, 'El cajero solicitante debe recibir notificación de la aprobación');
+    }
+
+    public function test_modulo_apartado_conciliaciones_gerencia_vistas_filtros_y_detalle()
+    {
+        $rolGG = Rol::firstOrCreate(['nombre' => 'Gerente General']);
+        $rolGS = Rol::firstOrCreate(['nombre' => 'Gerente de Sucursal']);
+
+        $gerenteGeneral = User::factory()->create([
+            'rol_id' => $rolGG->id,
+            'sucursal_id' => $this->sucursal->id,
+        ]);
+        $gerenteSucursal = User::factory()->create([
+            'rol_id' => $rolGS->id,
+            'sucursal_id' => $this->sucursal->id,
+        ]);
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+        ]);
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+        ]);
+
+        $conciliacion = \App\Models\Conciliacion::create([
+            'solicitante_id' => $cajero->id,
+            'distribuidora_id' => $distribuidora->id,
+            'referencia_original' => 'REF-ORIG-TEST',
+            'referencia_conciliacion' => 'REF-CONC-TEST',
+            'fecha_pago' => now(),
+            'monto_original' => 1500.00,
+            'monto_corregido' => 1500.00,
+            'motivo' => 'Revisión gerencial de comprobante',
+            'estado' => 'pendiente_gerencia',
+        ]);
+
+        // 1. Acceso permitido para Gerente General
+        $resGG = $this->actingAs($gerenteGeneral)->get(route('gerente.conciliaciones.index'));
+        $resGG->assertStatus(200);
+        $resGG->assertSee('Conciliaciones de Pago');
+        $resGG->assertSee('REF-CONC-TEST');
+
+        // 2. Acceso permitido para Gerente de Sucursal
+        $resGS = $this->actingAs($gerenteSucursal)->get(route('gerente.conciliaciones.index', ['estado' => 'pendientes']));
+        $resGS->assertStatus(200);
+        $resGS->assertSee('REF-CONC-TEST');
+
+        // 3. Vista de detalle de conciliación
+        $resShow = $this->actingAs($gerenteSucursal)->get(route('gerente.conciliaciones.show', $conciliacion));
+        $resShow->assertStatus(200);
+        $resShow->assertSee('Revisión gerencial de comprobante');
+        $resShow->assertSee('Trazabilidad y Logs de Auditoría');
+
+        // 4. Bloqueo para roles no gerenciales (Distribuidor)
+        $resDist = $this->actingAs($distribuidora)->get(route('gerente.conciliaciones.index'));
+        $resDist->assertRedirect(route('distribuidor.dashboard'));
+        $resDist->assertSessionHas('error');
+
+        // 5. Visualización del archivo adjunto
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $fakeFile = \Illuminate\Http\UploadedFile::fake()->create('comprobante_banco.pdf', 100, 'application/pdf');
+        $pathGuardado = $fakeFile->store('evidencias', 'public');
+        $conciliacion->update(['evidencia_path' => $pathGuardado]);
+
+        $resArchivo = $this->actingAs($gerenteGeneral)->get(route('conciliaciones.archivo', $conciliacion));
+        $resArchivo->assertStatus(200);
+
+        $resArchivoGS = $this->actingAs($gerenteSucursal)->get(route('conciliaciones.archivo', $conciliacion));
+        $resArchivoGS->assertStatus(200);
+    }
 }

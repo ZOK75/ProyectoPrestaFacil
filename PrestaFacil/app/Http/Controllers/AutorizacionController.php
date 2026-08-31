@@ -227,6 +227,25 @@ class AutorizacionController extends Controller
                         'conciliado_at' => now(),
                         'observaciones_resolucion' => $request->observaciones,
                     ]);
+
+                    $corteService = app(\App\Services\CorteCobranzaService::class);
+                    $corteService->aplicarConciliacionAprobada($conciliacion, $user);
+
+                    AuditService::registrar('CONCILIACION_VALIDADA', "Conciliación #{$conciliacion->id} APROBADA por {$user->name} ({$user->rol->nombre})", [
+                        'entidad_tipo' => 'conciliaciones',
+                        'entidad_id' => $conciliacion->id,
+                        'autorizador_id' => $user->id,
+                        'autorizador_rol' => $user->rol->nombre,
+                        'sucursal_id' => $user->sucursal_id ?? $solicitud->sucursal_id,
+                        'despues' => [
+                            'estado' => 'conciliado',
+                            'accion' => 'aprobada',
+                            'observaciones' => $request->observaciones,
+                            'monto_conciliado' => $conciliacion->monto_corregido,
+                            'fecha_pago' => $conciliacion->fecha_pago?->toDateString(),
+                            'prestamos_asignados' => $conciliacion->prestamos_asignados,
+                        ],
+                    ]);
                 }
             }
             
@@ -276,6 +295,20 @@ class AutorizacionController extends Controller
                     'observaciones_resolucion' => $request->motivo,
                     'resolved_at' => now(),
                 ]);
+
+                AuditService::registrar('CONCILIACION_VALIDADA', "Conciliación #{$solicitud->entidad_id} RECHAZADA por {$user->name} ({$user->rol->nombre})", [
+                    'entidad_tipo' => 'conciliaciones',
+                    'entidad_id' => $solicitud->entidad_id,
+                    'autorizador_id' => $user->id,
+                    'autorizador_rol' => $user->rol->nombre,
+                    'sucursal_id' => $user->sucursal_id ?? $solicitud->sucursal_id,
+                    'despues' => [
+                        'estado' => 'rechazada',
+                        'accion' => 'rechazada',
+                        'motivo_rechazo' => $request->motivo,
+                        'observaciones' => $request->observaciones,
+                    ],
+                ]);
             }
 
             NotificacionService::enviar(
@@ -289,5 +322,39 @@ class AutorizacionController extends Controller
         });
 
         return redirect()->route('autorizaciones.index')->with('success', 'Solicitud rechazada.');
+    }
+
+    public function verArchivo(SolicitudAutorizacion $solicitud)
+    {
+        $path = $solicitud->evidencia_path;
+        if (!$path) {
+            return back()->with('error', 'La solicitud no cuenta con un archivo adjunto.');
+        }
+
+        $candidatePaths = [
+            storage_path('app/public/' . $path),
+            storage_path('app/private/' . $path),
+            storage_path('app/' . $path),
+            public_path('storage/' . $path),
+        ];
+
+        foreach ($candidatePaths as $fullPath) {
+            if (file_exists($fullPath) && is_file($fullPath)) {
+                $mime = mime_content_type($fullPath) ?: 'application/octet-stream';
+                return response()->file($fullPath, [
+                    'Content-Type' => $mime,
+                    'Content-Disposition' => 'inline; filename="' . basename($fullPath) . '"',
+                ]);
+            }
+        }
+
+        $defaultDisk = config('filesystems.default', 'public');
+        if (\Illuminate\Support\Facades\Storage::disk($defaultDisk)->exists($path)) {
+            return \Illuminate\Support\Facades\Storage::disk($defaultDisk)->response($path, basename($path), [
+                'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
+            ]);
+        }
+
+        return back()->with('error', 'El archivo adjunto no fue encontrado en el servidor.');
     }
 }

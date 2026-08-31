@@ -614,9 +614,28 @@ class CajeroController extends Controller
             });
         }
 
-        $conciliaciones = $query->paginate(15)->withQueryString();
+        $conciliaciones = $query->paginate(15, ['*'], 'conciliaciones_page')->withQueryString();
 
-        $prestamosQuery = Prestamo::where('estado', 'activo')->with('cliente');
+        // Pagos registrados recientes para consulta directa del cajero
+        $pagosQuery = PagoPrestamo::with(['prestamo.cliente', 'prestamo.createdBy'])
+            ->orderBy('created_at', 'desc');
+            
+        if ($cajera->sucursal_id) {
+            $pagosQuery->whereHas('prestamo.createdBy', fn($q) => $q->where('sucursal_id', $cajera->sucursal_id));
+        }
+
+        if ($request->filled('buscar_pago')) {
+            $bp = $request->buscar_pago;
+            $pagosQuery->where(function($q) use ($bp) {
+                $q->where('folio_pago', 'like', "%{$bp}%")
+                  ->orWhereHas('prestamo', fn($qp) => $qp->where('referencia', 'like', "%{$bp}%"))
+                  ->orWhereHas('prestamo.cliente', fn($qc) => $qc->where('nombre', 'like', "%{$bp}%"));
+            });
+        }
+
+        $pagosRecientes = $pagosQuery->paginate(15, ['*'], 'pagos_page')->withQueryString();
+
+        $prestamosQuery = Prestamo::where('estado', 'activo')->with(['cliente', 'createdBy']);
         $distQuery = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Distribuidor', 'Distribuidora', 'distribuidor', 'distribuidora']))->where('activo', true);
 
         if ($cajera->sucursal_id) {
@@ -627,7 +646,7 @@ class CajeroController extends Controller
         $prestamosActivos = $prestamosQuery->get();
         $distribuidoras = $distQuery->get();
 
-        return view('cajero.conciliaciones.index', compact('conciliaciones', 'prestamosActivos', 'distribuidoras'));
+        return view('cajero.conciliaciones.index', compact('conciliaciones', 'pagosRecientes', 'prestamosActivos', 'distribuidoras'));
     }
 
     /**
@@ -669,6 +688,40 @@ class CajeroController extends Controller
             'evidencia' => 'nullable|file|max:5120',
         ]);
 
+        // Procesar préstamos asignados si se enviaron múltiples
+        $prestamosAsignados = [];
+        if ($request->filled('prestamos_asignados')) {
+            $rawAsignados = is_array($request->prestamos_asignados) ? $request->prestamos_asignados : json_decode($request->prestamos_asignados, true);
+            if (is_array($rawAsignados)) {
+                foreach ($rawAsignados as $asig) {
+                    if (!empty($asig['prestamo_id']) || !empty($asig['folio'])) {
+                        $p = !empty($asig['prestamo_id']) ? Prestamo::find($asig['prestamo_id']) : Prestamo::where('referencia', $asig['folio'])->first();
+                        if ($p) {
+                            $prestamosAsignados[] = [
+                                'prestamo_id' => $p->id,
+                                'folio' => $p->referencia,
+                                'cliente' => $p->cliente?->nombre ?? 'Cliente',
+                                'monto' => floatval($asig['monto'] ?? $request->monto_corregido),
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+
+        // Si no se especificó array pero sí prestamo_id directo
+        if (empty($prestamosAsignados) && $request->filled('prestamo_id')) {
+            $p = Prestamo::find($request->prestamo_id);
+            if ($p) {
+                $prestamosAsignados[] = [
+                    'prestamo_id' => $p->id,
+                    'folio' => $p->referencia,
+                    'cliente' => $p->cliente?->nombre ?? 'Cliente',
+                    'monto' => floatval($request->monto_corregido),
+                ];
+            }
+        }
+
         // Verificar si ya existe una conciliación pendiente para esta referencia o pago
         $existente = Conciliacion::where(function($q) use ($request) {
             if ($request->prestamo_id) $q->orWhere('prestamo_id', $request->prestamo_id);
@@ -684,14 +737,14 @@ class CajeroController extends Controller
         
         $path = null;
         if ($request->hasFile('evidencia')) {
-            $disk = config('filesystems.default', 'public');
-            $path = $request->file('evidencia')->store('evidencias', $disk);
+            $path = $request->file('evidencia')->store('evidencias', 'public');
         }
 
-        DB::transaction(function () use ($request, $cajera, $path) {
-            $distribuidoraId = $request->distribuidora_id ?: ($request->prestamo_id ? Prestamo::find($request->prestamo_id)?->created_by_user_id : null);
+        DB::transaction(function () use ($request, $cajera, $path, $prestamosAsignados) {
+            $primerPrestamo = !empty($prestamosAsignados) ? Prestamo::find($prestamosAsignados[0]['prestamo_id']) : null;
+            $distribuidoraId = $request->distribuidora_id ?: ($primerPrestamo ? $primerPrestamo->created_by_user_id : null);
             $distribuidora = $distribuidoraId ? User::find($distribuidoraId) : null;
-            $prestamo = $request->prestamo_id ? Prestamo::find($request->prestamo_id) : null;
+            $prestamo = $request->prestamo_id ? Prestamo::find($request->prestamo_id) : $primerPrestamo;
 
             $refOriginal = $request->referencia_original;
             if (empty($refOriginal) || strtoupper(trim($refOriginal)) === 'N/A') {
@@ -704,8 +757,9 @@ class CajeroController extends Controller
             }
 
             $conciliacion = Conciliacion::create([
-                'prestamo_id' => $request->prestamo_id ?: null,
+                'prestamo_id' => $prestamo?->id ?: null,
                 'pago_prestamo_id' => $request->pago_prestamo_id ?: null,
+                'prestamos_asignados' => !empty($prestamosAsignados) ? $prestamosAsignados : null,
                 'distribuidora_id' => $distribuidoraId,
                 'referencia_original' => $refOriginal,
                 'referencia_conciliacion' => $refConciliacion,
@@ -733,12 +787,55 @@ class CajeroController extends Controller
                     'monto_corregido' => $request->monto_corregido,
                     'referencia_conciliacion' => $request->referencia_conciliacion,
                     'fecha_pago' => $request->fecha_pago,
+                    'prestamos_asignados' => $prestamosAsignados,
                 ],
                 'motivo' => $request->motivo,
                 'evidencia_path' => $path,
             ]);
 
-            // Notificar a los coordinadores de la sucursal del cajero
+            // 1. Notificar a Gerente General
+            $gerentesGenerales = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente General', 'gerente general', 'GerenteGeneral', 'gerente_general']))
+                ->where('activo', true)
+                ->get();
+
+            foreach ($gerentesGenerales as $gg) {
+                NotificacionCajero::enviar(
+                    $gg->id,
+                    'conciliacion_solicitada_gerente',
+                    'Solicitud de Conciliación de Pago',
+                    "La cajera {$cajera->name} solicita la revisión y dictamen de una conciliación de pago por $" . number_format($request->monto_corregido, 2) . ($distribuidora ? " para la distribuidora {$distribuidora->name}." : "."),
+                    [
+                        'conciliacion_id' => $conciliacion->id,
+                        'referencia' => $request->referencia_conciliacion,
+                        'url' => route('gerente-general.dashboard', [], false),
+                    ]
+                );
+            }
+
+            // 2. Notificar a Gerente de Sucursal
+            $sucursalTargetId = $cajera->sucursal_id ?? $distribuidora?->sucursal_id;
+            if ($sucursalTargetId) {
+                $gerentesSucursal = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente de Sucursal', 'gerente de sucursal', 'Gerente Sucursal', 'gerente_de_sucursal']))
+                    ->where('sucursal_id', $sucursalTargetId)
+                    ->where('activo', true)
+                    ->get();
+
+                foreach ($gerentesSucursal as $gs) {
+                    NotificacionCajero::enviar(
+                        $gs->id,
+                        'conciliacion_solicitada_gerente',
+                        'Solicitud de Conciliación de Pago',
+                        "La cajera {$cajera->name} solicita la revisión y dictamen de una conciliación de pago por $" . number_format($request->monto_corregido, 2) . ($distribuidora ? " para la distribuidora {$distribuidora->name}." : "."),
+                        [
+                            'conciliacion_id' => $conciliacion->id,
+                            'referencia' => $request->referencia_conciliacion,
+                            'url' => route('gerente-sucursal.dashboard', [], false),
+                        ]
+                    );
+                }
+            }
+
+            // 3. Notificar a los coordinadores de la sucursal del cajero
             $coordinadores = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Coordinador', 'coordinador']))
                 ->where('sucursal_id', $cajera->sucursal_id)
                 ->where('activo', true)
@@ -749,7 +846,7 @@ class CajeroController extends Controller
                     $coord->id,
                     'conciliacion_solicitada_coordinador',
                     'Solicitud de Conciliación Manual',
-                    "La cajera {$cajera->name} solicita la revisión y pre-aprobación de una conciliación manual por \${$request->monto_corregido}.",
+                    "La cajera {$cajera->name} solicita la revisión de una conciliación manual por $" . number_format($request->monto_corregido, 2) . ".",
                     [
                         'conciliacion_id' => $conciliacion->id,
                         'referencia' => $request->referencia_conciliacion,
@@ -757,10 +854,33 @@ class CajeroController extends Controller
                 );
             }
 
-            AuditService::registrar('SOLICITUD_CONCILIACION', "Conciliación por \${$request->monto_corregido} enviada a Coordinación por {$cajera->name}");
+            // Log de Auditoría 1: Creación / Solicitud de la Conciliación
+            AuditService::registrar(
+                'CONCILIACION_SOLICITADA',
+                "Solicitud de conciliación manual creada por {$cajera->name} por $" . number_format($request->monto_corregido, 2),
+                [
+                    'entidad_tipo' => 'conciliaciones',
+                    'entidad_id' => $conciliacion->id,
+                    'user_id' => $cajera->id,
+                    'user_rol' => $cajera->rol?->nombre ?? 'Cajero',
+                    'sucursal_id' => $cajera->sucursal_id,
+                    'evidencia_path' => $path,
+                    'antes' => [
+                        'referencia_original' => $refOriginal,
+                        'monto_original' => $request->monto_original,
+                    ],
+                    'despues' => [
+                        'referencia_conciliacion' => $refConciliacion,
+                        'monto_corregido' => $request->monto_corregido,
+                        'fecha_pago' => $request->fecha_pago,
+                        'prestamos_asignados' => $prestamosAsignados,
+                        'motivo' => $request->motivo,
+                    ],
+                ]
+            );
         });
 
-        return back()->with('success', 'Solicitud de conciliación enviada exitosamente a Coordinación para su pre-aprobación.');
+        return back()->with('success', 'Solicitud de conciliación registrada y notificada a Gerencia y Coordinación.');
     }
     
     public function mostrarConciliacion(Conciliacion $conciliacion)

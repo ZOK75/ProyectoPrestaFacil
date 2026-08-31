@@ -17,6 +17,7 @@ class Conciliacion extends Model
     protected $fillable = [
         'prestamo_id',
         'pago_prestamo_id',
+        'prestamos_asignados',
         'distribuidora_id',
         'referencia_original',
         'referencia_conciliacion',
@@ -38,6 +39,7 @@ class Conciliacion extends Model
 
     protected $casts = [
         'fecha_pago' => 'date',
+        'prestamos_asignados' => 'array',
         'monto_original' => 'decimal:2',
         'monto_corregido' => 'decimal:2',
         'resolved_at' => 'datetime',
@@ -55,6 +57,11 @@ class Conciliacion extends Model
     }
 
     public function pago(): BelongsTo
+    {
+        return $this->belongsTo(PagoPrestamo::class, 'pago_prestamo_id');
+    }
+
+    public function pagoPrestamo(): BelongsTo
     {
         return $this->belongsTo(PagoPrestamo::class, 'pago_prestamo_id');
     }

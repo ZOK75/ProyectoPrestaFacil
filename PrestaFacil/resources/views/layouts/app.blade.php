@@ -256,6 +256,12 @@
                                 Usuarios
                             </a>
 
+                            @if(Auth::user()->esGerenteGeneral() || Auth::user()->esGerenteSucursal())
+                                <a href="{{ route('gerente.conciliaciones.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('gerente.conciliaciones.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
+                                    Conciliaciones
+                                </a>
+                            @endif
+
                             <!-- Módulos de Auditoría (Exclusivos para Administrador) -->
                             @if(Auth::user()->esAdministrador())
                                 <a href="{{ route('clientes.index') }}" class="px-3 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('clientes.*') ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800' }}">
@@ -626,6 +632,13 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                         <span>Gestión de Usuarios</span>
                     </a>
+
+                    @if(Auth::user()->esGerenteGeneral() || Auth::user()->esGerenteSucursal())
+                        <a href="{{ route('gerente.conciliaciones.index') }}" @click="mobileMenuOpen = false" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold {{ request()->routeIs('gerente.conciliaciones.*') ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800' }}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <span>Conciliaciones de Pago</span>
+                        </a>
+                    @endif
 
                     @php
                         $conteoNotifGerente = Auth::user()->conteoNotificacionesSinLeer();

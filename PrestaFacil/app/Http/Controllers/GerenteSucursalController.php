@@ -680,13 +680,14 @@ class GerenteSucursalController extends Controller
     }
 
     /**
-     * Autorización final o rechazo de conciliación manual por Gerente de Sucursal o Gerente General (Paso 2).
+     * Autorización final o rechazo de conciliación manual por Gerente de Sucursal o Gerente General.
      */
     public function decidirConciliacionGerencia(Request $request, \App\Models\Conciliacion $conciliacion)
     {
         $request->validate([
-            'accion' => 'required|in:aceptar,rechazar',
+            'accion' => 'required|in:aceptar,aprobar,rechazar',
             'observaciones' => 'nullable|string|max:500',
+            'motivo' => 'nullable|string|max:500',
         ]);
 
         $gerente = Auth::user();
@@ -694,19 +695,30 @@ class GerenteSucursalController extends Controller
             abort(403, 'No estás autorizado para resolver conciliaciones manuales.');
         }
 
-        if ($conciliacion->estado !== 'pendiente_gerencia') {
-            return back()->with('error', 'Esta conciliación ya ha sido resuelta previamente o no se encuentra pendiente de autorización gerencial.');
+        if (!in_array($conciliacion->estado, ['pendiente_gerencia', 'pendiente_coordinador', 'pendiente'])) {
+            return back()->with('error', 'Esta conciliación ya ha sido resuelta previamente o no se encuentra pendiente de autorización.');
         }
 
         $cajeroSolicitante = $conciliacion->solicitante;
-        $sucursalId = $cajeroSolicitante?->sucursal_id;
+        $sucursalId = $cajeroSolicitante?->sucursal_id ?? $conciliacion->distribuidora?->sucursal_id;
 
         if ($request->accion === 'rechazar') {
+            $motivo = $request->motivo ?: ($request->observaciones ?: 'Rechazada por la Gerencia');
+            $estadoAnterior = $conciliacion->estado;
+
             $conciliacion->update([
                 'estado' => 'rechazada',
                 'autorizador_id' => $gerente->id,
-                'notas_resolucion' => $request->observaciones ?? 'Rechazada por la Gerencia',
+                'autorizador_rol' => $gerente->rol?->nombre ?? 'Gerente',
+                'resolved_at' => now(),
+                'observaciones_resolucion' => $motivo,
+                'notas_resolucion' => $motivo,
             ]);
+
+            $solicitud = \App\Models\SolicitudAutorizacion::where('entidad_id', $conciliacion->id)->first();
+            if ($solicitud) {
+                $solicitud->rechazar($gerente, $motivo, $request->observaciones);
+            }
 
             // Notificar al cajero
             if ($cajeroSolicitante) {
@@ -714,7 +726,7 @@ class GerenteSucursalController extends Controller
                     $cajeroSolicitante->id,
                     'conciliacion_rechazada_gerencia',
                     'Conciliación Manual Rechazada por Gerencia',
-                    "La Gerencia ({$gerente->name}) ha rechazado tu solicitud de conciliación (Ref: {$conciliacion->referencia_conciliacion}). Nota: " . ($request->observaciones ?? 'Sin notas.')
+                    "La Gerencia ({$gerente->name}) ha rechazado tu solicitud de conciliación (Ref: {$conciliacion->referencia_conciliacion}). Motivo: {$motivo}"
                 );
             }
 
@@ -728,15 +740,30 @@ class GerenteSucursalController extends Controller
                 \App\Models\NotificacionCajero::enviar(
                     $coord->id,
                     'conciliacion_rechazada_gerencia',
-                    'Conciliación Pre-Aprobada fue Rechazada por Gerencia',
-                    "La Gerencia ({$gerente->name}) rechazó la conciliación que habías pre-aprobado (Ref: {$conciliacion->referencia_conciliacion})."
+                    'Conciliación fue Rechazada por Gerencia',
+                    "La Gerencia ({$gerente->name}) rechazó la conciliación (Ref: {$conciliacion->referencia_conciliacion})."
                 );
             }
 
+            // Log de Auditoría 2: Validación / Rechazo de la Conciliación
             \App\Services\AuditService::registrar(
-                'RECHAZAR_CONCILIACION',
-                "Gerencia rechaza conciliación manual (Ref: {$conciliacion->referencia_conciliacion})",
-                ['conciliacion_id' => $conciliacion->id, 'observaciones' => $request->observaciones]
+                'CONCILIACION_VALIDADA',
+                "Conciliación #{$conciliacion->id} RECHAZADA por {$gerente->name} ({$gerente->rol?->nombre})",
+                [
+                    'entidad_tipo' => 'conciliaciones',
+                    'entidad_id' => $conciliacion->id,
+                    'autorizador_id' => $gerente->id,
+                    'autorizador_rol' => $gerente->rol?->nombre ?? 'Gerente',
+                    'sucursal_id' => $gerente->sucursal_id ?? $sucursalId,
+                    'antes' => [
+                        'estado' => $estadoAnterior,
+                    ],
+                    'despues' => [
+                        'estado' => 'rechazada',
+                        'accion' => 'rechazada',
+                        'motivo_rechazo' => $motivo,
+                    ],
+                ]
             );
 
             return back()->with('info', 'La conciliación ha sido rechazada y se han enviado las notificaciones correspondientes.');
@@ -744,44 +771,36 @@ class GerenteSucursalController extends Controller
 
         // APROBAR CONCILIACIÓN
         \Illuminate\Support\Facades\DB::transaction(function () use ($conciliacion, $gerente, $request, $cajeroSolicitante, $sucursalId) {
+            $estadoAnterior = $conciliacion->estado;
+            $observaciones = $request->observaciones ?: 'Aprobada por Gerencia ' . $gerente->name;
+
             $conciliacion->update([
                 'estado' => 'conciliado',
                 'autorizador_id' => $gerente->id,
+                'autorizador_rol' => $gerente->rol?->nombre ?? 'Gerente',
                 'conciliado_por_user_id' => $gerente->id,
                 'conciliado_at' => now(),
-                'notas_resolucion' => $request->observaciones ?? 'Aprobada por Gerencia ' . $gerente->name,
+                'resolved_at' => now(),
+                'observaciones_resolucion' => $observaciones,
+                'notas_resolucion' => $observaciones,
             ]);
 
-            // Si la conciliación está ligada a un pago existente, actualizar el monto abonado
-            if ($conciliacion->pago_prestamo_id && $conciliacion->pagoPrestamo) {
-                $pago = $conciliacion->pagoPrestamo;
-                $diferencia = floatval($conciliacion->monto_corregido) - floatval($pago->monto_abonado);
-
-                $pago->update([
-                    'monto_abonado' => $conciliacion->monto_corregido,
-                    'observaciones' => ($pago->observaciones ? $pago->observaciones . ' | ' : '') . "Conciliado por {$gerente->name} (Ref: {$conciliacion->referencia_conciliacion})",
-                ]);
-
-                if ($pago->prestamo && $diferencia != 0) {
-                    $pago->prestamo->decrement('adeudo_pendiente', $diferencia);
-                    $pago->prestamo->increment('pagos_recibidos', $diferencia);
-                }
-            } elseif ($conciliacion->distribuidora_id && $conciliacion->distribuidora) {
-                // Conciliación de abono directo de distribuidora
-                $diferencia = floatval($conciliacion->monto_corregido) - floatval($conciliacion->monto_original);
-                if ($diferencia != 0) {
-                    $corteService = app(\App\Services\CorteCobranzaService::class);
-                    $corteService->actualizarRelacionPorAbono($conciliacion->distribuidora, $diferencia);
-                }
+            $solicitud = \App\Models\SolicitudAutorizacion::where('entidad_id', $conciliacion->id)->first();
+            if ($solicitud) {
+                $solicitud->aprobar($gerente, $observaciones);
             }
+
+            // Aplicar motor de retroactividad multi-vale
+            $corteService = app(\App\Services\CorteCobranzaService::class);
+            $corteService->aplicarConciliacionAprobada($conciliacion, $gerente);
 
             // Notificar al Cajero Solicitante
             if ($cajeroSolicitante) {
                 \App\Models\NotificacionCajero::enviar(
                     (string) $cajeroSolicitante->id,
                     'conciliacion_aprobada',
-                    '🎉 Conciliación Manual Aprobada',
-                    "La Gerencia ({$gerente->name}) ha autorizado la conciliación manual (Ref: {$conciliacion->referencia_conciliacion}) por \${$conciliacion->monto_corregido}."
+                    'Conciliación Manual Aprobada',
+                    "La Gerencia ({$gerente->name}) ha autorizado la conciliación (Ref: {$conciliacion->referencia_conciliacion}) por $" . number_format($conciliacion->monto_corregido, 2) . "."
                 );
             }
 
@@ -795,12 +814,12 @@ class GerenteSucursalController extends Controller
                 \App\Models\NotificacionCajero::enviar(
                     (string) $coord->id,
                     'conciliacion_aprobada',
-                    'Conciliación Pre-Aprobada Autorizada por Gerencia',
-                    "La Gerencia ({$gerente->name}) autorizó definitivamente la conciliación (Ref: {$conciliacion->referencia_conciliacion}) por \${$conciliacion->monto_corregido}."
+                    'Conciliación Autorizada por Gerencia',
+                    "La Gerencia ({$gerente->name}) autorizó la conciliación (Ref: {$conciliacion->referencia_conciliacion}) por $" . number_format($conciliacion->monto_corregido, 2) . "."
                 );
             }
 
-            // Notificar al OTRO Gerente (Si aprobó el Gerente de Sucursal, notificar al Gerente General y viceversa)
+            // Notificar al OTRO Gerente
             if ($gerente->esGerenteSucursal()) {
                 $gerentesGenerales = User::whereHas('rol', fn($q) => $q->whereIn('nombre', ['Gerente General', 'gerente general', 'Administrador', 'administrador']))
                     ->where('activo', true)
@@ -811,7 +830,7 @@ class GerenteSucursalController extends Controller
                         (string) $gg->id,
                         'conciliacion_resuelta_otra_gerencia',
                         'Conciliación Resuelta por Gerente de Sucursal',
-                        "El Gerente de Sucursal {$gerente->name} aprobó la conciliación (Ref: {$conciliacion->referencia_conciliacion}) por \${$conciliacion->monto_corregido}."
+                        "El Gerente de Sucursal {$gerente->name} aprobó la conciliación (Ref: {$conciliacion->referencia_conciliacion}) por $" . number_format($conciliacion->monto_corregido, 2) . "."
                     );
                 }
             } else {
@@ -825,18 +844,223 @@ class GerenteSucursalController extends Controller
                         (string) $gs->id,
                         'conciliacion_resuelta_otra_gerencia',
                         'Conciliación Resuelta por Gerencia General',
-                        "La Gerencia General ({$gerente->name}) aprobó la conciliación de tu sucursal (Ref: {$conciliacion->referencia_conciliacion}) por \${$conciliacion->monto_corregido}."
+                        "La Gerencia General ({$gerente->name}) aprobó la conciliación de tu sucursal (Ref: {$conciliacion->referencia_conciliacion}) por $" . number_format($conciliacion->monto_corregido, 2) . "."
                     );
                 }
             }
 
+            // Log de Auditoría 2: Validación / Aprobación de la Conciliación
             \App\Services\AuditService::registrar(
-                'APROBAR_CONCILIACION',
-                "Gerencia aprueba conciliación manual (Ref: {$conciliacion->referencia_conciliacion}) por \${$conciliacion->monto_corregido}",
-                ['conciliacion_id' => $conciliacion->id, 'monto_corregido' => $conciliacion->monto_corregido]
+                'CONCILIACION_VALIDADA',
+                "Conciliación #{$conciliacion->id} APROBADA por {$gerente->name} ({$gerente->rol?->nombre})",
+                [
+                    'entidad_tipo' => 'conciliaciones',
+                    'entidad_id' => $conciliacion->id,
+                    'autorizador_id' => $gerente->id,
+                    'autorizador_rol' => $gerente->rol?->nombre ?? 'Gerente',
+                    'sucursal_id' => $gerente->sucursal_id ?? $sucursalId,
+                    'antes' => [
+                        'estado' => $estadoAnterior,
+                    ],
+                    'despues' => [
+                        'estado' => 'conciliado',
+                        'accion' => 'aprobada',
+                        'observaciones' => $observaciones,
+                        'monto_conciliado' => $conciliacion->monto_corregido,
+                        'fecha_pago' => $conciliacion->fecha_pago?->toDateString(),
+                        'prestamos_asignados' => $conciliacion->prestamos_asignados,
+                    ],
+                ]
             );
         });
 
         return back()->with('success', "La conciliación manual ha sido autorizada y aplicada exitosamente.");
+    }
+
+    /**
+     * Módulo exclusivo de Conciliaciones para Gerencia (General y Sucursal).
+     */
+    public function indexConciliacionesGerencia(Request $request)
+    {
+        $operador = Auth::user();
+        if (!$operador->esGerenteGeneral() && !$operador->esGerenteSucursal() && !$operador->esAdministrador()) {
+            abort(403, 'No tienes permisos para acceder a las conciliaciones de gerencia.');
+        }
+
+        $sucursalId = $operador->esGerenteSucursal() ? $operador->sucursal_id : $request->get('sucursal_id');
+
+        $query = \App\Models\Conciliacion::with([
+            'solicitante.sucursal',
+            'distribuidora.sucursal',
+            'prestamo.cliente',
+            'autorizador',
+            'conciliadoPor',
+        ]);
+
+        if ($operador->esGerenteSucursal()) {
+            $query->where(function($q) use ($sucursalId) {
+                $q->whereHas('solicitante', fn($s) => $s->where('sucursal_id', $sucursalId))
+                  ->orWhereHas('distribuidora', fn($d) => $d->where('sucursal_id', $sucursalId));
+            });
+        } elseif ($sucursalId) {
+            $query->where(function($q) use ($sucursalId) {
+                $q->whereHas('solicitante', fn($s) => $s->where('sucursal_id', $sucursalId))
+                  ->orWhereHas('distribuidora', fn($d) => $d->where('sucursal_id', $sucursalId));
+            });
+        }
+
+        // Filtro de búsqueda
+        if ($buscar = trim($request->get('buscar', ''))) {
+            $query->where(function($q) use ($buscar) {
+                $q->where('referencia_original', 'like', "%{$buscar}%")
+                  ->orWhere('referencia_conciliacion', 'like', "%{$buscar}%")
+                  ->orWhere('motivo', 'like', "%{$buscar}%")
+                  ->orWhereHas('solicitante', fn($s) => $s->where('name', 'like', "%{$buscar}%"))
+                  ->orWhereHas('distribuidora', fn($d) => $d->where('name', 'like', "%{$buscar}%"))
+                  ->orWhereHas('prestamo', fn($p) => $p->where('referencia', 'like', "%{$buscar}%"));
+            });
+        }
+
+        // Filtro de estado / pestaña
+        $filtroEstado = $request->get('estado', 'pendientes');
+        if ($filtroEstado === 'pendientes') {
+            $query->whereIn('estado', ['pendiente_gerencia', 'pendiente_coordinador', 'pendiente']);
+        } elseif ($filtroEstado === 'conciliadas' || $filtroEstado === 'aprobadas') {
+            $query->where('estado', 'conciliado');
+        } elseif ($filtroEstado === 'rechazadas') {
+            $query->where('estado', 'rechazada');
+        }
+
+        $conciliaciones = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
+
+        // Conteos estadísticos
+        $baseCounts = \App\Models\Conciliacion::query();
+        if ($operador->esGerenteSucursal()) {
+            $baseCounts->where(function($q) use ($sucursalId) {
+                $q->whereHas('solicitante', fn($s) => $s->where('sucursal_id', $sucursalId))
+                  ->orWhereHas('distribuidora', fn($d) => $d->where('sucursal_id', $sucursalId));
+            });
+        }
+
+        $conteos = [
+            'pendientes' => (clone $baseCounts)->whereIn('estado', ['pendiente_gerencia', 'pendiente_coordinador', 'pendiente'])->count(),
+            'conciliadas' => (clone $baseCounts)->where('estado', 'conciliado')->count(),
+            'rechazadas' => (clone $baseCounts)->where('estado', 'rechazada')->count(),
+            'todas' => (clone $baseCounts)->count(),
+            'monto_pendiente' => (clone $baseCounts)->whereIn('estado', ['pendiente_gerencia', 'pendiente_coordinador', 'pendiente'])->sum('monto_corregido'),
+        ];
+
+        $sucursales = \App\Models\Sucursal::where('activo', true)->orderBy('nombre')->get();
+
+        return view('gerente.conciliaciones.index', compact('operador', 'conciliaciones', 'conteos', 'filtroEstado', 'sucursales', 'sucursalId'));
+    }
+
+    /**
+     * Ver detalle de una conciliación desde la perspectiva de Gerencia.
+     */
+    public function showConciliacionGerencia(\App\Models\Conciliacion $conciliacion)
+    {
+        $operador = Auth::user();
+        if (!$operador->esGerenteGeneral() && !$operador->esGerenteSucursal() && !$operador->esAdministrador()) {
+            abort(403, 'No estás autorizado para ver este detalle.');
+        }
+
+        if ($operador->esGerenteSucursal()) {
+            $sucursalId = $operador->sucursal_id;
+            $solicitanteSucursal = $conciliacion->solicitante?->sucursal_id;
+            $distribuidoraSucursal = $conciliacion->distribuidora?->sucursal_id;
+            if ($solicitanteSucursal != $sucursalId && $distribuidoraSucursal != $sucursalId) {
+                abort(403, 'Esta conciliación pertenece a otra sucursal.');
+            }
+        }
+
+        $conciliacion->load(['solicitante.sucursal', 'distribuidora.sucursal', 'prestamo.cliente', 'autorizador', 'conciliadoPor', 'pagoPrestamo']);
+        
+        $logs = \App\Models\AuditLog::where('entidad_tipo', 'conciliaciones')
+            ->where('entidad_id', $conciliacion->id)
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        return view('gerente.conciliaciones.show', compact('operador', 'conciliacion', 'logs'));
+    }
+
+    /**
+     * Servir / Visualizar de forma segura y autorizada el archivo o comprobante de la conciliación.
+     */
+    public function verArchivoConciliacion(\App\Models\Conciliacion $conciliacion)
+    {
+        $operador = Auth::user();
+        if (!$operador) {
+            abort(401, 'Usuario no autenticado.');
+        }
+
+        // Validación de permisos por rol
+        if ($operador->esGerenteSucursal()) {
+            $sucursalId = $operador->sucursal_id;
+            $solicitanteSucursal = $conciliacion->solicitante?->sucursal_id;
+            $distribuidoraSucursal = $conciliacion->distribuidora?->sucursal_id;
+            if ($solicitanteSucursal != $sucursalId && $distribuidoraSucursal != $sucursalId) {
+                abort(403, 'Esta conciliación pertenece a otra sucursal.');
+            }
+        } elseif ($operador->esCajero()) {
+            if ($conciliacion->solicitante_id !== $operador->id && $conciliacion->solicitante?->sucursal_id !== $operador->sucursal_id) {
+                abort(403, 'No tienes permiso para ver el comprobante de esta conciliación.');
+            }
+        } elseif ($operador->esCoordinador()) {
+            $sucursalId = $operador->sucursal_id;
+            $solicitanteSucursal = $conciliacion->solicitante?->sucursal_id;
+            $distribuidoraSucursal = $conciliacion->distribuidora?->sucursal_id;
+            if ($solicitanteSucursal != $sucursalId && $distribuidoraSucursal != $sucursalId) {
+                abort(403, 'Esta conciliación pertenece a otra sucursal.');
+            }
+        } elseif (!$operador->esGerenteGeneral() && !$operador->esAdministrador()) {
+            abort(403, 'No tienes permiso para ver este archivo.');
+        }
+
+        $path = $conciliacion->evidencia_path ?: $conciliacion->comprobante_path;
+
+        if (!$path) {
+            return back()->with('error', 'Esta conciliación no cuenta con un archivo o comprobante adjunto.');
+        }
+
+        // Buscar en los diferentes discos y ubicaciones del servidor
+        $candidatePaths = [
+            storage_path('app/public/' . $path),
+            storage_path('app/private/' . $path),
+            storage_path('app/' . $path),
+            public_path('storage/' . $path),
+        ];
+
+        foreach ($candidatePaths as $fullPath) {
+            if (file_exists($fullPath) && is_file($fullPath)) {
+                $mime = mime_content_type($fullPath) ?: 'application/octet-stream';
+                return response()->file($fullPath, [
+                    'Content-Type' => $mime,
+                    'Content-Disposition' => 'inline; filename="' . basename($fullPath) . '"',
+                ]);
+            }
+        }
+
+        // Probar con Storage facades
+        $defaultDisk = config('filesystems.default', 'public');
+        if (\Illuminate\Support\Facades\Storage::disk($defaultDisk)->exists($path)) {
+            return \Illuminate\Support\Facades\Storage::disk($defaultDisk)->response($path, basename($path), [
+                'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
+            ]);
+        }
+
+        if ($defaultDisk !== 'public' && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+            return \Illuminate\Support\Facades\Storage::disk('public')->response($path, basename($path), [
+                'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
+            ]);
+        }
+
+        if ($defaultDisk !== 'local' && \Illuminate\Support\Facades\Storage::disk('local')->exists($path)) {
+            return \Illuminate\Support\Facades\Storage::disk('local')->response($path, basename($path), [
+                'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
+            ]);
+        }
+
+        return back()->with('error', 'El archivo adjunto no fue encontrado en el servidor de almacenamiento.');
     }
 }

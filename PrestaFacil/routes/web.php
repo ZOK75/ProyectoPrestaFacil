@@ -128,8 +128,8 @@ Route::middleware(['auth'])->group(function () {
 
         // Configuración General del Sistema (Lectura para Administrador, Edición solo Gerente General)
         Route::get('configuracion-general', [ConfiguracionController::class, 'edit'])->name('configuracion-general.edit');
-        Route::put('configuracion-general', [ConfiguracionController::class, 'update'])->middleware('require.vpn')->name('configuracion-general.update');
-        Route::post('configuracion-general/simular-corte', [ConfiguracionController::class, 'simularCorte'])->middleware('require.vpn')->name('configuracion-general.simular-corte');
+        Route::put('configuracion-general', [ConfiguracionController::class, 'update'])->name('configuracion-general.update');
+        Route::post('configuracion-general/simular-corte', [ConfiguracionController::class, 'simularCorte'])->name('configuracion-general.simular-corte');
     });
 
     // ──────────────────────────────────────────
@@ -176,7 +176,6 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('require.vpn')
             ->name('gerente-sucursal.transferencias.decidir');
         Route::post('/gerente/conciliaciones/{conciliacion}/decidir', [GerenteSucursalController::class, 'decidirConciliacionGerencia'])
-            ->middleware('require.vpn')
             ->name('gerente.conciliaciones.decidir');
     });
 
@@ -206,7 +205,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:verificador'])->prefix('verificador')->name('verificador.')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\VerificadorController::class, 'dashboard'])->name('dashboard');
         Route::get('/solicitudes/{solicitud}', [\App\Http\Controllers\VerificadorController::class, 'showSolicitud'])->name('solicitudes.show');
-        Route::post('/solicitudes/{solicitud}/procesar', [\App\Http\Controllers\VerificadorController::class, 'procesarSolicitud'])->middleware('require.vpn')->name('solicitudes.procesar');
+        Route::post('/solicitudes/{solicitud}/procesar', [\App\Http\Controllers\VerificadorController::class, 'procesarSolicitud'])->name('solicitudes.procesar');
     });
 
     // 6. Procesamiento de incremento de crédito, cambio de categoría y creación de cuenta de distribuidor
@@ -315,12 +314,13 @@ Route::middleware(['auth'])->group(function () {
     // ──────────────────────────────────────────
     // 9. PRÉSTAMOS, VALES Y COBRANZA (Distribuidores, Cajeros y Administrador)
     // ──────────────────────────────────────────
-    Route::middleware(['role:distribuidor,cajero,administrador,gerente_general,gerente_de_sucursal'])->group(function () {
+    Route::middleware(['role:distribuidor,cajero,administrador,gerente_general,gerente_de_sucursal,coordinador,verificador'])->group(function () {
         Route::get('prestamos-relacion-pdf/{corte_id?}', [PrestamoController::class, 'relacionCobranza'])->name('prestamos.relacion-pdf');
+        Route::get('prestamos/{prestamo}', [PrestamoController::class, 'show'])->name('prestamos.show');
     });
 
     Route::middleware(['role:distribuidor,cajero,administrador'])->group(function () {
-        Route::resource('prestamos', PrestamoController::class);
+        Route::resource('prestamos', PrestamoController::class)->except(['show']);
         Route::get('prestamos/{prestamo}/pago', [PrestamoController::class, 'pagoForm'])->name('prestamos.pago');
         Route::post('prestamos/{prestamo}/pago', [PrestamoController::class, 'registrarPago'])->name('prestamos.pago.store');
     });

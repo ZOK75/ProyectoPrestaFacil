@@ -50,8 +50,8 @@ class PrestamoController extends Controller
     {
         $operador = $this->operador();
 
-        if ($redirect = $this->verificarBloqueoGerencial($operador)) {
-            return $redirect;
+        if ($operador && ($operador->esGerenteGeneral() || $operador->esGerenteSucursal())) {
+            return redirect()->route('dashboard');
         }
 
         // Ejecución automática reactiva con hora del servidor
@@ -285,8 +285,11 @@ class PrestamoController extends Controller
     {
         $operador = $this->operador();
 
-        if ($redirect = $this->verificarBloqueoGerencial($operador)) {
-            return $redirect;
+        if ($operador && $operador->esGerenteSucursal()) {
+            $creador = $prestamo->createdBy;
+            if ($creador && $creador->sucursal_id && $creador->sucursal_id !== $operador->sucursal_id) {
+                abort(403, 'Acceso denegado: Este vale pertenece a otra sucursal.');
+            }
         }
 
         $prestamo->load(['cliente', 'productoVale', 'pagos.registradoPor', 'createdBy']);

@@ -97,13 +97,35 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $user = $request->user();
+        $datosAntes = $user->makeHidden(['password', 'remember_token'])->toArray();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        $user->fill($request->validated());
+
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
         }
 
-        $request->user()->save();
+        $user->save();
+        $datosDespues = $user->fresh()->makeHidden(['password', 'remember_token'])->toArray();
+
+        $resumenCambios = \App\Services\AuditService::describirCambiosUsuario($datosAntes, $datosDespues, $request->validated());
+
+        \App\Services\AuditService::registrar(
+            'ACTUALIZACION_PERFIL',
+            "Usuario '{$user->name}' actualizó sus datos de perfil" . $resumenCambios['texto'],
+            [
+                'entidad_tipo' => 'users',
+                'entidad_id' => $user->id,
+                'user_id' => $user->id,
+                'user_rol' => $user->rol?->nombre,
+                'sucursal_id' => $user->sucursal_id,
+                'antes' => $datosAntes,
+                'despues' => $datosDespues,
+                'detalle_cambios' => $resumenCambios['cambios'],
+                'resumen_modificaciones' => $resumenCambios['detalles'],
+            ]
+        );
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }

@@ -3145,4 +3145,48 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $resArchivoGS = $this->actingAs($gerenteSucursal)->get(route('conciliaciones.archivo', $conciliacion));
         $resArchivoGS->assertStatus(200);
     }
+
+    public function test_log_de_corte_registra_fechas_de_corte_y_limite(): void
+    {
+        $rolGG = Rol::firstOrCreate(['nombre' => 'Gerente General']);
+        $gerenteGeneral = User::factory()->create([
+            'rol_id' => $rolGG->id,
+            'sucursal_id' => $this->sucursal->id,
+            'name' => 'Roberto Gerente',
+            'activo' => true,
+        ]);
+
+        $config = \App\Models\Configuracion::firstOrCreate([], [
+            'dia_corte' => 15,
+            'dia_limite_pago' => 20,
+            'hora_corte' => '22:00:00',
+            'fecha_corte' => now()->addDays(2),
+            'fecha_limite_pago' => now()->addDays(7),
+        ]);
+
+        $response = $this->actingAs($gerenteGeneral)->post(route('configuracion-general.simular-corte'));
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('audit_logs', [
+            'tipo_operacion' => 'SIMULACION_CORTE',
+            'user_id' => $gerenteGeneral->id,
+        ]);
+
+        $log = \App\Models\AuditLog::where('tipo_operacion', 'SIMULACION_CORTE')
+            ->where('user_id', $gerenteGeneral->id)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($log);
+        $this->assertStringContainsString('Roberto Gerente', $log->descripcion);
+        $this->assertStringContainsString('Fecha de Corte:', $log->descripcion);
+        $this->assertStringContainsString('Fecha Límite de Pago:', $log->descripcion);
+        $this->assertStringContainsString('Próximo Ciclo:', $log->descripcion);
+
+        $this->assertNotNull($log->datos_despues['fecha_corte']);
+        $this->assertNotNull($log->datos_despues['fecha_limite_pago']);
+        $this->assertNotNull($log->datos_despues['proxima_fecha_corte']);
+        $this->assertNotNull($log->datos_despues['proxima_fecha_limite']);
+    }
 }

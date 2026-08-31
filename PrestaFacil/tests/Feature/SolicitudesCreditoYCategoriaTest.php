@@ -164,6 +164,18 @@ class SolicitudesCreditoYCategoriaTest extends TestCase
         $this->assertEquals('plata', $distActualizado->categoria_distribuidor);
         $this->assertEquals(30000, $distActualizado->limite_credito);
         $this->assertEquals('REF-MOD-12345', $distActualizado->referencia_pago_distribuidor);
+
+        $log = \App\Models\AuditLog::where('tipo_operacion', 'ACTUALIZACION_USUARIO')
+            ->where('entidad_id', $distribuidor->id)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($log);
+        $this->assertStringContainsString('Maria Perez Modificada', $log->descripcion);
+        $this->assertStringContainsString("Nombre: [Antes: 'Maria Perez' -> Ahora: 'Maria Perez Modificada']", $log->descripcion);
+        $this->assertStringContainsString("Categoría: [Antes: 'cobre' -> Ahora: 'plata']", $log->descripcion);
+        $this->assertStringContainsString("Límite de Crédito: [Antes: '$20,000.00' -> Ahora: '$30,000.00']", $log->descripcion);
+        $this->assertStringContainsString("Referencia de Pago:", $log->descripcion);
     }
 
     public function test_coordinador_solicita_aumento_de_categoria_y_gerente_la_aprueba()

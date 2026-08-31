@@ -263,6 +263,9 @@ class UserController extends Controller
 
         $datosAntes = $usuario->makeHidden('password')->toArray();
         $usuario->update($data);
+        $datosDespues = $usuario->fresh()->makeHidden('password')->toArray();
+
+        $resumenCambios = AuditService::describirCambiosUsuario($datosAntes, $datosDespues, $request->validated());
 
         // Notificaciones automáticas si cambió límite de crédito o categoría de distribuidor
         if ($usuario->esDistribuidor()) {
@@ -305,7 +308,7 @@ class UserController extends Controller
 
         AuditService::registrar(
             'ACTUALIZACION_USUARIO',
-            "Usuario '{$usuario->name}' actualizado por " . ($operador->name ?? 'Usuario'),
+            "Usuario '{$usuario->name}' actualizado por " . ($operador->name ?? 'Usuario') . $resumenCambios['texto'],
             [
                 'entidad_tipo' => 'users',
                 'entidad_id' => $usuario->id,
@@ -313,7 +316,9 @@ class UserController extends Controller
                 'user_rol' => $operador->rol?->nombre,
                 'sucursal_id' => $usuario->sucursal_id,
                 'antes' => $datosAntes,
-                'despues' => $usuario->fresh()->makeHidden('password')->toArray(),
+                'despues' => $datosDespues,
+                'detalle_cambios' => $resumenCambios['cambios'],
+                'resumen_modificaciones' => $resumenCambios['detalles'],
             ]
         );
 

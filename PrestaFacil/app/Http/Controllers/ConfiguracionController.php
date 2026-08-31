@@ -143,17 +143,41 @@ class ConfiguracionController extends Controller
         $resultados = $corteService->simularSiguienteCorte();
         $config = Configuracion::actual();
 
+        $fechaCorteProcesada = $resultados['fecha_corte_procesada'] ?? now();
+        $fechaLimiteProcesada = $resultados['fecha_limite_procesada'] ?? $fechaCorteProcesada->copy()->addDays(5);
+        $proxFechaCorte = $resultados['proxima_fecha_corte'] ?? $config->fecha_corte;
+        $proxFechaLimite = $resultados['proxima_fecha_limite'] ?? $config->fecha_limite_pago;
+
+        $corteStr = $fechaCorteProcesada->format('d/m/Y H:i:s');
+        $limiteStr = $fechaLimiteProcesada ? $fechaLimiteProcesada->format('d/m/Y') : 'N/A';
+        $proxCorteStr = $proxFechaCorte ? $proxFechaCorte->format('d/m/Y H:i:s') : 'N/A';
+        $proxLimiteStr = $proxFechaLimite ? $proxFechaLimite->format('d/m/Y') : 'N/A';
+
         AuditService::registrar(
             'SIMULACION_CORTE',
-            "Simulación de corte quincenal ejecutada por {$operador->name} ({$resultados['multas_aplicadas']} multas aplicadas)",
+            "Simulación de corte quincenal ejecutada por {$operador->name} (Fecha de Corte: {$corteStr} | Fecha Límite de Pago: {$limiteStr}) - {$resultados['multas_aplicadas']} multas aplicadas | Próximo Ciclo: Corte {$proxCorteStr}, Límite {$proxLimiteStr}",
             [
                 'entidad_tipo' => 'configuraciones',
                 'user_id' => $operador->id,
                 'user_rol' => $operador->rol?->nombre,
                 'sucursal_id' => $operador->sucursal_id,
+                'fecha_corte' => $corteStr,
+                'fecha_limite_pago' => $limiteStr,
+                'proxima_fecha_corte' => $proxCorteStr,
+                'proxima_fecha_limite' => $proxLimiteStr,
+                'multas_aplicadas' => $resultados['multas_aplicadas'],
+                'cortes_procesados' => $resultados['cortes_procesados'],
+                'despues' => [
+                    'fecha_corte' => $corteStr,
+                    'fecha_limite_pago' => $limiteStr,
+                    'proxima_fecha_corte' => $proxCorteStr,
+                    'proxima_fecha_limite' => $proxLimiteStr,
+                    'multas_aplicadas' => $resultados['multas_aplicadas'],
+                    'cortes_procesados' => $resultados['cortes_procesados'],
+                ],
             ]
         );
 
-        return back()->with('success', "⚡ Corte quincenal simulado con éxito: Se acumularon las multas de los vales vencidos ({$resultados['multas_aplicadas']} multas aplicadas) y se avanzó el ciclo quincenal +15 días (Próximo corte: Día {$config->dia_corte} a las " . substr($config->hora_corte, 0, 5) . " hrs).");
+        return back()->with('success', "Corte quincenal procesado con éxito: Fecha de Corte ({$corteStr}), Fecha Límite de Pago ({$limiteStr}). Se acumularon las multas de los vales vencidos ({$resultados['multas_aplicadas']} multas aplicadas) y se avanzó el ciclo quincenal +15 días (Próximo corte: {$proxCorteStr}).");
     }
 }

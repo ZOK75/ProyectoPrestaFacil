@@ -465,9 +465,16 @@ class CorteCobranzaService
         $config = Configuracion::actual();
         $ahora = now();
 
+        $fechaCorteProcesada = ($config->fecha_corte && $config->fecha_corte->greaterThan($ahora)) ? $config->fecha_corte : $ahora;
+        $fechaLimiteProcesada = $config->fecha_limite_pago ?? $fechaCorteProcesada->copy()->addDays(5);
+
         $resultados = [
             'multas_aplicadas' => 0,
             'cortes_procesados' => 0,
+            'fecha_corte_procesada' => $fechaCorteProcesada,
+            'fecha_limite_procesada' => $fechaLimiteProcesada,
+            'proxima_fecha_corte' => null,
+            'proxima_fecha_limite' => null,
         ];
 
         DB::transaction(function () use ($config, $ahora, &$resultados) {
@@ -619,6 +626,9 @@ class CorteCobranzaService
                 'fecha_corte' => $nuevaFechaCorte,
                 'fecha_limite_pago' => $nuevaFechaLimite,
             ]);
+
+            $resultados['proxima_fecha_corte'] = $nuevaFechaCorte;
+            $resultados['proxima_fecha_limite'] = $nuevaFechaLimite;
 
             // 4. Inicializar la relación de cobranza limpia para el nuevo ciclo quincenal
             foreach ($distribuidoras as $dist) {

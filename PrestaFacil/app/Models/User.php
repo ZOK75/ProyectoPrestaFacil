@@ -558,7 +558,7 @@ class User extends Authenticatable
         NotificacionCajero::enviar(
             $this->id,
             'informativa',
-            '✅ Estado de Morosidad Retirado',
+            'Estado de Morosidad Retirado',
             "La Gerencia ha retirado la restricción de morosidad de tu cuenta. Ya puedes generar y asignar vales con normalidad."
         );
 

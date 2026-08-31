@@ -33,7 +33,7 @@
                         class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition">
                     <span class="w-2 h-2 rounded-full" :class="autoRefresh ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'"></span>
                     <span class="w-2 h-2 rounded-full absolute" :class="autoRefresh ? 'bg-emerald-400' : 'bg-slate-500'"></span>
-                    <span class="ml-2" x-text="autoRefresh ? 'EN VIVO (3s)' : 'PAUSADO'"></span>
+                    <span class="ml-2" x-text="autoRefresh ? 'EN VIVO (15s)' : 'PAUSADO'"></span>
                 </button>
 
                 <button @click="fetchLogs(true)" 
@@ -236,7 +236,7 @@
             tipoOperacion: '{{ request('tipo_operacion', '') }}',
             searchSystem: '{{ request('buscar_sistema', '') }}',
             levelSystem: '{{ request('nivel_sistema', '') }}',
-            auditLogs: @json($auditLogs->items() ?? []),
+            auditLogs: @json($auditLogs ?? []),
             systemLogs: @json($systemLogs ?? []),
             modalOpen: false,
             modalData: null,
@@ -269,7 +269,7 @@
                     if (this.autoRefresh && !this.modalOpen) {
                         this.fetchLogs(false);
                     }
-                }, 3000);
+                }, 15000);
             },
 
             toggleLive() {

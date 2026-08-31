@@ -43,7 +43,7 @@ class LogViewerController extends Controller
             });
         }
 
-        $auditLogs = $auditQuery->paginate(20, ['*'], 'audit_page')->withQueryString();
+        $auditLogs = $auditQuery->limit(3000)->get();
 
         // Tipos de operaciones únicas para el selector de filtro
         $tiposOperacion = AuditLog::select('tipo_operacion')
@@ -118,8 +118,8 @@ class LogViewerController extends Controller
                 'stack_trace' => $stackTrace,
             ];
 
-            // Límite de 100 registros para rendimiento óptimo
-            if (count($parsedLogs) >= 100) {
+            // Límite de 1000 registros para historial largo
+            if (count($parsedLogs) >= 1000) {
                 break;
             }
         }
@@ -155,7 +155,7 @@ class LogViewerController extends Controller
             });
         }
 
-        $auditLogs = $auditQuery->limit(35)->get()->map(function ($log) {
+        $auditLogs = $auditQuery->limit(3000)->get()->map(function ($log) {
             return [
                 'id' => (string) $log->id,
                 'fecha_hora' => $log->created_at->format('d/m/Y H:i:s'),
@@ -183,7 +183,7 @@ class LogViewerController extends Controller
 
         return response()->json([
             'audit_logs' => $auditLogs,
-            'system_logs' => array_slice($systemLogs, 0, 35),
+            'system_logs' => array_slice($systemLogs, 0, 1000),
             'timestamp' => now()->format('H:i:s'),
             'total_audit' => AuditLog::count(),
         ]);

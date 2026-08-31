@@ -116,15 +116,14 @@ Route::middleware(['auth'])->group(function () {
                 ->middleware('require.vpn')
                 ->name('gerente-general.coordinadores.traspaso.decidir-final');
             Route::post('/reasignar-gerente', [SucursalController::class, 'reasignarGerente'])
-                ->middleware('require.vpn')
                 ->name('gerente-general.reasignar-gerente');
         });
 
         // CRUD de Sucursales (Gerente General / Administrador)
         Route::get('sucursales', [SucursalController::class, 'index'])->name('sucursales.index');
-        Route::post('sucursales', [SucursalController::class, 'store'])->middleware('require.vpn')->name('sucursales.store');
-        Route::put('sucursales/{sucursal}', [SucursalController::class, 'update'])->middleware('require.vpn')->name('sucursales.update');
-        Route::patch('sucursales/{sucursal}/toggle-status', [SucursalController::class, 'toggleStatus'])->middleware('require.vpn')->name('sucursales.toggle-status');
+        Route::post('sucursales', [SucursalController::class, 'store'])->name('sucursales.store');
+        Route::put('sucursales/{sucursal}', [SucursalController::class, 'update'])->name('sucursales.update');
+        Route::patch('sucursales/{sucursal}/toggle-status', [SucursalController::class, 'toggleStatus'])->name('sucursales.toggle-status');
 
         // Configuración General del Sistema (Lectura para Administrador, Edición solo Gerente General)
         Route::get('configuracion-general', [ConfiguracionController::class, 'edit'])->name('configuracion-general.edit');
@@ -152,7 +151,6 @@ Route::middleware(['auth'])->group(function () {
     // Morosidad de Distribuidoras (Decisión EXCLUSIVA de Gerencia: General y Sucursal, NO Administrador)
     Route::middleware(['role:gerente_de_sucursal,gerente_general'])->group(function () {
         Route::post('distribuidores/{distribuidor}/decidir-morosidad', [GerenteSucursalController::class, 'decidirMorosidad'])
-            ->middleware('require.vpn')
             ->name('gerente.distribuidores.decidir-morosidad');
     });
 
@@ -287,12 +285,12 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:gerente_general,gerente_de_sucursal,administrador'])->group(function () {
         Route::get('usuarios', [UserController::class, 'index'])->name('usuarios.index');
         Route::get('usuarios/create', [UserController::class, 'create'])->name('usuarios.create');
-        Route::post('usuarios', [UserController::class, 'store'])->middleware('require.vpn')->name('usuarios.store');
+        Route::post('usuarios', [UserController::class, 'store'])->name('usuarios.store');
         Route::get('usuarios/{usuario}', [UserController::class, 'show'])->name('usuarios.show');
         Route::get('usuarios/{usuario}/edit', [UserController::class, 'edit'])->name('usuarios.edit');
-        Route::put('usuarios/{usuario}', [UserController::class, 'update'])->middleware('require.vpn')->name('usuarios.update');
-        Route::patch('usuarios/{usuario}', [UserController::class, 'update'])->middleware('require.vpn');
-        Route::delete('usuarios/{usuario}', [UserController::class, 'destroy'])->middleware('require.vpn')->name('usuarios.destroy');
+        Route::put('usuarios/{usuario}', [UserController::class, 'update'])->name('usuarios.update');
+        Route::patch('usuarios/{usuario}', [UserController::class, 'update']);
+        Route::delete('usuarios/{usuario}', [UserController::class, 'destroy'])->name('usuarios.destroy');
     });
 
 

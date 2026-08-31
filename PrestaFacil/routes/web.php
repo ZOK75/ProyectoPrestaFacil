@@ -204,7 +204,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:verificador'])->prefix('verificador')->name('verificador.')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\VerificadorController::class, 'dashboard'])->name('dashboard');
         Route::get('/solicitudes/{solicitud}', [\App\Http\Controllers\VerificadorController::class, 'showSolicitud'])->name('solicitudes.show');
-        Route::post('/solicitudes/{solicitud}/procesar', [\App\Http\Controllers\VerificadorController::class, 'procesarSolicitud'])->middleware('require.vpn')->name('solicitudes.procesar');
+        Route::post('/solicitudes/{solicitud}/procesar', [\App\Http\Controllers\VerificadorController::class, 'procesarSolicitud'])->name('solicitudes.procesar');
     });
 
     // 6. Procesamiento de incremento de crédito, cambio de categoría y creación de cuenta de distribuidor

@@ -209,6 +209,8 @@ class RealtimeNotificationsAndLogsTest extends TestCase
         $this->assertStringContainsString('Teléfono', $log->descripcion);
         $this->assertStringContainsString('Calle y Número', $log->descripcion);
         $this->assertStringContainsString('RFC', $log->descripcion);
+        $this->assertStringContainsString("Teléfono: [Antes: '5511223344' -> Ahora: '5599887766']", $log->descripcion);
+        $this->assertStringContainsString("Calle y Número: [Antes: 'Av Hidalgo 123' -> Ahora: 'Av Hidalgo 456 Int 2']", $log->descripcion);
 
         $this->assertEquals('5511223344', $log->datos_antes['campos']['telefono']);
         $this->assertEquals('5599887766', $log->datos_despues['campos']['telefono']);

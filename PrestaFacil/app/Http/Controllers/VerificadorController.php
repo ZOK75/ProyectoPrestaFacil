@@ -196,9 +196,15 @@ class VerificadorController extends Controller
             }
         }
 
-        $nombresCampos = array_column($cambios, 'campo');
-        $detalleModificaciones = count($cambios) > 0 
-            ? " (Campos modificados: " . implode(', ', $nombresCampos) . ")"
+        $detallesArray = [];
+        foreach ($cambios as $c) {
+            $valAntes = is_array($c['antes']) ? json_encode($c['antes'], JSON_UNESCAPED_UNICODE) : ($c['antes'] !== null && $c['antes'] !== '' ? (string)$c['antes'] : '(vacío)');
+            $valDespues = is_array($c['despues']) ? json_encode($c['despues'], JSON_UNESCAPED_UNICODE) : ($c['despues'] !== null && $c['despues'] !== '' ? (string)$c['despues'] : '(vacío)');
+            $detallesArray[] = "{$c['campo']}: [Antes: '{$valAntes}' -> Ahora: '{$valDespues}']";
+        }
+
+        $detalleModificaciones = count($detallesArray) > 0 
+            ? " (Campos modificados y contenido: " . implode(', ', $detallesArray) . ")"
             : " (Sin cambios a los datos originales)";
 
         AuditService::registrar(
@@ -221,6 +227,7 @@ class VerificadorController extends Controller
                     'estado' => 'en espera',
                     'campos' => $datosDespues,
                     'detalle_cambios' => $cambios,
+                    'resumen_modificaciones' => $detallesArray,
                 ],
             ]
         );

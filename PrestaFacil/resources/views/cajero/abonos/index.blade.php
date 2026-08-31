@@ -167,15 +167,21 @@
                                         $multaPrestamo += floatval($fp['recargos']);
                                     }
                                     $cuotaNetaVale = max(0.0, $totalExigibleVale - $multaPrestamo);
+
+                                    $numCortesAtrasados = max(0, count($filasPrestamo) - 1);
+                                    $comisionPorQuincena = count($filasPrestamo) > 0 ? ($comisionVale / count($filasPrestamo)) : $prestamo->comisionDistribuidorPorQuincena();
+                                    $comisionesPerdidas = ($numCortesAtrasados > 0 && $multaPrestamo > 0) ? ($numCortesAtrasados * $comisionPorQuincena) : 0.0;
                                 } else {
                                     $cuotaBrutaVale = floatval($prestamo->cuota_quincenal);
                                     $comisionVale = $prestamo->comisionDistribuidorPorQuincena();
                                     $multaPrestamo = floatval($prestamo->multas ?? 0.0);
                                     $totalExigibleVale = $prestamo->totalExigibleQuincenalNeto();
                                     $cuotaNetaVale = max(0.0, $cuotaBrutaVale - $comisionVale);
+                                    $comisionesPerdidas = 0.0;
                                 }
 
                                 $saldoCapital = floatval($prestamo->adeudo_pendiente);
+                                $saldoTotalPendiente = $saldoCapital + $multaPrestamo + $comisionesPerdidas;
                             @endphp
                             <div class="bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
                                 <div class="space-y-0.5">
@@ -186,7 +192,7 @@
                                     <div class="text-[11px] text-slate-400">
                                         Producto: <strong class="text-slate-300">{{ $prestamo->productoVale?->nombre ?? 'Vale Estándar' }}</strong>
                                         @if($multaPrestamo > 0)
-                                            &bull; <span class="text-rose-400 font-bold font-mono">Recargos: ${{ number_format($multaPrestamo, 2) }}</span>
+                                             &bull; <span class="text-rose-400 font-bold font-mono">Recargos: ${{ number_format($multaPrestamo, 2) }}</span>
                                         @endif
                                     </div>
                                 </div>
@@ -201,7 +207,7 @@
                                                 <span class="text-rose-400 font-bold"> + ${{ number_format($multaPrestamo, 2) }} recargos</span>
                                             @endif
                                         </div>
-                                        <div class="text-[10px] text-slate-500 font-mono">Saldo pendiente: ${{ number_format($saldoCapital, 2) }}</div>
+                                        <div class="text-[10px] text-slate-500 font-mono">Saldo pendiente: ${{ number_format($saldoTotalPendiente, 2) }}</div>
                                     </div>
 
                                     <button type="button"
@@ -215,7 +221,7 @@
                                                 comision: {{ $comisionVale }},
                                                 cuotaNeta: {{ $cuotaNetaVale }},
                                                 multas: {{ $multaPrestamo }},
-                                                saldo: {{ $saldoCapital }},
+                                                saldo: {{ $saldoTotalPendiente }},
                                                 totalExigible: {{ $totalExigibleVale }}
                                             }; pagoValeModalOpen = true"
                                             class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/20 transition flex items-center gap-1">

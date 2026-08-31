@@ -90,7 +90,7 @@ class VpnAuthorizationSuiteTest extends TestCase
             'datos_casa' => 'Propia',
             'coordinador_id' => $verificador->id,
             'sucursal_id' => $verificador->sucursal_id,
-            'estado' => 'en espera',
+            'estado' => 'en espera de verificacion',
         ]);
 
         $response = $this->actingAs($verificador)

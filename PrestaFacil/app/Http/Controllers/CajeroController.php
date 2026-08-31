@@ -496,14 +496,26 @@ class CajeroController extends Controller
             return back()->with('error', 'Límite de un solo abono debe ser menor a 1 millón.')->withInput();
         }
 
-        $totalMaximoPermitido = floatval($prestamo->adeudo_pendiente) + floatval($prestamo->multas ?? 0);
+        $distribuidora = $prestamo->createdBy;
+        $fechaInicioPrestamo = $prestamo->entregado_at ?? $prestamo->created_at;
+        $cortesPosteriores = 0;
+        if ($distribuidora && $fechaInicioPrestamo) {
+            $cortesPosteriores = \App\Models\RelacionCobranza::where('distribuidora_id', $distribuidora->id)
+                ->whereNotNull('fecha_corte')
+                ->where('fecha_corte', '<=', now())
+                ->where('fecha_corte', '>=', $fechaInicioPrestamo)
+                ->count();
+        }
+        $comisionPerdidaUnit = $prestamo->comisionDistribuidorPorQuincena();
+        $comisionesPerdidas = ($cortesPosteriores > 0 && floatval($prestamo->multas) > 0) ? ($cortesPosteriores * $comisionPerdidaUnit) : 0.0;
+
+        $totalMaximoPermitido = floatval($prestamo->adeudo_pendiente) + floatval($prestamo->multas ?? 0) + $comisionesPerdidas;
         if (floatval($request->monto_abonado) > ($totalMaximoPermitido + 0.01)) {
             return back()->with('error', "El abono ingresado (\$" . number_format($request->monto_abonado, 2) . ") excede el adeudo total pendiente del vale (\$" . number_format($totalMaximoPermitido, 2) . ").")->withInput();
         }
 
         $cajera = $this->cajera();
         $ahora = now();
-        $distribuidora = $prestamo->createdBy;
 
         DB::transaction(function () use ($prestamo, $request, $cajera, $ahora, $distribuidora) {
             $montoRestante = floatval($request->monto_abonado);

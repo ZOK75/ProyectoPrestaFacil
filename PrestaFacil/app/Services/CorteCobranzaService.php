@@ -853,10 +853,11 @@ class CorteCobranzaService
                         } elseif ($abonoEsteCorte > 0) {
                             $faltante = max(0.0, round($exigibleCorte - $abonoEsteCorte, 2));
                             $totalFila = $faltante;
-                            $adeudoArrastre = $faltante;
+                            $adeudoArrastre = $faltante + $comisionFila;
                         } else {
                             $totalFila = $exigibleCorte;
-                            $adeudoArrastre = $exigibleCorte;
+                            // Al vencerse sin pagar, se pierde el beneficio de comision en el arrastre
+                            $adeudoArrastre = $exigibleCorte + $comisionFila;
                         }
                     }
                 } else {

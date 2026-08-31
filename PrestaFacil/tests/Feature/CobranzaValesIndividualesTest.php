@@ -28,6 +28,7 @@ class CobranzaValesIndividualesTest extends TestCase
     {
         parent::setUp();
         \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-25 12:00:00'));
+        config(['app.vpn_required' => false]);
 
         $rolGG = Rol::firstOrCreate(['nombre' => 'Gerente General']);
         $rolCajero = Rol::firstOrCreate(['nombre' => 'Cajero']);

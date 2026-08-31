@@ -2722,4 +2722,94 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
 
         \Carbon\Carbon::setTestNow();
     }
+
+    public function test_pago_con_centavos_faltantes_o_sobrantes_se_iguala_y_no_genera_excedente_ni_mora()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-08-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        Configuracion::actual()->update([
+            'comision_oro' => 1.50,
+            'comision_plata' => 1.50,
+            'comision_cobre' => 1.50,
+            'multa_mora_distribuidora' => 300.00,
+            'fecha_corte' => $tiempoInicial->copy()->addDays(5),
+            'fecha_limite_pago' => $tiempoInicial->copy()->addDays(10),
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+        ]);
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+        ]);
+
+        $cliente = $this->crearClienteTest('Leo Test Centavos', $distribuidora);
+        $productoVale = ProductoVale::firstOrCreate(['clave' => 'VALE-8Q-CENT'], [
+            'nombre' => '5/8',
+            'monto_prestamo' => 10000.00,
+            'plazo_quincenas' => 8,
+            'cuota_quincenal' => 950.00,
+            'multa' => 300.00,
+            'comision_distribuidor' => 1.50,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VALE-LEO-CENT',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 10000.00,
+            'cuota_quincenal' => 950.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 7600.00,
+            'adeudo_pendiente' => 7600.00,
+            'multas' => 0,
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+            'created_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+        $filas = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertEquals(931.25, $filas[0]['total']);
+
+        // Caso 1: Debe 931.25 y abona 931.00 (faltan 0.25 centavos) -> se iguala y queda en 0.00
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 931.00,
+            'metodo_pago' => 'transferencia',
+        ]);
+
+        $filasDespues = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertEquals(0.00, $filasDespues[0]['total'], 'El pago de 931.00 sobre 931.25 debe igualarse a 0.00');
+
+        // Simular corte -> Al avanzar al segundo corte, NO debe generar multa ni adeudo
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(5));
+        $service->simularSiguienteCorte();
+
+        $prestamo->refresh();
+        $this->assertEquals(0.00, floatval($prestamo->multas), 'No debe generar recargos');
+
+        $relacion2 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)->where('estado_pago', 'pendiente')->latest('fecha_corte')->first();
+        $filasCorte2 = $service->generarFilasRelacionCobranza($distribuidora, $relacion2);
+        $this->assertCount(2, $filasCorte2);
+        $this->assertEquals(931.25, $filasCorte2[0]['total'], 'Corte 1 histórico queda en 931.25 (saldado)');
+        $this->assertEquals(931.25, $filasCorte2[1]['total'], 'Corte 2 activo es cuota normal 931.25 sin recargos');
+
+        // Caso 2: Paga 931.50 (sobran 0.25 centavos) -> los centavos no cuentan como excedente
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 931.50,
+            'metodo_pago' => 'transferencia',
+        ]);
+
+        $filasCorte2Pagado = $service->generarFilasRelacionCobranza($distribuidora, $relacion2);
+        $this->assertEquals(0.00, $filasCorte2Pagado[1]['total'], 'El pago de 931.50 sobre 931.25 no debe dejar saldo negativo ni excedente de centavos');
+
+        \Carbon\Carbon::setTestNow();
+    }
 }

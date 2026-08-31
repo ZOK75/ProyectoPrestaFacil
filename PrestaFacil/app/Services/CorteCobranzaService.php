@@ -279,7 +279,7 @@ class CorteCobranzaService
                             $totalAbonadoAlVale = floatval($prestamo->pagos()->sum('monto_abonado'));
                             $montoEsperadoAlCorriente = $cortesHastaEste * $cuotaNeta;
 
-                            $estaAlCorrienteEsteVale = $prestamo->estaPagado() || ($totalAbonadoAlVale >= ($montoEsperadoAlCorriente - 0.01));
+                            $estaAlCorrienteEsteVale = $prestamo->estaPagado() || (floor($totalAbonadoAlVale) >= floor($montoEsperadoAlCorriente)) || ($totalAbonadoAlVale >= ($montoEsperadoAlCorriente - 0.99));
 
                             if (!$estaAlCorrienteEsteVale) {
                                 $multaVale = $prestamo->multaConfigurada();
@@ -363,7 +363,8 @@ class CorteCobranzaService
 
         if (!$relacion) {
             $montoPagado = $montoAbonado;
-            $adeudoPendiente15nal = max(0.0, $total15nalExigible - $montoPagado);
+            $estaLiquidado = floor($montoPagado) >= floor($total15nalExigible) || abs($montoPagado - $total15nalExigible) < 0.99;
+            $adeudoPendiente15nal = $estaLiquidado ? 0.00 : max(0.0, $total15nalExigible - $montoPagado);
 
             $relacion = RelacionCobranza::create([
                 'distribuidora_id' => $distribuidora->id,
@@ -372,10 +373,10 @@ class CorteCobranzaService
                 'monto_total_periodo' => $total15nalExigible,
                 'monto_pagado' => $montoPagado,
                 'adeudo_pendiente' => $adeudoPendiente15nal,
-                'estado_pago' => $adeudoPendiente15nal <= 0 ? 'pago_anticipado' : 'pendiente',
+                'estado_pago' => $estaLiquidado ? 'pago_anticipado' : 'pendiente',
                 'puntos_ganados' => 0,
                 'puntos_descontados' => 0,
-                'liquidado_at' => $adeudoPendiente15nal <= 0 ? $ahora : null,
+                'liquidado_at' => $estaLiquidado ? $ahora : null,
             ]);
         } else {
             if (!$relacion->fecha_corte) {
@@ -384,10 +385,11 @@ class CorteCobranzaService
             }
             $relacion->monto_total_periodo = $total15nalExigible;
             $relacion->monto_pagado = floatval($relacion->monto_pagado) + $montoAbonado;
-            $adeudoPendiente15nal = max(0.0, $total15nalExigible - floatval($relacion->monto_pagado));
+            $estaLiquidado = floor(floatval($relacion->monto_pagado)) >= floor($total15nalExigible) || abs(floatval($relacion->monto_pagado) - $total15nalExigible) < 0.99;
+            $adeudoPendiente15nal = $estaLiquidado ? 0.00 : max(0.0, $total15nalExigible - floatval($relacion->monto_pagado));
             $relacion->adeudo_pendiente = $adeudoPendiente15nal;
 
-            if ($adeudoPendiente15nal <= 0 && $relacion->estado_pago === 'pendiente') {
+            if ($estaLiquidado && $relacion->estado_pago === 'pendiente') {
                 $relacion->estado_pago = 'pago_anticipado';
                 $relacion->liquidado_at = $ahora;
             }
@@ -500,7 +502,7 @@ class CorteCobranzaService
                     ->orderBy('fecha_corte', 'desc')
                     ->first();
 
-                $fueLiquidadoEsteCorte = ($relacionActual && ($relacionActual->adeudo_pendiente <= 0 || floatval($relacionActual->monto_pagado) >= floatval($relacionActual->monto_total_periodo)) && in_array($relacionActual->estado_pago, ['pago_anticipado', 'pago_a_tiempo', 'liquidado']));
+                $fueLiquidadoEsteCorte = ($relacionActual && ($relacionActual->adeudo_pendiente <= 0 || floor(floatval($relacionActual->monto_pagado)) >= floor(floatval($relacionActual->monto_total_periodo)) || abs(floatval($relacionActual->monto_pagado) - floatval($relacionActual->monto_total_periodo)) < 0.99) && in_array($relacionActual->estado_pago, ['pago_anticipado', 'pago_a_tiempo', 'liquidado']));
 
                 $multaTotalEsteCiclo = 0.0;
 
@@ -530,7 +532,7 @@ class CorteCobranzaService
                         $totalAbonadoAlVale = floatval($prestamo->pagos()->sum('monto_abonado'));
                         $montoEsperadoAlCorriente = $cortesHastaEste * $cuotaNeta;
 
-                        $estaAlCorrienteEsteVale = $prestamo->estaPagado() || ($totalAbonadoAlVale >= ($montoEsperadoAlCorriente - 0.01));
+                        $estaAlCorrienteEsteVale = $prestamo->estaPagado() || (floor($totalAbonadoAlVale) >= floor($montoEsperadoAlCorriente)) || ($totalAbonadoAlVale >= ($montoEsperadoAlCorriente - 0.99));
 
                         if (!$estaAlCorrienteEsteVale) {
                             $multaVale = $prestamo->multaConfigurada();
@@ -826,13 +828,14 @@ class CorteCobranzaService
                     }
 
                     if ($corteNum === 1) {
-                        if ($abonoEsteCorte > $cuotaNetaFila && $cuotaNetaFila > 0) {
-                            $excedente = round($abonoEsteCorte - $cuotaNetaFila, 2);
-                            $totalFila = -$excedente;
-                            $adeudoArrastre = -$excedente;
-                        } elseif ($abonoEsteCorte == $cuotaNetaFila && $cuotaNetaFila > 0) {
+                        $pagoIgualado = ($abonoEsteCorte > 0 && $cuotaNetaFila > 0) && (floor($abonoEsteCorte) === floor($cuotaNetaFila) || abs($abonoEsteCorte - $cuotaNetaFila) < 0.99);
+                        if ($pagoIgualado) {
                             $totalFila = $cuotaNetaFila;
                             $adeudoArrastre = 0.00;
+                        } elseif (floor($abonoEsteCorte) > floor($cuotaNetaFila) && $cuotaNetaFila > 0) {
+                            $excedente = floor($abonoEsteCorte) - floor($cuotaNetaFila);
+                            $totalFila = -$excedente;
+                            $adeudoArrastre = -$excedente;
                         } elseif ($abonoEsteCorte > 0) {
                             $faltante = $cuotaBrutaFila - $abonoEsteCorte;
                             $totalFila = $cuotaBrutaFila;
@@ -843,13 +846,14 @@ class CorteCobranzaService
                         }
                     } else {
                         $exigibleCorte = $adeudoArrastre + $cuotaNetaFila + $recargosFila;
-                        if ($abonoEsteCorte > $exigibleCorte && $exigibleCorte > 0) {
-                            $excedente = round($abonoEsteCorte - $exigibleCorte, 2);
-                            $totalFila = -$excedente;
-                            $adeudoArrastre = -$excedente;
-                        } elseif ($abonoEsteCorte == $exigibleCorte && $exigibleCorte > 0) {
+                        $pagoIgualado = ($abonoEsteCorte > 0 && $exigibleCorte > 0) && (floor($abonoEsteCorte) === floor($exigibleCorte) || abs($abonoEsteCorte - $exigibleCorte) < 0.99);
+                        if ($pagoIgualado) {
                             $totalFila = ($adeudoArrastre == 0) ? $cuotaNetaFila : 0.00;
                             $adeudoArrastre = 0.00;
+                        } elseif (floor($abonoEsteCorte) > floor($exigibleCorte) && $exigibleCorte > 0) {
+                            $excedente = floor($abonoEsteCorte) - floor($exigibleCorte);
+                            $totalFila = -$excedente;
+                            $adeudoArrastre = -$excedente;
                         } elseif ($abonoEsteCorte > 0) {
                             $faltante = max(0.0, round($exigibleCorte - $abonoEsteCorte, 2));
                             $totalFila = $faltante;
@@ -879,9 +883,23 @@ class CorteCobranzaService
                         $exigibleCorte = $adeudoArrastre + $cuotaNetaFila + $recargosFila;
                     }
 
-                    $diferencia = round($exigibleCorte - $abonoEsteCorte, 2);
-                    $totalFila = $diferencia;
-                    $adeudoArrastre = $diferencia;
+                    $pagoIgualado = ($abonoEsteCorte > 0 && $exigibleCorte > 0) && (floor($abonoEsteCorte) === floor($exigibleCorte) || abs($abonoEsteCorte - $exigibleCorte) < 0.99);
+
+                    if ($pagoIgualado) {
+                        $totalFila = 0.00;
+                        $adeudoArrastre = 0.00;
+                    } elseif (floor($abonoEsteCorte) > floor($exigibleCorte) && $exigibleCorte > 0) {
+                        $excedente = floor($abonoEsteCorte) - floor($exigibleCorte);
+                        $totalFila = -$excedente;
+                        $adeudoArrastre = -$excedente;
+                    } elseif ($abonoEsteCorte > 0) {
+                        $diferencia = round($exigibleCorte - $abonoEsteCorte, 2);
+                        $totalFila = $diferencia;
+                        $adeudoArrastre = $diferencia;
+                    } else {
+                        $totalFila = $exigibleCorte;
+                        $adeudoArrastre = $exigibleCorte;
+                    }
                 }
 
                 $totalFila = round($totalFila, 2);

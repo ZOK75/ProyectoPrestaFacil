@@ -114,24 +114,8 @@
                         <span class="text-xs text-slate-400">{{ $dist->sucursal?->nombre ?? 'Sucursal General' }}</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button type="button" @click="expanded = !expanded" class="text-xs font-semibold text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 border border-slate-700">
+                        <button type="button" @click="expanded = !expanded" class="text-xs font-semibold text-slate-400 hover:text-white px-2.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 transition">
                             <span x-text="expanded ? 'Ocultar Vales ▲' : 'Ver {{ $dist->prestamos->count() }} Vales ▼'"></span>
-                        </button>
-                        <button type="button" 
-                                @click="distSeleccionada = { 
-                                    id: '{{ $dist->id }}', 
-                                    ref: '{{ $dist->referenciaPago() }}', 
-                                    nombre: '{{ addslashes($dist->name) }}', 
-                                    cuotaBruta: {{ $cuotaBruta }},
-                                    comision: {{ $comisionDist }},
-                                    cuotaNeta: {{ $cuotaNeta }}, 
-                                    multas: {{ $multasAcum }}, 
-                                    totalRelacion: {{ $totalRelacion }},
-                                    adeudoGlobal: {{ $adeudoGlobal }} 
-                                }; pagoModalOpen = true"
-                                class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition-colors shadow-md shadow-indigo-600/20 flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                            Abono Global
                         </button>
                     </div>
                 </div>
@@ -151,7 +135,7 @@
                     </div>
                     <div>
                         <span class="text-[10px] text-slate-500 block uppercase">Total a Cobrar Relación</span>
-                        <span class="font-bold font-mono text-white">${{ number_format($totalRelacion, 2) }}</span>
+                        <span class="font-bold font-mono text-white">${{ number_format(floor($totalRelacion), 2) }}</span>
                     </div>
                 </div>
 
@@ -346,7 +330,7 @@
                     </div>
                     <div class="flex justify-between border-t border-slate-800 pt-1.5 font-bold">
                         <span class="text-white">Total a Cobrar (Relación):</span>
-                        <span class="text-emerald-400 font-mono font-black text-sm" x-text="'$' + Number(distSeleccionada?.totalRelacion || 0).toFixed(2)"></span>
+                        <span class="text-emerald-400 font-mono font-black text-sm" x-text="'$' + Number(Math.floor(distSeleccionada?.totalRelacion || 0)).toFixed(2)"></span>
                     </div>
                 </div>
 
@@ -360,7 +344,7 @@
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 uppercase">Monto a Abonar ($)</label>
                     <input type="number" name="monto_abonado" step="0.01" min="0.01" required placeholder="0.00"
-                        :value="Number(distSeleccionada?.totalRelacion || 0).toFixed(2)"
+                        :value="Number(Math.floor(distSeleccionada?.totalRelacion || 0)).toFixed(2)"
                         class="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 px-3 text-indigo-300 font-mono text-xl font-black mt-1 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-center">
                     <span class="text-[10px] text-slate-500 block mt-0.5">Monto total sugerido según la Relación de Cobranza.</span>
                 </div>

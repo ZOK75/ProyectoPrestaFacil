@@ -162,7 +162,7 @@
                 @if($totalRecargosSum > 0)
                     <span class="text-[11px] uppercase font-bold text-rose-600 block">Recargos por Retraso: +${{ number_format($totalRecargosSum, 2) }}</span>
                 @endif
-                <span class="text-xl font-black text-slate-900 block">Total a PAGAR: ${{ number_format($totalGeneralSum, 2) }}</span>
+                <span class="text-xl font-black text-slate-900 block">Total a PAGAR: ${{ number_format(floor($totalGeneralSum), 2) }}</span>
             </div>
         </div>
 
@@ -225,7 +225,7 @@
                         <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-indigo-900">${{ number_format($totalComisionesSum, 2) }}</td>
                         <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-slate-900">${{ number_format($totalPagosSum, 2) }}</td>
                         <td class="border-r border-slate-900 px-3 py-2.5 text-right font-mono text-rose-700">${{ number_format($totalRecargosSum, 2) }}</td>
-                        <td class="px-3 py-2.5 text-right font-mono text-slate-950 text-sm">${{ number_format($totalGeneralSum, 2) }}</td>
+                        <td class="px-3 py-2.5 text-right font-mono text-slate-950 text-sm">${{ number_format(floor($totalGeneralSum), 2) }}</td>
                     </tr>
                 </tfoot>
             </table>

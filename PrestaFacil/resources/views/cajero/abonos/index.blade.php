@@ -33,12 +33,26 @@
         </form>
     </div>
 
-    <!-- Alertas de Error / Validación -->
+    <!-- Alertas de Sesión / Error / Validación -->
+    @if (session('success'))
+        <div class="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center gap-2 text-emerald-400 font-bold text-xs">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span>{{ session('success') }}</span>
+        </div>
+    @endif
+
+    @if (session('error'))
+        <div class="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center gap-2 text-rose-400 font-bold text-xs">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>{{ session('error') }}</span>
+        </div>
+    @endif
+
     @if ($errors->any())
         <div class="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl space-y-1">
             <div class="flex items-center gap-2 text-rose-400 font-bold text-xs">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                Error al registrar el abono:
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Error al registrar el abono:</span>
             </div>
             <ul class="text-xs text-rose-300 list-disc pl-5">
                 @foreach ($errors->all() as $error)

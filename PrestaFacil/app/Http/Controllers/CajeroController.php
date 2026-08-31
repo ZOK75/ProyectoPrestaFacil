@@ -497,19 +497,20 @@ class CajeroController extends Controller
         }
 
         $distribuidora = $prestamo->createdBy;
-        $fechaInicioPrestamo = $prestamo->entregado_at ?? $prestamo->created_at;
-        $cortesPosteriores = 0;
-        if ($distribuidora && $fechaInicioPrestamo) {
-            $cortesPosteriores = \App\Models\RelacionCobranza::where('distribuidora_id', $distribuidora->id)
-                ->whereNotNull('fecha_corte')
-                ->where('fecha_corte', '<=', now())
-                ->where('fecha_corte', '>=', $fechaInicioPrestamo)
-                ->count();
+        $corteService = app(\App\Services\CorteCobranzaService::class);
+        $filasRelacion = $distribuidora ? $corteService->generarFilasRelacionCobranza($distribuidora) : [];
+        $filasPrestamo = array_values(array_filter($filasRelacion, fn($f) => $f['prestamo_id'] == $prestamo->id));
+        $comisionVale = 0;
+        $multaPrestamo = 0;
+        foreach ($filasPrestamo as $fp) {
+            $comisionVale += floatval($fp['comision']);
+            $multaPrestamo += floatval($fp['recargos']);
         }
-        $comisionPerdidaUnit = $prestamo->comisionDistribuidorPorQuincena();
-        $comisionesPerdidas = ($cortesPosteriores > 0 && floatval($prestamo->multas) > 0) ? ($cortesPosteriores * $comisionPerdidaUnit) : 0.0;
+        $numCortesAtrasados = max(0, count($filasPrestamo) - 1);
+        $comisionPorQuincena = count($filasPrestamo) > 0 ? ($comisionVale / count($filasPrestamo)) : $prestamo->comisionDistribuidorPorQuincena();
+        $comisionesPerdidas = ($numCortesAtrasados > 0 && $multaPrestamo > 0) ? ($numCortesAtrasados * $comisionPorQuincena) : 0.0;
 
-        $totalMaximoPermitido = floatval($prestamo->adeudo_pendiente) + floatval($prestamo->multas ?? 0) + $comisionesPerdidas;
+        $totalMaximoPermitido = floatval($prestamo->adeudo_pendiente) + max(floatval($prestamo->multas ?? 0), $multaPrestamo) + $comisionesPerdidas;
         if (floatval($request->monto_abonado) > ($totalMaximoPermitido + 0.01)) {
             return back()->with('error', "El abono ingresado (\$" . number_format($request->monto_abonado, 2) . ") excede el adeudo total pendiente del vale (\$" . number_format($totalMaximoPermitido, 2) . ").")->withInput();
         }

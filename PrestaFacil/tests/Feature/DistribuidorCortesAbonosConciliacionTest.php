@@ -2618,4 +2618,108 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
 
         \Carbon\Carbon::setTestNow();
     }
+
+    public function test_cajero_puede_pagar_saldo_total_pendiente_con_multas_y_comisiones_perdidas()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-08-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        Configuracion::actual()->update([
+            'comision_oro' => 1.50,
+            'comision_plata' => 1.50,
+            'comision_cobre' => 1.50,
+            'multa_mora_distribuidora' => 300.00,
+            'fecha_corte' => $tiempoInicial->copy()->addDays(5),
+            'fecha_limite_pago' => $tiempoInicial->copy()->addDays(10),
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+        ]);
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+        ]);
+
+        $cliente = $this->crearClienteTest('Probino Macaquino', $distribuidora);
+        $productoVale = ProductoVale::firstOrCreate(['clave' => 'VALE-8Q-5'], [
+            'nombre' => '5/8',
+            'monto_prestamo' => 10000.00,
+            'plazo_quincenas' => 8,
+            'cuota_quincenal' => 950.00,
+            'multa' => 300.00,
+            'comision_distribuidor' => 1.50,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VALE-PROB-1',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 10000.00,
+            'cuota_quincenal' => 950.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 7600.00,
+            'adeudo_pendiente' => 5750.00,
+            'multas' => 0,
+            'estado' => 'activo',
+            'created_by_user_id' => $distribuidora->id,
+            'created_at' => $tiempoInicial,
+        ]);
+
+        RelacionCobranza::create([
+            'distribuidora_id' => $distribuidora->id,
+            'fecha_corte' => $tiempoInicial->copy()->addDays(5),
+            'fecha_limite_pago' => $tiempoInicial->copy()->addDays(10),
+            'monto_total_periodo' => 931.25,
+            'monto_pagado' => 0.00,
+            'adeudo_pendiente' => 931.25,
+            'estado_pago' => 'pendiente',
+        ]);
+
+        // Simular 2 cortes con atraso (acumula 2 multas de $300 = $600 y comisiones perdidas)
+        $service = app(CorteCobranzaService::class);
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(5));
+        $service->simularSiguienteCorte();
+
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(20));
+        $service->simularSiguienteCorte();
+
+        $prestamo->refresh();
+        $this->assertEquals(600.00, floatval($prestamo->multas));
+
+        // Total pendiente incluye capital + multas + comisiones perdidas (ej. 6350 o 6537.50)
+        $filas = $service->generarFilasRelacionCobranza($distribuidora);
+        $filasP = array_values(array_filter($filas, fn($f) => $f['prestamo_id'] == $prestamo->id));
+        $comisionVale = 0;
+        $multaPrestamo = 0;
+        foreach ($filasP as $fp) {
+            $comisionVale += floatval($fp['comision']);
+            $multaPrestamo += floatval($fp['recargos']);
+        }
+        $numCortesAtrasados = max(0, count($filasP) - 1);
+        $comisionPorQuincena = count($filasP) > 0 ? ($comisionVale / count($filasP)) : 0;
+        $comisionesPerdidas = ($numCortesAtrasados > 0 && $multaPrestamo > 0) ? ($numCortesAtrasados * $comisionPorQuincena) : 0.0;
+        $totalSaldoPendiente = floatval($prestamo->adeudo_pendiente) + $multaPrestamo + $comisionesPerdidas;
+
+        // El cajero abona el totalSaldoPendiente completo
+        $response = $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => $totalSaldoPendiente,
+            'metodo_pago' => 'transferencia',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success');
+
+        $prestamo->refresh();
+        $this->assertEquals(0.00, floatval($prestamo->multas));
+        $this->assertEquals(0.00, floatval($prestamo->adeudo_pendiente));
+        $this->assertEquals('finalizado', $prestamo->estado);
+
+        \Carbon\Carbon::setTestNow();
+    }
 }

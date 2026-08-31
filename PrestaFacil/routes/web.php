@@ -174,6 +174,7 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('require.vpn')
             ->name('gerente-sucursal.transferencias.decidir');
         Route::post('/gerente/conciliaciones/{conciliacion}/decidir', [GerenteSucursalController::class, 'decidirConciliacionGerencia'])
+            ->middleware('require.vpn')
             ->name('gerente.conciliaciones.decidir');
     });
 

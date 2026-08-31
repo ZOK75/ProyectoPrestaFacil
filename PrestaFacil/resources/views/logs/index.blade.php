@@ -33,7 +33,7 @@
                         class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition">
                     <span class="w-2 h-2 rounded-full" :class="autoRefresh ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'"></span>
                     <span class="w-2 h-2 rounded-full absolute" :class="autoRefresh ? 'bg-emerald-400' : 'bg-slate-500'"></span>
-                    <span class="ml-2" x-text="autoRefresh ? 'EN VIVO (3s)' : 'PAUSADO'"></span>
+                    <span class="ml-2" x-text="autoRefresh ? 'EN VIVO (15s)' : 'PAUSADO'"></span>
                 </button>
 
                 <button @click="fetchLogs(true)" 
@@ -74,36 +74,7 @@
     <!-- ────────────────────────────────────────── -->
     <div x-show="activeTab === 'auditoria'" class="space-y-4">
         
-        <!-- Filtros de Auditoría -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <!-- Búsqueda General -->
-                <div class="relative sm:col-span-2">
-                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                    </div>
-                    <input type="text" x-model="searchAudit" @input.debounce.400ms="fetchLogs(true)" placeholder="Buscar en vivo por descripción, rol, IP o entidad..."
-                        class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
-                </div>
-
-                <!-- Filtro por Tipo de Operación -->
-                <div class="flex gap-2">
-                    <select x-model="tipoOperacion" @change="fetchLogs(true)" class="flex-1 px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-indigo-500">
-                        <option value="">Todas las operaciones</option>
-                        @foreach($tiposOperacion as $tipo)
-                            <option value="{{ $tipo }}">{{ $tipo }}</option>
-                        @endforeach
-                    </select>
-
-                    <button type="button" @click="fetchLogs(true)" class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition shrink-0">
-                        Filtrar
-                    </button>
-                </div>
-            </div>
-        </div>
-
+        
         <!-- Tabla de Auditoría en Tiempo Real -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
             <div class="overflow-x-auto">
@@ -167,37 +138,7 @@
     <!-- ────────────────────────────────────────── -->
     <div x-show="activeTab === 'sistema'" class="space-y-4" style="display: none;">
         
-        <!-- Filtros de Logs del Sistema -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md">
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <!-- Búsqueda en texto del log -->
-                <div class="relative sm:col-span-2">
-                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                    </div>
-                    <input type="text" x-model="searchSystem" @input.debounce.400ms="fetchLogs(true)" placeholder="Buscar en mensaje o traza de error en tiempo real..."
-                        class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
-                </div>
-
-                <!-- Filtro por Nivel de Severidad -->
-                <div class="flex gap-2">
-                    <select x-model="levelSystem" @change="fetchLogs(true)" class="flex-1 px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-indigo-500">
-                        <option value="">Todos los niveles</option>
-                        <option value="error">ERROR / CRITICAL</option>
-                        <option value="warning">WARNING</option>
-                        <option value="info">INFO / NOTICE</option>
-                        <option value="debug">DEBUG</option>
-                    </select>
-
-                    <button type="button" @click="fetchLogs(true)" class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition shrink-0">
-                        Filtrar
-                    </button>
-                </div>
-            </div>
-        </div>
-
+        
         <!-- Flujo de Registros de Log del Sistema en Tiempo Real -->
         <div class="space-y-3">
             <template x-for="log in systemLogs" :key="log.id">
@@ -295,7 +236,7 @@
             tipoOperacion: '{{ request('tipo_operacion', '') }}',
             searchSystem: '{{ request('buscar_sistema', '') }}',
             levelSystem: '{{ request('nivel_sistema', '') }}',
-            auditLogs: @json($auditLogs->items() ?? []),
+            auditLogs: @json($auditLogs ?? []),
             systemLogs: @json($systemLogs ?? []),
             modalOpen: false,
             modalData: null,
@@ -328,7 +269,7 @@
                     if (this.autoRefresh && !this.modalOpen) {
                         this.fetchLogs(false);
                     }
-                }, 3000);
+                }, 15000);
             },
 
             toggleLive() {

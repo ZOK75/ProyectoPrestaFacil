@@ -175,14 +175,30 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('require.vpn')
             ->name('gerente-sucursal.transferencias.decidir');
 
-        // Apartado de Conciliaciones de Gerencia
+        // Apartado de Conciliaciones de Gerencia y Direccion General
         Route::get('/gerente/conciliaciones', [GerenteSucursalController::class, 'indexConciliacionesGerencia'])
             ->name('gerente.conciliaciones.index');
+        Route::get('/gerente-general/conciliaciones', [GerenteSucursalController::class, 'indexConciliacionesGerencia'])
+            ->name('gerente-general.conciliaciones.index');
+        Route::get('/gerente-sucursal/conciliaciones', [GerenteSucursalController::class, 'indexConciliacionesGerencia'])
+            ->name('gerente-sucursal.conciliaciones.index');
+
         Route::get('/gerente/conciliaciones/{conciliacion}', [GerenteSucursalController::class, 'showConciliacionGerencia'])
             ->name('gerente.conciliaciones.show');
+        Route::get('/gerente-general/conciliaciones/{conciliacion}', [GerenteSucursalController::class, 'showConciliacionGerencia'])
+            ->name('gerente-general.conciliaciones.show');
+        Route::get('/gerente-sucursal/conciliaciones/{conciliacion}', [GerenteSucursalController::class, 'showConciliacionGerencia'])
+            ->name('gerente-sucursal.conciliaciones.show');
+
         Route::post('/gerente/conciliaciones/{conciliacion}/decidir', [GerenteSucursalController::class, 'decidirConciliacionGerencia'])
             ->middleware('require.vpn')
             ->name('gerente.conciliaciones.decidir');
+        Route::post('/gerente-general/conciliaciones/{conciliacion}/decidir', [GerenteSucursalController::class, 'decidirConciliacionGerencia'])
+            ->middleware('require.vpn')
+            ->name('gerente-general.conciliaciones.decidir');
+        Route::post('/gerente-sucursal/conciliaciones/{conciliacion}/decidir', [GerenteSucursalController::class, 'decidirConciliacionGerencia'])
+            ->middleware('require.vpn')
+            ->name('gerente-sucursal.conciliaciones.decidir');
     });
 
     // ──────────────────────────────────────────
@@ -211,7 +227,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:verificador'])->prefix('verificador')->name('verificador.')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\VerificadorController::class, 'dashboard'])->name('dashboard');
         Route::get('/solicitudes/{solicitud}', [\App\Http\Controllers\VerificadorController::class, 'showSolicitud'])->name('solicitudes.show');
-        Route::post('/solicitudes/{solicitud}/procesar', [\App\Http\Controllers\VerificadorController::class, 'procesarSolicitud'])->name('solicitudes.procesar');
+        Route::post('/solicitudes/{solicitud}/procesar', [\App\Http\Controllers\VerificadorController::class, 'procesarSolicitud'])->middleware('require.vpn')->name('solicitudes.procesar');
     });
 
     // 6. Procesamiento de incremento de crédito, cambio de categoría y creación de cuenta de distribuidor

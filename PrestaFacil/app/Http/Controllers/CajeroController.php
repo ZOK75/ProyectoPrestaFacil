@@ -680,7 +680,7 @@ class CajeroController extends Controller
     {
         $request->validate([
             'motivo' => 'required|string|max:500',
-            'monto_original' => 'required|numeric|min:0.01',
+            'monto_original' => 'nullable|numeric|min:0',
             'monto_corregido' => 'required|numeric|min:0.01',
             'referencia_conciliacion' => 'nullable|string|max:100',
             'referencia_original' => 'nullable|string|max:100',
@@ -723,11 +723,14 @@ class CajeroController extends Controller
         }
 
         // Verificar si ya existe una conciliación pendiente para esta referencia o pago
-        $existente = Conciliacion::where(function($q) use ($request) {
-            if ($request->prestamo_id) $q->orWhere('prestamo_id', $request->prestamo_id);
-            if ($request->pago_prestamo_id) $q->orWhere('pago_prestamo_id', $request->pago_prestamo_id);
-            if ($request->referencia_conciliacion) $q->orWhere('referencia_conciliacion', $request->referencia_conciliacion);
-        })->whereIn('estado', ['pendiente_coordinador', 'pendiente_gerencia', 'pendiente'])->first();
+        $existente = null;
+        if ($request->filled('prestamo_id') || $request->filled('pago_prestamo_id') || $request->filled('referencia_conciliacion')) {
+            $existente = Conciliacion::where(function($q) use ($request) {
+                if ($request->filled('prestamo_id')) $q->orWhere('prestamo_id', $request->prestamo_id);
+                if ($request->filled('pago_prestamo_id')) $q->orWhere('pago_prestamo_id', $request->pago_prestamo_id);
+                if ($request->filled('referencia_conciliacion')) $q->orWhere('referencia_conciliacion', $request->referencia_conciliacion);
+            })->whereIn('estado', ['pendiente_coordinador', 'pendiente_gerencia', 'pendiente'])->first();
+        }
 
         if ($existente) {
             return back()->with('error', 'Ya existe una solicitud de conciliación manual pendiente para esta referencia o pago.')->withInput();
@@ -756,6 +759,8 @@ class CajeroController extends Controller
                 $refConciliacion = $distribuidora ? $distribuidora->referenciaPago() : ($prestamo?->referencia ?? 'REF-CONC-' . strtoupper(Str::random(6)));
             }
 
+            $montoOriginal = $request->filled('monto_original') ? floatval($request->monto_original) : floatval($request->monto_corregido);
+
             $conciliacion = Conciliacion::create([
                 'prestamo_id' => $prestamo?->id ?: null,
                 'pago_prestamo_id' => $request->pago_prestamo_id ?: null,
@@ -763,9 +768,9 @@ class CajeroController extends Controller
                 'distribuidora_id' => $distribuidoraId,
                 'referencia_original' => $refOriginal,
                 'referencia_conciliacion' => $refConciliacion,
-                'fecha_pago' => $request->fecha_pago,
+                'fecha_pago' => $request->fecha_pago ?: now()->toDateString(),
                 'metodo_pago' => $request->metodo_pago ?? 'transferencia',
-                'monto_original' => $request->monto_original,
+                'monto_original' => $montoOriginal,
                 'monto_corregido' => $request->monto_corregido,
                 'motivo' => $request->motivo,
                 'evidencia_path' => $path,
@@ -773,20 +778,45 @@ class CajeroController extends Controller
                 'estado' => 'pendiente_coordinador',
             ]);
 
-            $solicitud = SolicitudAutorizacion::create([
+            // Log de Auditoría 1: Creación de la Solicitud de Conciliación
+            AuditService::registrar(
+                'CONCILIACION_SOLICITADA',
+                "Cajera {$cajera->name} solicitó conciliación manual por $" . number_format($request->monto_corregido, 2) . " (Ref: {$refConciliacion})",
+                [
+                    'entidad_tipo' => 'conciliaciones',
+                    'entidad_id' => $conciliacion->id,
+                    'solicitante_id' => $cajera->id,
+                    'sucursal_id' => $cajera->sucursal_id,
+                    'antes' => [
+                        'referencia_original' => $refOriginal,
+                        'monto_original' => $montoOriginal,
+                    ],
+                    'despues' => [
+                        'referencia_conciliacion' => $refConciliacion,
+                        'monto_corregido' => $request->monto_corregido,
+                        'prestamos_asignados' => $prestamosAsignados,
+                        'motivo' => $request->motivo,
+                        'fecha_pago' => $request->fecha_pago ?: now()->toDateString(),
+                        'estado' => 'pendiente_coordinador',
+                    ],
+                ]
+            );
+
+            // Crear solicitud de autorización para seguimiento
+            SolicitudAutorizacion::create([
                 'tipo' => 'conciliacion_manual',
                 'solicitante_id' => $cajera->id,
                 'sucursal_id' => $cajera->sucursal_id,
                 'entidad_tipo' => 'conciliaciones',
                 'entidad_id' => $conciliacion->id,
                 'datos_originales' => [
-                    'monto_original' => $request->monto_original,
-                    'referencia_original' => $request->referencia_original,
+                    'monto_original' => $montoOriginal,
+                    'referencia_original' => $refOriginal,
                 ],
                 'datos_propuestos' => [
                     'monto_corregido' => $request->monto_corregido,
-                    'referencia_conciliacion' => $request->referencia_conciliacion,
-                    'fecha_pago' => $request->fecha_pago,
+                    'referencia_conciliacion' => $refConciliacion,
+                    'fecha_pago' => $request->fecha_pago ?: now()->toDateString(),
                     'prestamos_asignados' => $prestamosAsignados,
                 ],
                 'motivo' => $request->motivo,
@@ -806,8 +836,8 @@ class CajeroController extends Controller
                     "La cajera {$cajera->name} solicita la revisión y dictamen de una conciliación de pago por $" . number_format($request->monto_corregido, 2) . ($distribuidora ? " para la distribuidora {$distribuidora->name}." : "."),
                     [
                         'conciliacion_id' => $conciliacion->id,
-                        'referencia' => $request->referencia_conciliacion,
-                        'url' => route('gerente-general.dashboard', [], false),
+                        'referencia' => $refConciliacion,
+                        'url' => route('gerente.conciliaciones.show', $conciliacion, false),
                     ]
                 );
             }
@@ -828,8 +858,8 @@ class CajeroController extends Controller
                         "La cajera {$cajera->name} solicita la revisión y dictamen de una conciliación de pago por $" . number_format($request->monto_corregido, 2) . ($distribuidora ? " para la distribuidora {$distribuidora->name}." : "."),
                         [
                             'conciliacion_id' => $conciliacion->id,
-                            'referencia' => $request->referencia_conciliacion,
-                            'url' => route('gerente-sucursal.dashboard', [], false),
+                            'referencia' => $refConciliacion,
+                            'url' => route('gerente.conciliaciones.show', $conciliacion, false),
                         ]
                     );
                 }
@@ -849,35 +879,10 @@ class CajeroController extends Controller
                     "La cajera {$cajera->name} solicita la revisión de una conciliación manual por $" . number_format($request->monto_corregido, 2) . ".",
                     [
                         'conciliacion_id' => $conciliacion->id,
-                        'referencia' => $request->referencia_conciliacion,
+                        'referencia' => $refConciliacion,
                     ]
                 );
             }
-
-            // Log de Auditoría 1: Creación / Solicitud de la Conciliación
-            AuditService::registrar(
-                'CONCILIACION_SOLICITADA',
-                "Solicitud de conciliación manual creada por {$cajera->name} por $" . number_format($request->monto_corregido, 2),
-                [
-                    'entidad_tipo' => 'conciliaciones',
-                    'entidad_id' => $conciliacion->id,
-                    'user_id' => $cajera->id,
-                    'user_rol' => $cajera->rol?->nombre ?? 'Cajero',
-                    'sucursal_id' => $cajera->sucursal_id,
-                    'evidencia_path' => $path,
-                    'antes' => [
-                        'referencia_original' => $refOriginal,
-                        'monto_original' => $request->monto_original,
-                    ],
-                    'despues' => [
-                        'referencia_conciliacion' => $refConciliacion,
-                        'monto_corregido' => $request->monto_corregido,
-                        'fecha_pago' => $request->fecha_pago,
-                        'prestamos_asignados' => $prestamosAsignados,
-                        'motivo' => $request->motivo,
-                    ],
-                ]
-            );
         });
 
         return back()->with('success', 'Solicitud de conciliación registrada y notificada a Gerencia y Coordinación.');

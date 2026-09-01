@@ -117,7 +117,20 @@ class Prestamo extends Model
 
     public function estaPagado(): bool
     {
-        return $this->estado === 'finalizado' || $this->adeudo_pendiente <= 0;
+        if ($this->estado === 'finalizado' || floatval($this->adeudo_pendiente) <= 0) {
+            return true;
+        }
+
+        $totalQuincenas = max(1, intval($this->pagos_totales ?: ($this->productoVale?->plazo_quincenas ?: 8)));
+        $cuotaNeta = $this->cuotaQuincenalNeta();
+        $totalNetoExigible = $totalQuincenas * $cuotaNeta;
+        $totalAbonado = floatval($this->pagos()->sum('monto_abonado'));
+
+        if ($totalNetoExigible > 0 && ($totalAbonado >= ($totalNetoExigible - 0.99) || floor($totalAbonado) >= floor($totalNetoExigible))) {
+            return true;
+        }
+
+        return false;
     }
 
     public function estaEntregado(): bool

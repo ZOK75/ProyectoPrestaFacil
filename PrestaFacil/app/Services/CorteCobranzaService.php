@@ -69,7 +69,12 @@ class CorteCobranzaService
                         ->whereDate('fecha_corte', $config->fecha_corte->toDateString())
                         ->first();
 
-                    $montoPagado = $relacion ? floatval($relacion->monto_pagado) : 0.0;
+                    $montoPagadoEnRelacion = $relacion ? floatval($relacion->monto_pagado) : 0.0;
+
+                    // Sumar pagos directos en ventanilla previos o iguales a la fecha de corte
+                    $prestamosDistIds = Prestamo::where('created_by_user_id', $dist->id)->pluck('id');
+                    $montoPagadoDirecto = floatval(PagoPrestamo::whereIn('prestamo_id', $prestamosDistIds)->where('created_at', '<=', $config->fecha_corte->endOfDay())->sum('monto_abonado'));
+                    $montoPagado = max($montoPagadoEnRelacion, $montoPagadoDirecto);
 
                     // Sumar pagos aprobados por conciliación cuya fecha de pago fue anterior o igual a la fecha de corte
                     $conciliacionesAnteriores = Conciliacion::where('distribuidora_id', $dist->id)
@@ -271,11 +276,11 @@ class CorteCobranzaService
                                     })
                                     ->whereNotNull('fecha_corte')
                                     ->where('fecha_corte', '<=', $ahora)
-                                    ->where('fecha_corte', '>=', $fechaInicioPrestamo)
+                                    ->where('fecha_corte', '>=', $fechaInicioPrestamo->copy()->subMinutes(1))
                                     ->count();
                             }
-                            $cortesHastaEste = $cortesPrevios + 1;
 
+                            $cortesHastaEste = $cortesPrevios + 1;
                             $totalAbonadoAlVale = floatval($prestamo->pagos()->sum('monto_abonado'));
                             $montoEsperadoAlCorriente = $cortesHastaEste * $cuotaNeta;
 
@@ -333,7 +338,6 @@ class CorteCobranzaService
 
         return $resultados;
     }
-
     /**
      * Actualiza la relación de cobranza cuando se registra un abono de la distribuidora.
      * Si se liquida el total antes o al momento del corte, calcula los puntos y los suma al distribuidor.
@@ -347,7 +351,6 @@ class CorteCobranzaService
         $config = Configuracion::actual();
         $ahora = now();
         $fechaCorte = $config->fecha_corte ?? $ahora;
-        $fechaLimite = $config->fecha_limite_pago ?? $ahora->copy()->addDays(5);
 
         $totalQuincenal = $distribuidora->totalCuotaQuincenalNeta();
 
@@ -355,84 +358,30 @@ class CorteCobranzaService
         $total15nalExigible = $totalQuincenal + $multasRestantes;
 
         $relacion = RelacionCobranza::where('distribuidora_id', $distribuidora->id)
-            ->where(function($q) use ($fechaCorte) {
-                $q->whereDate('fecha_corte', $fechaCorte->toDateString())
-                  ->orWhereNull('fecha_corte');
-            })
+            ->latest('fecha_corte')
             ->first();
 
-        if (!$relacion) {
-            $montoPagado = $montoAbonado;
-            $estaLiquidado = floor($montoPagado) >= floor($total15nalExigible) || abs($montoPagado - $total15nalExigible) < 0.99;
-            $adeudoPendiente15nal = $estaLiquidado ? 0.00 : max(0.0, $total15nalExigible - $montoPagado);
-
-            $relacion = RelacionCobranza::create([
-                'distribuidora_id' => $distribuidora->id,
-                'fecha_corte' => $fechaCorte,
-                'fecha_limite_pago' => $fechaLimite,
-                'monto_total_periodo' => $total15nalExigible,
-                'monto_pagado' => $montoPagado,
-                'adeudo_pendiente' => $adeudoPendiente15nal,
-                'estado_pago' => $estaLiquidado ? 'pago_anticipado' : 'pendiente',
-                'puntos_ganados' => 0,
-                'puntos_descontados' => 0,
-                'liquidado_at' => $estaLiquidado ? $ahora : null,
-            ]);
-        } else {
-            if (!$relacion->fecha_corte) {
-                $relacion->fecha_corte = $fechaCorte;
-                $relacion->fecha_limite_pago = $fechaLimite;
-            }
+        if ($relacion) {
             $relacion->monto_total_periodo = $total15nalExigible;
             $relacion->monto_pagado = floatval($relacion->monto_pagado) + $montoAbonado;
             $estaLiquidado = floor(floatval($relacion->monto_pagado)) >= floor($total15nalExigible) || abs(floatval($relacion->monto_pagado) - $total15nalExigible) < 0.99;
             $adeudoPendiente15nal = $estaLiquidado ? 0.00 : max(0.0, $total15nalExigible - floatval($relacion->monto_pagado));
             $relacion->adeudo_pendiente = $adeudoPendiente15nal;
 
+            $esPagoAntesDelCorte = false;
+            if ($relacion->fecha_corte) {
+                $esPagoAntesDelCorte = $ahora->lessThanOrEqualTo($relacion->fecha_corte);
+            } elseif ($config->fecha_corte) {
+                $esPagoAntesDelCorte = $ahora->lessThanOrEqualTo($config->fecha_corte);
+            }
+
+            $tieneMultas = floatval($distribuidora->multas ?? 0.0) > 0 || floatval($relacion->multa_aplicada ?? 0.0) > 0;
+
             if ($estaLiquidado && $relacion->estado_pago === 'pendiente') {
-                $relacion->estado_pago = 'pago_anticipado';
+                $relacion->estado_pago = ($esPagoAntesDelCorte && !$tieneMultas) ? 'pago_anticipado' : 'pago_a_tiempo';
                 $relacion->liquidado_at = $ahora;
             }
             $relacion->save();
-        }
-
-        // Si se liquidó por completo el total antes o al corte: CALCULAR Y SUMAR PUNTOS AL DISTRIBUIDOR
-        if ($adeudoPendiente15nal <= 0 && intval($relacion->puntos_ganados) <= 0) {
-            $totalProductos = floatval(Prestamo::where('created_by_user_id', $distribuidora->id)
-                ->where(function($q) {
-                    $q->where('estado', 'activo')
-                      ->orWhere(function($q2) {
-                          $q2->where('estado', 'finalizado')
-                             ->where('updated_at', '>=', now()->subDays(30));
-                      });
-                })
-                ->sum('monto_prestamo'));
-
-            if ($totalProductos > 0) {
-                $puntosGanados = $config->calcularPuntosPorMonto($totalProductos);
-                if ($puntosGanados > 0) {
-                    $distribuidora->increment('puntos', $puntosGanados);
-                    $distribuidora->refresh();
-
-                    $relacion->update([
-                        'puntos_ganados' => $puntosGanados,
-                        'estado_pago' => 'pago_anticipado',
-                    ]);
-
-                    NotificacionCajero::create([
-                        'user_id' => $distribuidora->id,
-                        'tipo' => 'pago_anticipado',
-                        'titulo' => '🎉 ¡Puntos Ganados por Liquidación!',
-                        'mensaje' => "Has liquidado tu cuota quincenal antes o al corte. ¡Se han sumado {$puntosGanados} puntos de bonificación a tu cuenta!",
-                        'data' => [
-                            'puntos' => $puntosGanados,
-                            'total_productos' => $totalProductos,
-                            'total_quincenal' => $total15nalExigible,
-                        ],
-                        'leida' => false,
-                    ]);
-                }
-            }
         }
 
         // Si la distribuidora liquidó por completo su adeudo exigible y deudas moratorias, se limpia automáticamente el estado de morosidad y retrasos
@@ -465,19 +414,20 @@ class CorteCobranzaService
         $config = Configuracion::actual();
         $ahora = now();
 
-        $fechaCorteProcesada = ($config->fecha_corte && $config->fecha_corte->greaterThan($ahora)) ? $config->fecha_corte : $ahora;
-        $fechaLimiteProcesada = $config->fecha_limite_pago ?? $fechaCorteProcesada->copy()->addDays(5);
+        $fechaCorteProcesada = $ahora;
+        $fechaLimiteProcesada = $config->fecha_limite_pago ?? $ahora->copy()->addDays(5);
 
         $resultados = [
             'multas_aplicadas' => 0,
             'cortes_procesados' => 0,
+            'puntos_otorgados' => 0,
             'fecha_corte_procesada' => $fechaCorteProcesada,
             'fecha_limite_procesada' => $fechaLimiteProcesada,
             'proxima_fecha_corte' => null,
             'proxima_fecha_limite' => null,
         ];
 
-        DB::transaction(function () use ($config, $ahora, &$resultados) {
+        DB::transaction(function () use ($config, $ahora, $fechaCorteProcesada, $fechaLimiteProcesada, &$resultados) {
             $distribuidoras = User::whereHas('rol', fn ($q) => $q->whereIn('nombre', ['Distribuidor', 'distribuidor', 'Distribuidora', 'distribuidora']))
                 ->where('activo', true)
                 ->get();
@@ -499,22 +449,19 @@ class CorteCobranzaService
 
                 $totalQuincenal = $dist->totalCuotaQuincenalNeta();
 
-                // 1. Verificar si la distribuidora ya liquidó el corte actual que se está cerrando
-                $relacionActual = RelacionCobranza::where('distribuidora_id', $dist->id)
-                    ->where(function($q) use ($config, $ahora) {
-                        $q->whereNull('fecha_corte')
-                          ->orWhere('fecha_corte', '<=', $config->fecha_corte ?? $ahora)
-                          ->orWhere('fecha_corte', '<=', $ahora->copy()->endOfDay());
-                    })
-                    ->orderBy('fecha_corte', 'desc')
+                // 1. Verificar si la distribuidora ya liquidó el corte previo que se está cerrando
+                $relacionPrevia = RelacionCobranza::where('distribuidora_id', $dist->id)
+                    ->whereNotNull('fecha_corte')
+                    ->where('fecha_corte', '<', $ahora)
+                    ->latest('fecha_corte')
                     ->first();
 
-                $fueLiquidadoEsteCorte = ($relacionActual && ($relacionActual->adeudo_pendiente <= 0 || floor(floatval($relacionActual->monto_pagado)) >= floor(floatval($relacionActual->monto_total_periodo)) || abs(floatval($relacionActual->monto_pagado) - floatval($relacionActual->monto_total_periodo)) < 0.99) && in_array($relacionActual->estado_pago, ['pago_anticipado', 'pago_a_tiempo', 'liquidado']));
+                $fueLiquidadoCortePrevio = ($relacionPrevia && ($relacionPrevia->adeudo_pendiente <= 0 || floor(floatval($relacionPrevia->monto_pagado)) >= floor(floatval($relacionPrevia->monto_total_periodo)) || abs(floatval($relacionPrevia->monto_pagado) - floatval($relacionPrevia->monto_total_periodo)) < 0.99) && in_array($relacionPrevia->estado_pago, ['pago_anticipado', 'pago_a_tiempo', 'liquidado']));
 
                 $multaTotalEsteCiclo = 0.0;
 
                 // Solo aplicar multas si NO se liquidó este corte
-                if (!$fueLiquidadoEsteCorte) {
+                if (!$fueLiquidadoCortePrevio) {
                     $porcentajeComision = floatval($dist->obtenerPorcentajeGanancia() ?? 0.0);
                     foreach ($prestamosActivos as $prestamo) {
                         $totalQuincenas = max(1, intval($prestamo->pagos_totales ?: ($prestamo->productoVale?->plazo_quincenas ?: 8)));
@@ -526,27 +473,26 @@ class CorteCobranzaService
                         $cortesPrevios = 0;
                         if ($fechaInicioPrestamo) {
                             $cortesPrevios = RelacionCobranza::where('distribuidora_id', $dist->id)
-                                ->when($relacionActual?->id, function ($q) use ($relacionActual) {
-                                    $q->where('id', '!=', $relacionActual->id);
-                                })
                                 ->whereNotNull('fecha_corte')
                                 ->where('fecha_corte', '<=', $ahora)
                                 ->where('fecha_corte', '>=', $fechaInicioPrestamo)
                                 ->count();
                         }
-                        $cortesHastaEste = $cortesPrevios + 1;
 
-                        $totalAbonadoAlVale = floatval($prestamo->pagos()->sum('monto_abonado'));
-                        $montoEsperadoAlCorriente = $cortesHastaEste * $cuotaNeta;
+                        // Solo aplicar multas si el préstamo ya cuenta con al menos un corte previo transcurrido sin liquidar
+                        if ($cortesPrevios >= 1) {
+                            $totalAbonadoAlVale = floatval($prestamo->pagos()->sum('monto_abonado'));
+                            $montoEsperadoAlCorriente = $cortesPrevios * $cuotaNeta;
 
-                        $estaAlCorrienteEsteVale = $prestamo->estaPagado() || (floor($totalAbonadoAlVale) >= floor($montoEsperadoAlCorriente)) || ($totalAbonadoAlVale >= ($montoEsperadoAlCorriente - 0.99));
+                            $estaAlCorrienteEsteVale = $prestamo->estaPagado() || (floor($totalAbonadoAlVale) >= floor($montoEsperadoAlCorriente)) || ($totalAbonadoAlVale >= ($montoEsperadoAlCorriente - 0.99));
 
-                        if (!$estaAlCorrienteEsteVale) {
-                            $multaVale = $prestamo->multaConfigurada();
-                            if ($multaVale > 0) {
-                                $prestamo->increment('multas', $multaVale);
-                                $multaTotalEsteCiclo += $multaVale;
-                                $resultados['multas_aplicadas']++;
+                            if (!$estaAlCorrienteEsteVale) {
+                                $multaVale = $prestamo->multaConfigurada();
+                                if ($multaVale > 0) {
+                                    $prestamo->increment('multas', $multaVale);
+                                    $multaTotalEsteCiclo += $multaVale;
+                                    $resultados['multas_aplicadas']++;
+                                }
                             }
                         }
                     }
@@ -567,56 +513,136 @@ class CorteCobranzaService
                 $multasAcumuladasDistribuidora = floatval($dist->multas ?? 0.0);
                 $total15nalExigible = $totalQuincenal + $multasAcumuladasDistribuidora;
 
-                // 2. Registrar o actualizar la relación de cobranza para este corte con fecha, hora, minuto y segundo exactos
-                if (!$fueLiquidadoEsteCorte) {
-                    $datosCorte = [
-                        'fecha_corte' => $ahora,
-                        'fecha_limite_pago' => $config->fecha_limite_pago ?? $ahora->copy()->addDays(5),
-                        'monto_total_periodo' => $total15nalExigible,
-                        'monto_pagado' => $relacionActual ? floatval($relacionActual->monto_pagado) : 0.00,
-                        'adeudo_pendiente' => max(0.0, $total15nalExigible - ($relacionActual ? floatval($relacionActual->monto_pagado) : 0.00)),
-                        'multa_aplicada' => $multaTotalEsteCiclo,
-                        'multa_aplicada_at' => $ahora,
-                        'estado_pago' => ($relacionActual && $relacionActual->monto_pagado > 0) ? 'pendiente' : 'pago_atrasado',
-                        'puntos_ganados' => 0,
-                        'puntos_descontados' => 0,
-                        'corte_notificado_at' => $ahora,
-                    ];
+                // Otorgar puntos si la relación previa se liquidó como pago anticipado y sin multas
+                if ($relacionPrevia && intval($relacionPrevia->puntos_ganados) <= 0 && $relacionPrevia->adeudo_pendiente <= 0 && $relacionPrevia->estado_pago === 'pago_anticipado' && $multasAcumuladasDistribuidora <= 0) {
+                    $totalProductos = floatval(Prestamo::where('created_by_user_id', $dist->id)
+                        ->where(function($q) {
+                            $q->where('estado', 'activo')
+                              ->orWhere(function($q2) {
+                                  $q2->where('estado', 'finalizado')
+                                     ->where('updated_at', '>=', now()->subDays(30));
+                              });
+                        })
+                        ->sum('monto_prestamo'));
 
-                    if ($relacionActual) {
-                        $relacionActual->update($datosCorte);
-                    } else {
-                        RelacionCobranza::create(array_merge(['distribuidora_id' => $dist->id], $datosCorte));
+                    if ($totalProductos > 0) {
+                        $puntosGanados = $config->calcularPuntosPorMonto($totalProductos);
+                        if ($puntosGanados > 0) {
+                            $dist->increment('puntos', $puntosGanados);
+                            $dist->refresh();
+                            $resultados['puntos_otorgados'] += $puntosGanados;
+
+                            $relacionPrevia->update([
+                                'puntos_ganados' => $puntosGanados,
+                            ]);
+
+                            NotificacionCajero::create([
+                                'user_id' => $dist->id,
+                                'tipo' => 'pago_anticipado',
+                                'titulo' => '🎉 ¡Puntos Otorgados al Corte!',
+                                'mensaje' => "Liquidaste tu cuota quincenal antes del corte. ¡Has acumulado {$puntosGanados} puntos de bonificación por un total en vales de $" . number_format($totalProductos, 2) . "!",
+                                'data' => [
+                                    'puntos' => $puntosGanados,
+                                    'total_productos' => $totalProductos,
+                                    'total_quincenal' => $relacionPrevia->monto_total_periodo,
+                                ],
+                                'leida' => false,
+                            ]);
+                        }
                     }
+                }
 
-                    if ($multaTotalEsteCiclo > 0) {
+                // Obtener todos los préstamos de la distribuidora
+                $prestamosDist = Prestamo::where('created_by_user_id', $dist->id)->get();
+                $prestamosIds = $prestamosDist->pluck('id');
+
+                // Total abonado a los préstamos de la distribuidora hasta este momento
+                $totalAbonadoHastaAhora = floatval(PagoPrestamo::whereIn('prestamo_id', $prestamosIds)->where('created_at', '<=', $ahora)->sum('monto_abonado'));
+
+                // Total consumido en cortes previos
+                $cortesPreviosRecords = RelacionCobranza::where('distribuidora_id', $dist->id)->whereNotNull('fecha_corte')->where('fecha_corte', '<', $ahora)->get();
+                $totalPagadoEnCortesPrevios = floatval($cortesPreviosRecords->sum('monto_pagado'));
+
+                $abonoDisponibleEsteCorte = max(0.0, $totalAbonadoHastaAhora - $totalPagadoEnCortesPrevios);
+                $estaCubiertoEsteCorte = ($total15nalExigible <= 0) || ($abonoDisponibleEsteCorte >= ($total15nalExigible - 0.99)) || (floor($abonoDisponibleEsteCorte) >= floor($total15nalExigible));
+                $montoPagadoEsteCorte = min($total15nalExigible, $abonoDisponibleEsteCorte);
+                $adeudoPendienteEsteCorte = $estaCubiertoEsteCorte ? 0.00 : max(0.0, $total15nalExigible - $montoPagadoEsteCorte);
+
+                $puntosGanadosEsteCorte = 0;
+                $tieneMultasDistribuidora = ($multasAcumuladasDistribuidora > 0);
+
+                // Si es el primer corte y se pagó anticipadamente (o abono previo para este corte sin relación previa)
+                if (!$relacionPrevia && $estaCubiertoEsteCorte && !$tieneMultasDistribuidora && $montoPagadoEsteCorte > 0) {
+                    $totalProductos = floatval(Prestamo::where('created_by_user_id', $dist->id)
+                        ->where(function($q) {
+                            $q->where('estado', 'activo')
+                              ->orWhere(function($q2) {
+                                  $q2->where('estado', 'finalizado')
+                                     ->where('updated_at', '>=', now()->subDays(30));
+                              });
+                        })
+                        ->sum('monto_prestamo'));
+
+                    if ($totalProductos > 0) {
+                        $puntosGanadosEsteCorte = $config->calcularPuntosPorMonto($totalProductos);
+                        $dist->increment('puntos', $puntosGanadosEsteCorte);
+                        $dist->refresh();
+                        $resultados['puntos_otorgados'] += $puntosGanadosEsteCorte;
+
                         NotificacionCajero::create([
                             'user_id' => $dist->id,
-                            'tipo' => 'multa_adeudo_aplicada',
-                            'titulo' => '⚠️ Multas Aplicadas al Corte (' . $ahora->format('d/m/Y H:i:s') . ')',
-                            'mensaje' => 'Se ha procesado el corte oficial con fecha y hora ' . $ahora->format('d/m/Y H:i:s') . '. Se aplicaron cargos moratorios de $' . number_format($multaTotalEsteCiclo, 2) . ' a los vales cobrados previos al corte con adeudo pendiente.',
+                            'tipo' => 'pago_anticipado',
+                            'titulo' => '🎉 ¡Puntos Otorgados al Corte!',
+                            'mensaje' => "Liquidaste tu cuota quincenal antes del corte. ¡Has acumulado {$puntosGanadosEsteCorte} puntos de bonificación por un total en vales de $" . number_format($totalProductos, 2) . "!",
                             'data' => [
-                                'multa_ciclo' => $multaTotalEsteCiclo,
-                                'multas_acumuladas' => $multasAcumuladasDistribuidora,
-                                'total_adeudo_global' => $dist->totalAdeudoGlobal(),
+                                'puntos' => $puntosGanadosEsteCorte,
+                                'total_productos' => $totalProductos,
+                                'total_quincenal' => $total15nalExigible,
                             ],
                             'leida' => false,
                         ]);
                     }
-                } else {
-                    if ($relacionActual) {
-                        $relacionActual->update([
-                            'fecha_corte' => $ahora,
-                            'corte_notificado_at' => $ahora,
-                        ]);
-                    }
+                }
+
+                // 2. Registrar siempre la nueva relación de cobranza para este corte
+                $datosCorte = [
+                    'distribuidora_id' => $dist->id,
+                    'fecha_corte' => $fechaCorteProcesada,
+                    'fecha_limite_pago' => $fechaLimiteProcesada,
+                    'monto_total_periodo' => $total15nalExigible,
+                    'monto_pagado' => $montoPagadoEsteCorte,
+                    'adeudo_pendiente' => $adeudoPendienteEsteCorte,
+                    'multa_aplicada' => $multaTotalEsteCiclo,
+                    'multa_aplicada_at' => ($multaTotalEsteCiclo > 0 ? $ahora : null),
+                    'estado_pago' => ($multaTotalEsteCiclo > 0 ? 'pago_atrasado' : ($estaCubiertoEsteCorte ? 'pago_anticipado' : 'pendiente')),
+                    'puntos_ganados' => $puntosGanadosEsteCorte,
+                    'puntos_descontados' => 0,
+                    'liquidado_at' => $estaCubiertoEsteCorte ? $ahora : null,
+                    'corte_notificado_at' => $ahora,
+                ];
+
+                RelacionCobranza::create($datosCorte);
+
+                if ($multaTotalEsteCiclo > 0) {
+                    NotificacionCajero::create([
+                        'user_id' => $dist->id,
+                        'tipo' => 'multa_adeudo_aplicada',
+                        'titulo' => '⚠️ Multas Aplicadas al Corte (' . $ahora->format('d/m/Y H:i:s') . ')',
+                        'mensaje' => 'Se ha procesado el corte oficial con fecha y hora ' . $ahora->format('d/m/Y H:i:s') . '. Se aplicaron cargos moratorios de $' . number_format($multaTotalEsteCiclo, 2) . ' a los vales cobrados previos al corte con adeudo pendiente.',
+                        'data' => [
+                            'multa_ciclo' => $multaTotalEsteCiclo,
+                            'multas_acumuladas' => $multasAcumuladasDistribuidora,
+                            'total_adeudo_global' => $dist->totalAdeudoGlobal(),
+                        ],
+                        'leida' => false,
+                    ]);
                 }
 
                 $resultados['cortes_procesados']++;
             }
 
             // 3. AVANZAR EL CICLO QUINCENAL (+15 DÍAS A PARTIR DEL CORTE SIMULADO)
-            $fechaBase = ($config->fecha_corte && $config->fecha_corte->greaterThan($ahora)) ? $config->fecha_corte : $ahora;
+            $fechaBase = $ahora;
             $nuevaFechaCorte = $fechaBase->copy()->addDays(15);
             $nuevaFechaLimite = $nuevaFechaCorte->copy()->addDays(5);
 
@@ -629,31 +655,6 @@ class CorteCobranzaService
 
             $resultados['proxima_fecha_corte'] = $nuevaFechaCorte;
             $resultados['proxima_fecha_limite'] = $nuevaFechaLimite;
-
-            // 4. Inicializar la relación de cobranza limpia para el nuevo ciclo quincenal
-            foreach ($distribuidoras as $dist) {
-                $multasRestantes = floatval($dist->multas ?? 0.0);
-                $total15nalNuevo = $dist->totalCuotaQuincenalNeta() + $multasRestantes;
-
-                RelacionCobranza::updateOrCreate(
-                    [
-                        'distribuidora_id' => $dist->id,
-                        'fecha_corte' => $nuevaFechaCorte,
-                    ],
-                    [
-                        'fecha_limite_pago' => $nuevaFechaLimite,
-                        'monto_total_periodo' => $total15nalNuevo,
-                        'monto_pagado' => 0.00,
-                        'adeudo_pendiente' => $total15nalNuevo,
-                        'multa_aplicada' => 0.00,
-                        'multa_aplicada_at' => null,
-                        'estado_pago' => 'pendiente',
-                        'puntos_ganados' => 0,
-                        'puntos_descontados' => 0,
-                        'corte_notificado_at' => $ahora,
-                    ]
-                );
-            }
         });
 
         return $resultados;
@@ -873,11 +874,16 @@ class CorteCobranzaService
 
         if (!$relacion) {
             $relacion = RelacionCobranza::where('distribuidora_id', $distribuidora->id)
+                ->where('fecha_corte', '<=', now())
                 ->orderBy('fecha_corte', 'desc')
                 ->first();
         }
 
+        $esConsultaEspecifica = ($relacion !== null);
         $fechaCorteRef = $relacion?->fecha_corte ?? $config->fecha_corte ?? now();
+        $fechaLimiteQuery = $esConsultaEspecifica
+            ? ($fechaCorteRef ? $fechaCorteRef->copy()->endOfDay() : now()->copy()->endOfDay())
+            : min($fechaCorteRef->copy()->endOfDay(), now()->copy()->endOfDay());
 
         // 1. Obtener todos los préstamos de la distribuidora activos (entregados/cobrados en caja)
         $prestamos = Prestamo::with(['cliente', 'productoVale', 'pagos'])
@@ -895,7 +901,7 @@ class CorteCobranzaService
 
         // Determinar número correlativo de cortes transcurridos para esta distribuidora
         $totalCortesPrevios = RelacionCobranza::where('distribuidora_id', $distribuidora->id)
-            ->where('fecha_corte', '<=', $fechaCorteRef->copy()->endOfDay())
+            ->where('fecha_corte', '<=', $fechaLimiteQuery)
             ->count();
         if ($totalCortesPrevios <= 0) {
             $totalCortesPrevios = 1;
@@ -905,38 +911,29 @@ class CorteCobranzaService
         $tieneMultasDistribuidora = (floatval($distribuidora->multas ?? 0.0) > 0);
 
         foreach ($prestamos as $p) {
-            // Cuando un pago se liquide se eliminará de la relación
-            if ($p->estaPagado() && floatval($p->adeudo_pendiente) <= 0) {
-                continue;
-            }
-
             $totalQuincenas = max(1, intval($p->pagos_totales ?: ($p->productoVale?->plazo_quincenas ?: 8)));
             $cuotaBruta = floatval($p->cuota_quincenal ?: ($p->monto_prestamo / $totalQuincenas));
             $comision = (($porcentajeComision / 100) * floatval($p->monto_prestamo)) / $totalQuincenas;
             $cuotaNeta = $cuotaBruta - $comision;
+            $totalNetoExigiblePrestamo = $totalQuincenas * $cuotaNeta;
 
             $multaVale = $p->multaConfigurada();
             $multasAcumuladas = floatval($p->multas ?? 0.0);
             $tieneRetraso = ($multasAcumuladas > 0);
 
-            // Cortes transcurridos para este préstamo específico (solo cortes cerrados posteriores a su entrega/activación + el corte activo)
+            // Cortes transcurridos para este préstamo específico (solo cortes procesados a partir de su entrega)
             $fechaInicioPrestamo = $p->entregado_at ?? $p->created_at;
-            $relacionActualId = $relacion?->id;
             $relacionesCerradas = collect();
             if ($fechaInicioPrestamo) {
                 $relacionesCerradas = RelacionCobranza::where('distribuidora_id', $distribuidora->id)
-                    ->when($relacionActualId, function ($q) use ($relacionActualId) {
-                        $q->where('id', '!=', $relacionActualId);
-                    })
                     ->whereNotNull('fecha_corte')
-                    ->where('fecha_corte', '<=', $fechaCorteRef)
+                    ->where('fecha_corte', '<=', $fechaLimiteQuery)
                     ->where('fecha_corte', '>=', $fechaInicioPrestamo)
                     ->orderBy('fecha_corte', 'asc')
                     ->get();
             }
 
-            $cortesCerradosPosteriores = $relacionesCerradas->count();
-            $cortesTranscurridos = $cortesCerradosPosteriores + 1;
+            $cortesTranscurridos = $relacionesCerradas->count();
 
             $pagosRealizados = intval($p->pagos_realizados);
             $adeudoArrastre = 0.0;
@@ -944,7 +941,15 @@ class CorteCobranzaService
             $pagosPrestamo = $p->pagos->sortBy('created_at');
             $abonosConsumidos = 0.0;
 
+            $filasEstePrestamo = [];
+            $corteDondeSeLiquido = null;
+
             for ($corteNum = 1; $corteNum <= $cortesTranscurridos; $corteNum++) {
+                // Si ya se liquidó en un corte anterior, no generar filas vacías o excedentes posteriores
+                if ($corteDondeSeLiquido !== null && $corteNum > $corteDondeSeLiquido) {
+                    break;
+                }
+
                 $esExcedidoPlazo = ($corteNum > $totalQuincenas);
                 $pagoDisplayNum = min($corteNum, $totalQuincenas);
                 $numeroPagoTexto = "{$pagoDisplayNum}/{$totalQuincenas}";
@@ -967,9 +972,12 @@ class CorteCobranzaService
                         return intval($pago->numero_quincena) === $corteNum;
                     });
                     if ($pagosHistoricos->isEmpty()) {
-                        $pagosHistoricos = $pagosPrestamo->filter(function($pago) use ($fechaCortePasada, $corteNum, $cuotaBrutaFila) {
+                        $relSiguiente = $relacionesCerradas[$corteNum] ?? null;
+                        $fechaLimiteCorte = $relSiguiente ? $relSiguiente->fecha_corte->copy()->endOfDay() : ($fechaCortePasada ? $fechaCortePasada->copy()->addDays(15)->endOfDay() : null);
+
+                        $pagosHistoricos = $pagosPrestamo->filter(function($pago) use ($fechaLimiteCorte, $corteNum, $cuotaBrutaFila) {
                             $sinQuincena = (intval($pago->numero_quincena) === 0 || $pago->numero_quincena === null);
-                            $coincideFecha = $fechaCortePasada && $pago->created_at <= $fechaCortePasada->copy()->endOfDay();
+                            $coincideFecha = $fechaLimiteCorte && $pago->created_at <= $fechaLimiteCorte;
                             return $sinQuincena && $coincideFecha;
                         });
                     }
@@ -1061,8 +1069,17 @@ class CorteCobranzaService
 
                 $totalFila = round($totalFila, 2);
 
+                // Evaluar si en este corte el préstamo queda completamente liquidado en su totalidad
+                $totalAbonadoHastaAqui = ($corteNum < $cortesTranscurridos) ? $abonosConsumidos : ($abonosConsumidos + $abonoEsteCorte);
+                $esLiquidadoTotal = ($corteNum >= $totalQuincenas && $adeudoArrastre <= 0)
+                    || ($totalNetoExigiblePrestamo > 0 && ($totalAbonadoHastaAqui >= ($totalNetoExigiblePrestamo - 0.99) || floor($totalAbonadoHastaAqui) >= floor($totalNetoExigiblePrestamo)) && $adeudoArrastre <= 0);
+
+                if ($esLiquidadoTotal && $corteDondeSeLiquido === null) {
+                    $corteDondeSeLiquido = $corteNum;
+                }
+
                 // Agregar fila al reporte con numeración por cliente
-                $filas[] = [
+                $filasEstePrestamo[] = [
                     'numero' => $contadorFilaCliente++,
                     'prestamo_id' => $p->id,
                     'referencia' => $p->referencia,
@@ -1078,6 +1095,23 @@ class CorteCobranzaService
                     'abono' => $abonoEsteCorte,
                     'total' => $totalFila,
                 ];
+            }
+
+            // REGLA: Si el adeudo total se liquidó en un corte previo ($corteDondeSeLiquido < $cortesTranscurridos),
+            // en el siguiente corte el préstamo desaparece por completo de la relación.
+            if ($corteDondeSeLiquido !== null && $cortesTranscurridos > $corteDondeSeLiquido) {
+                if ($p->estado !== 'finalizado') {
+                    $p->update([
+                        'estado' => 'finalizado',
+                        'adeudo_pendiente' => 0.00,
+                    ]);
+                }
+                continue;
+            }
+
+            // Agregar las filas generadas de este préstamo
+            foreach ($filasEstePrestamo as $f) {
+                $filas[] = $f;
             }
         }
 

@@ -255,23 +255,23 @@ class CobranzaValesIndividualesTest extends TestCase
         $config = Configuracion::actual();
         $corteOriginal = $config->fecha_corte->copy();
 
-        // 1er Clic: Gerente General presiona el botón "Simular Siguiente Corte"
+        // 1er Clic: Gerente General presiona el botón "Simular Siguiente Corte" (Corte 1: se abre sin multas)
         $response1 = $this->actingAs($this->gerenteGeneral)->post(route('configuracion-general.simular-corte'));
         $response1->assertSessionHas('success');
+        $prestamo->refresh();
+        $this->assertEquals(0.00, $prestamo->multas);
 
-        // El préstamo con adeudo vencido debe haber recibido su multa individual de $200
+        // 2do Clic: Se vuelve a presionar el botón (Corte 2: vence corte 1 impago y se aplica multa de $200)
+        $response2 = $this->actingAs($this->gerenteGeneral)->post(route('configuracion-general.simular-corte'));
+        $response2->assertSessionHas('success');
         $prestamo->refresh();
         $this->assertEquals(200.00, $prestamo->multas);
-
-        // La distribuidora debe registrar la multa acumulada de sus vales ($200)
         $this->distribuidor->refresh();
         $this->assertEquals(200.00, $this->distribuidor->multas);
 
-        // 2do Clic: Se vuelve a presionar el botón simulando otro corte consecutivo
-        $response2 = $this->actingAs($this->gerenteGeneral)->post(route('configuracion-general.simular-corte'));
-        $response2->assertSessionHas('success');
-
-        // Las multas se acumulan: $200 + $200 = $400 en el préstamo y en la distribuidora
+        // 3er Clic: Se simula otro corte consecutivo (Corte 3: multas se acumulan a $400)
+        $response3 = $this->actingAs($this->gerenteGeneral)->post(route('configuracion-general.simular-corte'));
+        $response3->assertSessionHas('success');
         $prestamo->refresh();
         $this->assertEquals(400.00, $prestamo->multas, 'La multa del vale debe acumularse a $400.');
         $this->assertEquals(4400.00, $prestamo->totalAdeudoConMultas());
@@ -320,7 +320,11 @@ class CobranzaValesIndividualesTest extends TestCase
             'estado_entrega' => 'entregado',
         ]);
 
-        // Simular 3 cortes consecutivos
+        // Simular 4 cortes consecutivos (1er corte abre periodo, los siguientes 3 registran retrasos)
+        $this->actingAs($this->gerenteGeneral)->post(route('configuracion-general.simular-corte'));
+        $this->distribuidor->refresh();
+        $this->assertEquals(0, $this->distribuidor->conteo_retrasos);
+
         $this->actingAs($this->gerenteGeneral)->post(route('configuracion-general.simular-corte'));
         $this->distribuidor->refresh();
         $this->assertEquals(1, $this->distribuidor->conteo_retrasos);
@@ -329,7 +333,7 @@ class CobranzaValesIndividualesTest extends TestCase
         $this->distribuidor->refresh();
         $this->assertEquals(2, $this->distribuidor->conteo_retrasos);
 
-        // 3er corte simulado: debe disparar la alerta del 3er retraso
+        // 4to corte simulado: 3er retraso acumulado -> debe disparar la alerta del 3er retraso
         $this->actingAs($this->gerenteGeneral)->post(route('configuracion-general.simular-corte'));
         $this->distribuidor->refresh();
         $this->assertEquals(3, $this->distribuidor->conteo_retrasos);
@@ -569,6 +573,9 @@ class CobranzaValesIndividualesTest extends TestCase
         $this->assertEquals(600.00, $this->distribuidor->totalCuotaQuincenalNeta());
         $this->assertEquals(600.00, $this->distribuidor->totalQuincenalExigibleRelacion());
 
+        // Simular primer corte para abrir periodo en caja
+        app(\App\Services\CorteCobranzaService::class)->simularSiguienteCorte();
+
         // Vista de cajero debe mostrar cuota neta ($600.00) y comisión (-$50.00)
         $response = $this->actingAs($this->cajero)->get(route('cajero.abonos.index'));
         $response->assertOk();
@@ -631,7 +638,11 @@ class CobranzaValesIndividualesTest extends TestCase
         $cuotaNeta = $this->distribuidor->totalCuotaQuincenalNeta();
         $this->assertEquals(276.00, $cuotaNeta);
 
-        // 1. Abonar el TOTAL antes o al corte vía cajero
+        // 1. Simular el primer corte para que el vale entre al periodo activo de cobranza
+        $corteService = app(\App\Services\CorteCobranzaService::class);
+        $corteService->simularSiguienteCorte();
+
+        // 2. Abonar el TOTAL antes o al corte vía cajero
         $responseAbono = $this->actingAs($this->cajero)->post(route('cajero.abonos.distribuidora.store', $this->distribuidor), [
             'referencia_pago' => 'REF-DIST-PUNTOS-01',
             'monto_abonado' => 276.00,
@@ -639,11 +650,16 @@ class CobranzaValesIndividualesTest extends TestCase
         ]);
         $responseAbono->assertSessionHasNoErrors();
 
-        // 2. Se deben haber calculado y sumado los puntos inmediatamente: floor(2400 / 1200) * 3 = 6 puntos
+        // 3. Inmediatamente con el abono NO tiene puntos aún
+        $this->distribuidor->refresh();
+        $this->assertEquals(0, $this->distribuidor->puntos, 'El abono no debe otorgar puntos antes del corte');
+
+        // 4. Al ejecutarse el corte siguiente, se evalúa el pago anticipado y se otorgan los puntos: floor(2400 / 1200) * 3 = 6 puntos
+        $corteService->simularSiguienteCorte();
         $this->distribuidor->refresh();
         $this->assertEquals(6, $this->distribuidor->puntos);
 
-        // 3. La relación debe mostrar el estado Liquidado y total en $0.00
+        // 5. La relación debe mostrar el estado Liquidado y total en $0.00
         $responseRelacion = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $responseRelacion->assertOk();
         $responseRelacion->assertSee('Liquidado');
@@ -702,7 +718,11 @@ class CobranzaValesIndividualesTest extends TestCase
         $cuotaNeta = $this->distribuidor->totalCuotaQuincenalNeta();
         $this->assertEquals(230.00, $cuotaNeta);
 
-        // 1. Se abona un monto MENOR al total ($100.00 de $230.00)
+        // 1. Simular el primer corte
+        $corteService = app(\App\Services\CorteCobranzaService::class);
+        $corteService->simularSiguienteCorte();
+
+        // 2. Se abona un monto MENOR al total ($100.00 de $230.00)
         $responseAbono = $this->actingAs($this->cajero)->post(route('cajero.abonos.distribuidora.store', $this->distribuidor), [
             'referencia_pago' => 'REF-DIST-PARCIAL-01',
             'monto_abonado' => 100.00,
@@ -710,14 +730,11 @@ class CobranzaValesIndividualesTest extends TestCase
         ]);
         $responseAbono->assertSessionHasNoErrors();
 
-        // 2. Al vencer la fecha límite, se aplican recargos / multas ($300.00)
+        // 3. Al vencer la fecha límite, se aplican recargos / multas ($300.00)
         $prestamo->update(['multas' => 300.00]);
         $this->distribuidor->update(['multas' => 300.00]);
 
-        // 3. En la relación de cobranza:
-        // Cuota neta actual ($230) + Recargos ($550 = Multa $300 + Cuota anterior $230 + Com anterior $20) = $780.00
-        // Restando el abono realizado ($100.00):
-        // Total a PAGAR = $680.00
+        // 4. En la relación de cobranza:
         $responseRelacion = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $responseRelacion->assertOk();
         $responseRelacion->assertSee('Relación de Cobranza Oficial');
@@ -758,16 +775,27 @@ class CobranzaValesIndividualesTest extends TestCase
             'estado_entrega' => 'entregado', // Cobrado/entregado por cajero
         ]);
 
-        // Abrir la relación de cobranza
-        $response = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
-        $response->assertOk();
-        $response->assertSee('Vale Reciente $1,000');
-        $response->assertSee($this->cliente->nombre);
-        $response->assertDontSee('No se encontraron clientes con préstamos activos para este periodo.');
+        // 1. Abrir la relación de cobranza antes del corte: debe estar vacía (flujo nuevo de vales diferidos)
+        $responseAntes = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
+        $responseAntes->assertOk();
+        $responseAntes->assertSee('No se encontraron clientes con préstamos activos para este periodo.');
+
+        // 2. Simular el primer corte: ahora sí debe reflejarse en la relación
+        $corteService = app(\App\Services\CorteCobranzaService::class);
+        $corteService->simularSiguienteCorte();
+
+        $responseDespues = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
+        $responseDespues->assertOk();
+        $responseDespues->assertSee('Vale Reciente $1,000');
+        $responseDespues->assertSee($this->cliente->nombre);
+        $responseDespues->assertDontSee('No se encontraron clientes con préstamos activos para este periodo.');
     }
 
     public function test_liquidated_cut_incurs_recargos_on_subsequent_unpaid_cuts(): void
     {
+        $t1 = \Carbon\Carbon::parse('2026-08-25 12:00:00');
+        \Carbon\Carbon::setTestNow($t1);
+
         $config = Configuracion::firstOrCreate([], [
             'comision_cobre' => 10.00,
             'multa_adeudo' => 300.00,
@@ -818,9 +846,11 @@ class CobranzaValesIndividualesTest extends TestCase
             'estado_entrega' => 'entregado',
         ]);
 
-        // 1. Corte 1: Se liquida por completo ($230 cuota neta)
-        $this->actingAs($this->cajero)->post(route('cajero.abonos.distribuidora.store', $this->distribuidor), [
-            'referencia_pago' => 'REF-DIST-MULTI-01',
+        // 1. Simular Corte 1 para que entre a cobranza y liquidar por completo ($230 cuota neta)
+        $corteService = app(\App\Services\CorteCobranzaService::class);
+        $corteService->simularSiguienteCorte();
+
+        $this->actingAs($this->cajero)->post(route('cajero.abonos.store', $prestamo), [
             'monto_abonado' => 230.00,
             'metodo_pago' => 'efectivo',
         ]);
@@ -831,7 +861,7 @@ class CobranzaValesIndividualesTest extends TestCase
         $response1->assertSee('Liquidado');
 
         // 2. Simular cierre de Corte 1 (Liquidado, 0 multas) y avance a Corte 2
-        $corteService = app(\App\Services\CorteCobranzaService::class);
+        \Carbon\Carbon::setTestNow($t1->copy()->addDays(15));
         $corteService->simularSiguienteCorte();
 
         // En Corte 2 recién iniciado: aún no tiene multas porque acaba de abrirse
@@ -839,6 +869,7 @@ class CobranzaValesIndividualesTest extends TestCase
         $this->assertEquals(0, $this->distribuidor->multas);
 
         // 3. Simular vencimiento de Corte 2 SIN PAGAR -> Aplica multas por mora
+        \Carbon\Carbon::setTestNow($t1->copy()->addDays(30));
         $corteService->simularSiguienteCorte();
 
         $this->distribuidor->refresh();
@@ -847,10 +878,14 @@ class CobranzaValesIndividualesTest extends TestCase
         $response2 = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));
         $response2->assertOk();
         $response2->assertSee('Relación de Cobranza Oficial');
+        \Carbon\Carbon::setTestNow();
     }
 
     public function test_partial_payment_then_mora_then_full_payment_cleans_subsequent_cut(): void
     {
+        $t1 = \Carbon\Carbon::parse('2026-08-25 12:00:00');
+        \Carbon\Carbon::setTestNow($t1);
+
         $config = Configuracion::firstOrCreate([], [
             'comision_cobre' => 3.00,
             'multa_adeudo' => 300.00,
@@ -897,15 +932,18 @@ class CobranzaValesIndividualesTest extends TestCase
             'estado_entrega' => 'entregado',
         ]);
 
-        // 1. Corte 1: Abona $930.00 (pago parcial, faltaron $1.25)
-        $this->actingAs($this->cajero)->post(route('cajero.abonos.distribuidora.store', $this->distribuidor), [
-            'referencia_pago' => 'REF-DIST-ESCENARIO-03',
+        // 1. Simular Corte 1 para que entre a cobranza
+        $corteService = app(\App\Services\CorteCobranzaService::class);
+        $corteService->simularSiguienteCorte();
+
+        // Abona $930.00 (pago parcial, faltaron $1.25)
+        $this->actingAs($this->cajero)->post(route('cajero.abonos.store', $prestamo), [
             'monto_abonado' => 930.00,
             'metodo_pago' => 'efectivo',
         ]);
 
         // Simular vencimiento de Corte 1 sin liquidar -> Aplica multas y avanza a Corte 2
-        $corteService = app(\App\Services\CorteCobranzaService::class);
+        \Carbon\Carbon::setTestNow($t1->copy()->addDays(15));
         $corteService->simularSiguienteCorte();
 
         // En Corte 2: Debe exigir $1,251.25 con recargos
@@ -918,8 +956,7 @@ class CobranzaValesIndividualesTest extends TestCase
         $responseCorte2->assertSee('1,251.00');
 
         // 2. En Corte 2: Abona y liquida el total con recargos ($1,251.00)
-        $this->actingAs($this->cajero)->post(route('cajero.abonos.distribuidora.store', $this->distribuidor), [
-            'referencia_pago' => 'REF-DIST-ESCENARIO-03',
+        $this->actingAs($this->cajero)->post(route('cajero.abonos.store', $prestamo), [
             'monto_abonado' => 1251.00,
             'metodo_pago' => 'efectivo',
         ]);
@@ -928,6 +965,7 @@ class CobranzaValesIndividualesTest extends TestCase
         $this->assertEquals(0.00, $this->distribuidor->multas);
 
         // 3. Simular avance a Corte 3
+        \Carbon\Carbon::setTestNow($t1->copy()->addDays(30));
         $corteService->simularSiguienteCorte();
 
         // Corte 3 debe ser un periodo limpio con adeudo de la quincena 3, 0 recargos, 0 abonos descontados erróneamente
@@ -935,6 +973,7 @@ class CobranzaValesIndividualesTest extends TestCase
         $responseCorte3->assertOk();
         $responseCorte3->assertSee('Relación de Cobranza Oficial');
         $responseCorte3->assertSee('3/8');
+        \Carbon\Carbon::setTestNow();
     }
 
     public function test_liquidated_prestamo_does_not_appear_in_relacion_pdf(): void
@@ -968,6 +1007,10 @@ class CobranzaValesIndividualesTest extends TestCase
             'estado' => 'activo',
             'estado_entrega' => 'entregado',
         ]);
+
+        // Simular Corte 1 para que el vale aparezca en la relación
+        $corteService = app(\App\Services\CorteCobranzaService::class);
+        $corteService->simularSiguienteCorte();
 
         // Ver relación antes de liquidar: debe aparecer el vale
         $responseAntes = $this->actingAs($this->distribuidor)->get(route('prestamos.relacion-pdf'));

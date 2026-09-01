@@ -912,6 +912,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         ]);
 
         $service = app(CorteCobranzaService::class);
+        $service->simularSiguienteCorte();
         $filas = $service->generarFilasRelacionCobranza($distribuidora);
 
         // Ana Alvarez debe aparecer primero y Bernardo Benitez después
@@ -1580,9 +1581,16 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         ]);
 
         $service = app(CorteCobranzaService::class);
+        $filasAntes = $service->generarFilasRelacionCobranza($distribuidora);
+
+        // Al cobrar el vale antes del corte debe verse vacío (0 filas para este nuevo vale)
+        $this->assertCount(0, $filasAntes);
+
+        // Al procesar el primer corte (simulación)
+        $service->simularSiguienteCorte();
         $filas = $service->generarFilasRelacionCobranza($distribuidora);
 
-        // Debe tener exactamente 1 fila (Corte 1 / 1/8)
+        // Debe tener exactamente 1 fila (Corte 1 / 1/8) sin multas
         $this->assertCount(1, $filas);
         $this->assertEquals(1, $filas[0]['numero']);
         $this->assertEquals('5/8', $filas[0]['producto']);
@@ -1827,14 +1835,14 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
             'created_by_user_id' => $distribuidora->id,
         ]);
 
-        // 2. Se presiona el botón "Simular Corte" a las 12:05:00
+        // 2. Se presiona el botón "Simular Corte" a las 12:05:00 (Primer corte para Leo)
         $t2 = \Carbon\Carbon::parse('2026-08-28 12:05:00');
         \Carbon\Carbon::setTestNow($t2);
         $service->simularSiguienteCorte();
 
-        // Leo recibió su multa por no pagar en corte 1
+        // En su primer corte, Leo se refleja sin multas ($931.25)
         $prestamoLeo->refresh();
-        $this->assertEquals(300.00, floatval($prestamoLeo->multas));
+        $this->assertEquals(0.00, floatval($prestamoLeo->multas));
 
         // 3. Después del corte, a las 12:10:00 se asigna y cobra vale a Maria Garcia
         $t3 = \Carbon\Carbon::parse('2026-08-28 12:10:00');
@@ -1858,10 +1866,23 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
             'created_by_user_id' => $distribuidora->id,
         ]);
 
-        // 4. Se genera la relación de cobranza en el ciclo activo
+        // 4. Se ejecuta el segundo corte a las 12:15:00
+        $t4 = \Carbon\Carbon::parse('2026-08-28 12:15:00');
+        \Carbon\Carbon::setTestNow($t4);
+        $service->simularSiguienteCorte();
+
+        // Ahora Leo sí recibe su multa de $300 por haber vencido el corte 1 impago
+        $prestamoLeo->refresh();
+        $this->assertEquals(300.00, floatval($prestamoLeo->multas));
+
+        // Maria en su primer corte tiene $0.00 de multa
+        $prestamoMaria->refresh();
+        $this->assertEquals(0.00, floatval($prestamoMaria->multas));
+
+        // 5. Se genera la relación de cobranza en el ciclo activo
         $filas = $service->generarFilasRelacionCobranza($distribuidora);
 
-        // Leo tiene 2 filas (estuvo antes del corte)
+        // Leo tiene 2 filas (1/8 vencido con arrastre + 2/8 con recargos de $300)
         $filasLeo = array_values(array_filter($filas, fn($f) => $f['cliente'] === 'Leo'));
         $this->assertCount(2, $filasLeo);
         $this->assertEquals(1, $filasLeo[0]['numero']);
@@ -1872,7 +1893,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertEquals(300.00, $filasLeo[1]['recargos']);
         $this->assertEquals(2181.25, $filasLeo[1]['total']);
 
-        // Maria Garcia tiene ÚNICAMENTE 1 fila limpia (entregada posterior al corte)
+        // Maria Garcia tiene ÚNICAMENTE 1 fila limpia (primer corte sin multas)
         $filasMaria = array_values(array_filter($filas, fn($f) => $f['cliente'] === 'Maria Garcia'));
         $this->assertCount(1, $filasMaria);
         $this->assertEquals(1, $filasMaria[0]['numero']);
@@ -2217,7 +2238,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         ]);
 
         // 4. Simular el corte (cerrar corte 1 y avanzar a corte 2)
-        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(5));
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(20));
         $service->simularSiguienteCorte();
 
         $relacion2 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)
@@ -2350,7 +2371,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         ]);
 
         // 2. Simular corte (Avanzar a Corte 2)
-        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(5));
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(20));
         $service = app(CorteCobranzaService::class);
         $service->simularSiguienteCorte();
 
@@ -2362,7 +2383,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertEquals(0.00, floatval($prestamoMaria->multas), 'Maria debe tener 0 recargos por haber pagado');
 
         $relacion2 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)
-            ->where('estado_pago', 'pendiente')
+            ->where('fecha_corte', '<=', now())
             ->latest('fecha_corte')
             ->first();
 
@@ -2457,7 +2478,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         ]);
 
         // 2. Avanzar a Corte 2
-        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(5));
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(20));
         $service = app(CorteCobranzaService::class);
         $service->simularSiguienteCorte();
 
@@ -2488,7 +2509,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertEquals(0.00, $totalGeneralSum2, 'El total general debe dar 0.00');
 
         // 5. Avanzar a Corte 3
-        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(20));
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(35));
         $service->simularSiguienteCorte();
 
         $relacion3 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)
@@ -2574,9 +2595,9 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertEquals(931.25, $filas1[0]['total']);
 
         // Simular Corte 1 -> Avanzar a Corte 2
-        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(5));
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(20));
         $service->simularSiguienteCorte();
-        $relacion2 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)->where('estado_pago', 'pendiente')->latest('fecha_corte')->first();
+        $relacion2 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)->where('fecha_corte', '<=', now())->latest('fecha_corte')->first();
 
         // Corte 2 sin pagar -> Fila 1: 950.00, Fila 2: 2,181.25 (950 + 931.25 + 300)
         $filas2 = $service->generarFilasRelacionCobranza($distribuidora, $relacion2);
@@ -2585,9 +2606,9 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertEquals(2181.25, $filas2[1]['total']);
 
         // Simular Corte 2 -> Avanzar a Corte 3
-        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(20));
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(35));
         $service->simularSiguienteCorte();
-        $relacion3 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)->where('estado_pago', 'pendiente')->latest('fecha_corte')->first();
+        $relacion3 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)->where('fecha_corte', '<=', now())->latest('fecha_corte')->first();
 
         // Corte 3 sin pagar -> Fila 1: 950.00, Fila 2: 2,181.25, Fila 3: 3,431.25 (2200 + 931.25 + 300)
         $filas3 = $service->generarFilasRelacionCobranza($distribuidora, $relacion3);
@@ -2597,9 +2618,9 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertEquals(3431.25, $filas3[2]['total'], 'El corte 3 debe ser 3,431.25 al sumar la comision perdida');
 
         // Simular Corte 3 -> Avanzar a Corte 4
-        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(35));
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(50));
         $service->simularSiguienteCorte();
-        $relacion4 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)->where('estado_pago', 'pendiente')->latest('fecha_corte')->first();
+        $relacion4 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)->where('fecha_corte', '<=', now())->latest('fecha_corte')->first();
 
         // Corte 4 sin pagar -> Fila 4: 4,681.25 (3450 + 931.25 + 300)
         $filas4 = $service->generarFilasRelacionCobranza($distribuidora, $relacion4);
@@ -2607,9 +2628,9 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertEquals(4681.25, $filas4[3]['total'], 'El corte 4 debe ser 4,681.25');
 
         // Simular Corte 4 -> Avanzar a Corte 5
-        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(50));
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(65));
         $service->simularSiguienteCorte();
-        $relacion5 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)->where('estado_pago', 'pendiente')->latest('fecha_corte')->first();
+        $relacion5 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)->where('fecha_corte', '<=', now())->latest('fecha_corte')->first();
 
         // Corte 5 sin pagar -> Fila 5: 5,931.25 (4700 + 931.25 + 300)
         $filas5 = $service->generarFilasRelacionCobranza($distribuidora, $relacion5);
@@ -2776,6 +2797,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         ]);
 
         $service = app(CorteCobranzaService::class);
+        $service->simularSiguienteCorte();
         $filas = $service->generarFilasRelacionCobranza($distribuidora);
         $this->assertEquals(931.25, $filas[0]['total']);
 
@@ -2795,7 +2817,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $prestamo->refresh();
         $this->assertEquals(0.00, floatval($prestamo->multas), 'No debe generar recargos');
 
-        $relacion2 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)->where('estado_pago', 'pendiente')->latest('fecha_corte')->first();
+        $relacion2 = RelacionCobranza::where('distribuidora_id', $distribuidora->id)->where('fecha_corte', '<=', now())->latest('fecha_corte')->first();
         $filasCorte2 = $service->generarFilasRelacionCobranza($distribuidora, $relacion2);
         $this->assertCount(2, $filasCorte2);
         $this->assertEquals(931.25, $filasCorte2[0]['total'], 'Corte 1 histórico queda en 931.25 (saldado)');
@@ -2893,8 +2915,11 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
 
         $service = app(CorteCobranzaService::class);
 
-        // Avanzar el tiempo más allá del corte sin registrar pago -> Genera atraso y multas
-        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(6));
+        // Avanzar el tiempo más allá del corte sin registrar pago -> Genera atraso y multas al segundo corte
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(5));
+        $service->simularSiguienteCorte();
+
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(20));
         $service->simularSiguienteCorte();
 
         $prestamo1->refresh();
@@ -3189,4 +3214,1215 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertNotNull($log->datos_despues['proxima_fecha_corte']);
         $this->assertNotNull($log->datos_despues['proxima_fecha_limite']);
     }
+
+    public function test_flujo_cobro_vale_vacio_y_primer_corte_sin_multas_y_segundo_corte_con_multas()
+    {
+        // Caso exacto: Vale $15,000, apertura 10%, interes quincenal 5%, seguro 100, distribuidora Cobre 3%, multa 300, 8 quincenas
+        Configuracion::actual()->update(['comision_cobre' => 3.00]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+        ]);
+
+        $cliente = $this->crearClienteTest('Carlos Sanchez', $distribuidora);
+
+        $producto = ProductoVale::firstOrCreate(['clave' => 'VALE-15K-8Q'], [
+            'nombre' => 'Vale $15,000 / 8Q',
+            'monto_prestamo' => 15000.00,
+            'costo_seguro' => 100.00,
+            'plazo_quincenas' => 8,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $tiempoInicial = \Carbon\Carbon::parse('2026-08-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        // 1. Cobro/Entrega del vale en caja (Momento 0)
+        $prestamo = Prestamo::create([
+            'referencia' => 'VALE-15K-001',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $producto->id,
+            'tipo' => 'vale_digital',
+            'monto_prestamo' => 15000.00,
+            'cuota_quincenal' => 2825.00, // ($15000 + $6000 interes + $1500 apertura + $100 seguro) / 8 = $22600 / 8 = $2825.00
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'monto_total_pagar' => 22600.00,
+            'adeudo_pendiente' => 22600.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'entregado_at' => $tiempoInicial,
+            'created_by_user_id' => $distribuidora->id,
+            'created_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // MOMENTO 0: Al cobrar el vale en caja, la relación de cobranza para este vale está VACÍA (0 filas)
+        $filasMomento0 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(0, $filasMomento0, 'Al cobrar el vale debe verse vacío en la relación');
+
+        // MOMENTO 1: Se ejecuta el 1er corte (Simulación 1 a los 15 días)
+        $tiempoCorte1 = $tiempoInicial->copy()->addDays(15);
+        \Carbon\Carbon::setTestNow($tiempoCorte1);
+        $resCorte1 = $service->simularSiguienteCorte();
+
+        // En el primer corte NO debe aplicar multas
+        $prestamo->refresh();
+        $this->assertEquals(0, $resCorte1['multas_aplicadas']);
+        $this->assertEquals(0.00, floatval($prestamo->multas), 'En el primer corte no hay multas');
+
+        // La relación de cobranza muestra 1 fila con la cuota neta ($2,768.75) sin multas
+        $filasCorte1 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(1, $filasCorte1);
+        $this->assertEquals(1, $filasCorte1[0]['numero']);
+        $this->assertEquals('1/8', $filasCorte1[0]['numero_pago']);
+        $this->assertEquals(2825.00, $filasCorte1[0]['pago']);
+        $this->assertEquals(56.25, $filasCorte1[0]['comision']); // ($15000 * 3%) / 8 = $56.25
+        $this->assertEquals(2768.75, $filasCorte1[0]['cuota_neta']);
+        $this->assertEquals(0.00, $filasCorte1[0]['recargos']);
+        $this->assertEquals(2768.75, $filasCorte1[0]['total']);
+
+        // MOMENTO 2: Se ejecuta el 2do corte (Simulación 2 a los 30 días) SIN HABER PAGADO EL 1ER CORTE
+        $tiempoCorte2 = $tiempoInicial->copy()->addDays(30);
+        \Carbon\Carbon::setTestNow($tiempoCorte2);
+        $resCorte2 = $service->simularSiguienteCorte();
+
+        // Ahora sí se aplica la multa del primer corte ($300.00)
+        $prestamo->refresh();
+        $this->assertEquals(1, $resCorte2['multas_aplicadas']);
+        $this->assertEquals(300.00, floatval($prestamo->multas), 'Al 2do corte se aplica la multa del 1ro');
+
+        // La relación de cobranza muestra 2 filas (1/8 vencido de $2,825.00 + 2/8 vigente con recargos de $300.00)
+        $filasCorte2 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(2, $filasCorte2);
+
+        // Fila 1 (Corte 1/8 vencido)
+        $this->assertEquals('1/8', $filasCorte2[0]['numero_pago']);
+        $this->assertEquals(2825.00, $filasCorte2[0]['total']);
+
+        // Fila 2 (Corte 2/8 vigente con multa acumulada: $2825 arrastre + $2768.75 cuota neta + $300 multa = $5893.75)
+        $this->assertEquals('2/8', $filasCorte2[1]['numero_pago']);
+        $this->assertEquals(300.00, $filasCorte2[1]['recargos']);
+        $this->assertEquals(5893.75, $filasCorte2[1]['total']);
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    /**
+     * PRUEBA 1: Pago quincenal completo.
+     * Al pagar un vale en su totalidad quincena a quincena, los cortes continúan creándose
+     * sucesivamente (1/8 -> 2/8 -> 3/8 -> 4/8) con $0 de multas y total neto exacto.
+     */
+    public function test_pago_quincenal_completo_continua_haciendo_cortes_consecutivos_sin_multas()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-09-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        $config = Configuracion::actual();
+        $config->update([
+            'comision_cobre' => 3.00,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'activo' => true,
+        ]);
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+        $cliente = $this->crearClienteTest('Ana Gomez', $distribuidora);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-5000-FULL',
+            'nombre' => 'Vale $5,000',
+            'monto_prestamo' => 5000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-5000-FULL-01',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'monto_total_pagar' => 7600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 5000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // 1. Simular Corte 1
+        $service->simularSiguienteCorte();
+        $filasCorte1 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(1, $filasCorte1);
+        $this->assertEquals('1/8', $filasCorte1[0]['numero_pago']);
+        $this->assertEquals(931.25, $filasCorte1[0]['total']);
+
+        // Pagar quincena 1 completa ($931.25)
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 931.25,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // 2. Avanzar a Corte 2 (+15 días)
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(15));
+        $resCorte2 = $service->simularSiguienteCorte();
+        $this->assertEquals(0, $resCorte2['multas_aplicadas'], 'No debe haber multas porque se pagó a tiempo el corte 1');
+
+        $filasCorte2 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(2, $filasCorte2, 'El corte 2 debe mostrar 2 filas (1/8 histórico y 2/8 vigente)');
+        $this->assertEquals('1/8', $filasCorte2[0]['numero_pago']);
+        $this->assertEquals('2/8', $filasCorte2[1]['numero_pago']);
+        $this->assertEquals(0.00, $filasCorte2[1]['recargos']);
+        $this->assertEquals(931.25, $filasCorte2[1]['total'], 'La fila 2/8 debe exigir su cuota neta regular de 931.25');
+
+        // Pagar quincena 2 completa ($931.25)
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 931.25,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // 3. Avanzar a Corte 3 (+30 días)
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(30));
+        $resCorte3 = $service->simularSiguienteCorte();
+        $this->assertEquals(0, $resCorte3['multas_aplicadas']);
+
+        $filasCorte3 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(3, $filasCorte3, 'El corte 3 debe mostrar 3 filas');
+        $this->assertEquals('3/8', $filasCorte3[2]['numero_pago']);
+        $this->assertEquals(0.00, $filasCorte3[2]['recargos']);
+        $this->assertEquals(931.25, $filasCorte3[2]['total']);
+
+        // Pagar quincena 3 completa ($931.25)
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 931.25,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // 4. Avanzar a Corte 4 (+45 días)
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(45));
+        $resCorte4 = $service->simularSiguienteCorte();
+        $this->assertEquals(0, $resCorte4['multas_aplicadas']);
+
+        $filasCorte4 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(4, $filasCorte4, 'El corte 4 debe mostrar 4 filas');
+        $this->assertEquals('4/8', $filasCorte4[3]['numero_pago']);
+        $this->assertEquals(0.00, $filasCorte4[3]['recargos']);
+        $this->assertEquals(931.25, $filasCorte4[3]['total']);
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    /**
+     * PRUEBA 2: Adeudo quincenal total (0 pago).
+     * Si no se realizan abonos, los cortes continúan avanzando, acumulando las multas
+     * por mora ($300 por corte atrasado) y arrastrando el saldo con pérdida de comisiones.
+     */
+    public function test_adeudo_quincenal_total_genera_cortes_con_multas_acumuladas_y_comisiones_perdidas()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-09-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        $config = Configuracion::actual();
+        $config->update([
+            'comision_cobre' => 3.00,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'activo' => true,
+        ]);
+        $cliente = $this->crearClienteTest('Roberto Mora', $distribuidora);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-5000-ADEUDO',
+            'nombre' => 'Vale $5,000',
+            'monto_prestamo' => 5000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-5000-ADEUDO-01',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'monto_total_pagar' => 7600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 5000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // Corte 1: 0 multas
+        $service->simularSiguienteCorte();
+        $filasCorte1 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertEquals(931.25, $filasCorte1[0]['total']);
+
+        // Corte 2 (+15 días) SIN PAGAR: 1er retraso -> Multa de $300 aplicada
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(15));
+        $service->simularSiguienteCorte();
+        $prestamo->refresh();
+        $this->assertEquals(300.00, floatval($prestamo->multas));
+
+        $filasCorte2 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(2, $filasCorte2);
+        $this->assertEquals(950.00, $filasCorte2[0]['total']);
+        $this->assertEquals(2181.25, $filasCorte2[1]['total']);
+
+        // Corte 3 (+30 días) SIN PAGAR: 2do retraso -> Multa acumulada de $600
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(30));
+        $service->simularSiguienteCorte();
+        $prestamo->refresh();
+        $this->assertEquals(600.00, floatval($prestamo->multas));
+
+        $filasCorte3 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(3, $filasCorte3);
+        $this->assertEquals(3431.25, $filasCorte3[2]['total'], 'El corte 3 debe ser $3,431.25');
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    /**
+     * PRUEBA 3: Pago parcial.
+     * Al abonar un monto parcial ($500 de $931.25), se registra el abono, queda saldo
+     * pendiente ($431.25), y en el siguiente corte se arrastra el saldo restante con multa.
+     */
+    public function test_pago_parcial_registra_abono_y_arrastra_saldo_restante_a_siguientes_cortes()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-09-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        $config = Configuracion::actual();
+        $config->update([
+            'comision_cobre' => 3.00,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'activo' => true,
+        ]);
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+        $cliente = $this->crearClienteTest('Luisa Parcial', $distribuidora);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-5000-PARC',
+            'nombre' => 'Vale $5,000',
+            'monto_prestamo' => 5000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-5000-PARC-01',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'monto_total_pagar' => 7600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 5000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // Corte 1
+        $service->simularSiguienteCorte();
+
+        // Se abonan $500.00 (faltan $431.25)
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 500.00,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        $filasCorte1 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertEquals(500.00, $filasCorte1[0]['abono']);
+        $this->assertEquals(431.25, $filasCorte1[0]['total']);
+
+        // Corte 2 (+15 días): Al no liquidar el faltante, entra a mora con multa de $300
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(15));
+        $service->simularSiguienteCorte();
+        $prestamo->refresh();
+        $this->assertEquals(300.00, floatval($prestamo->multas));
+
+        $filasCorte2 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(2, $filasCorte2);
+        $this->assertEquals(500.00, $filasCorte2[0]['abono']);
+        $this->assertEquals(1681.25, $filasCorte2[1]['total'], 'Fila 2/8 debe exigir $1,681.25 ($450 restante + $300 multa + $931.25 cuota neta)');
+
+        // Ahora en Corte 2 se abona el saldo restante ($1,681.25)
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 1681.25,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // Corte 3 (+30 días): El vale queda al corriente, 0 multas nuevas y cuota limpia de $931.25
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(30));
+        $service->simularSiguienteCorte();
+
+        $filasCorte3 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(3, $filasCorte3);
+        $this->assertEquals('3/8', $filasCorte3[2]['numero_pago']);
+        $this->assertEquals(0.00, $filasCorte3[2]['recargos']);
+        $this->assertEquals(931.25, $filasCorte3[2]['total']);
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    /**
+     * PRUEBA 4: Pago excedente.
+     * Al pagar de más ($1,000 sobre una cuota neta de $931.25), se genera saldo a favor (-$69.00)
+     * y en el siguiente corte se descuenta automáticamente ($931.25 - $69.00 = $862.25).
+     */
+    public function test_pago_excedente_genera_saldo_a_favor_y_se_descuenta_en_siguiente_corte()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-09-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        $config = Configuracion::actual();
+        $config->update([
+            'comision_cobre' => 3.00,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'activo' => true,
+        ]);
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+        $cliente = $this->crearClienteTest('Victor Excedente', $distribuidora);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-5000-EXC',
+            'nombre' => 'Vale $5,000',
+            'monto_prestamo' => 5000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-5000-EXC-01',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'monto_total_pagar' => 7600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 5000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // Corte 1
+        $service->simularSiguienteCorte();
+
+        // Se abonan $1,000.00 (excedente de $69.00)
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 1000.00,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        $filasCorte1 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertEquals(-69.00, $filasCorte1[0]['total'], 'La fila 1/8 debe mostrar -$69.00 de saldo a favor');
+
+        // Corte 2 (+15 días): La fila 2/8 descuenta los $69.00 -> $862.25
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(15));
+        $resCorte2 = $service->simularSiguienteCorte();
+        $this->assertEquals(0, $resCorte2['multas_aplicadas']);
+
+        $filasCorte2 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(2, $filasCorte2);
+        $this->assertEquals(-69.00, $filasCorte2[0]['total']);
+        $this->assertEquals(862.25, $filasCorte2[1]['total'], 'La fila 2/8 debe reflejar el descuento: $931.25 - $69.00 = $862.25');
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    /**
+     * PRUEBA 5: Combinando múltiples clientes de vales a la vez.
+     * Con 4 clientes distintos bajo la misma distribuidora:
+     * - Cliente A (Juan): Pago COMPLETO ($931.25)
+     * - Cliente B (Pedro): SIN PAGO ($0.00) -> Entra en mora
+     * - Cliente C (Luis): Pago PARCIAL ($500.00) -> Saldo pendiente con mora
+     * - Cliente D (Carlos): Pago EXCEDENTE ($1,000.00) -> Saldo a favor
+     * Se procesan cortes sucesivos y cada préstamo mantiene su estado, cálculo y avance independiente.
+     */
+    public function test_combinando_pagos_con_multiples_clientes_de_vales_simultaneamente()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-09-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        $config = Configuracion::actual();
+        $config->update([
+            'comision_cobre' => 3.00,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'activo' => true,
+        ]);
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+
+        $clienteJuan = $this->crearClienteTest('Juan Completo', $distribuidora);
+        $clientePedro = $this->crearClienteTest('Pedro Adeudo', $distribuidora);
+        $clienteLuis = $this->crearClienteTest('Luis Parcial', $distribuidora);
+        $clienteCarlos = $this->crearClienteTest('Carlos Excedente', $distribuidora);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-5000-MULTI',
+            'nombre' => 'Vale $5,000',
+            'monto_prestamo' => 5000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $prestamoJuan = Prestamo::create([
+            'referencia' => 'VAL-JUAN-01',
+            'cliente_id' => $clienteJuan->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'monto_total_pagar' => 7600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 5000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $prestamoPedro = Prestamo::create([
+            'referencia' => 'VAL-PEDRO-01',
+            'cliente_id' => $clientePedro->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'monto_total_pagar' => 7600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 5000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $prestamoLuis = Prestamo::create([
+            'referencia' => 'VAL-LUIS-01',
+            'cliente_id' => $clienteLuis->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'monto_total_pagar' => 7600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 5000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $prestamoCarlos = Prestamo::create([
+            'referencia' => 'VAL-CARLOS-01',
+            'cliente_id' => $clienteCarlos->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'monto_total_pagar' => 7600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 5000.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // 1. Simular Corte 1
+        $service->simularSiguienteCorte();
+
+        // Juan paga COMPLETO ($931.25)
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamoJuan), [
+            'monto_abonado' => 931.25,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // Pedro NO paga ($0.00)
+
+        // Luis paga PARCIAL ($500.00)
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamoLuis), [
+            'monto_abonado' => 500.00,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // Carlos paga EXCEDENTE ($1,000.00)
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamoCarlos), [
+            'monto_abonado' => 1000.00,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // 2. Avanzar a Corte 2 (+15 días)
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(15));
+        $resCorte2 = $service->simularSiguienteCorte();
+
+        // Se deben aplicar multas únicamente a los 2 vales con adeudo (Pedro y Luis), NO a Juan ni Carlos
+        $this->assertEquals(2, $resCorte2['multas_aplicadas'], 'Solo Pedro y Luis deben recibir multa');
+
+        $prestamoJuan->refresh();
+        $prestamoPedro->refresh();
+        $prestamoLuis->refresh();
+        $prestamoCarlos->refresh();
+
+        $this->assertEquals(0.00, floatval($prestamoJuan->multas), 'Juan no tiene multas');
+        $this->assertEquals(300.00, floatval($prestamoPedro->multas), 'Pedro tiene multa de $300');
+        $this->assertEquals(300.00, floatval($prestamoLuis->multas), 'Luis tiene multa de $300');
+        $this->assertEquals(0.00, floatval($prestamoCarlos->multas), 'Carlos no tiene multas');
+
+        // Verificar reporte global de la relación de cobranza
+        $filasCorte2 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(8, $filasCorte2, 'Debe haber 8 filas (2 por cada uno de los 4 préstamos)');
+
+        // Agrupar filas por préstamo
+        $filasPorPrestamo = [];
+        foreach ($filasCorte2 as $f) {
+            $filasPorPrestamo[$f['prestamo_id']][] = $f;
+        }
+
+        // Juan: Fila 2/8 limpia ($931.25)
+        $this->assertEquals(931.25, $filasPorPrestamo[$prestamoJuan->id][1]['total']);
+        $this->assertEquals(0.00, $filasPorPrestamo[$prestamoJuan->id][1]['recargos']);
+
+        // Pedro: Fila 2/8 con multa y arrastre ($2,181.25)
+        $this->assertEquals(2181.25, $filasPorPrestamo[$prestamoPedro->id][1]['total']);
+        $this->assertEquals(300.00, $filasPorPrestamo[$prestamoPedro->id][1]['recargos']);
+
+        // Luis: Fila 2/8 con multa y faltante ($1,681.25)
+        $this->assertEquals(1681.25, $filasPorPrestamo[$prestamoLuis->id][1]['total']);
+        $this->assertEquals(300.00, $filasPorPrestamo[$prestamoLuis->id][1]['recargos']);
+
+        // Carlos: Fila 2/8 con descuento del saldo a favor ($862.25)
+        $this->assertEquals(862.25, $filasPorPrestamo[$prestamoCarlos->id][1]['total']);
+        $this->assertEquals(0.00, $filasPorPrestamo[$prestamoCarlos->id][1]['recargos']);
+
+        // PDF de la relación se genera correctamente
+        $responsePDF = $this->actingAs($distribuidora)->get(route('prestamos.relacion-pdf'));
+        $responsePDF->assertOk();
+        $responsePDF->assertSee('Relación de Cobranza Oficial');
+        $responsePDF->assertSee('Juan Completo');
+        $responsePDF->assertSee('Pedro Adeudo');
+        $responsePDF->assertSee('Luis Parcial');
+        $responsePDF->assertSee('Carlos Excedente');
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    /**
+     * PRUEBA: Al liquidar el total de un vale (8/8 quincenas pagadas), el corte actual muestra
+     * la liquidación y en el siguiente corte (corte 9 o posteriores) desaparece completamente de la relación.
+     */
+    public function test_si_se_paga_el_adeudo_total_el_siguiente_corte_desaparece_de_la_relacion()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-09-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        $config = Configuracion::actual();
+        $config->update([
+            'comision_cobre' => 3.00,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'activo' => true,
+        ]);
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+        $cliente = $this->crearClienteTest('Maria Garcia', $distribuidora);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-15000-FULL',
+            'nombre' => 'jgcfjck',
+            'monto_prestamo' => 15000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-15000-MG-01',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 15000.00,
+            'cuota_quincenal' => 2825.00,
+            'monto_total_pagar' => 22600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 22600.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // Pagar las 8 quincenas consecutivas ($2,768.75 cada una)
+        for ($c = 1; $c <= 8; $c++) {
+            \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(($c - 1) * 15));
+            $service->simularSiguienteCorte();
+
+            $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+                'monto_abonado' => 2768.75,
+                'metodo_pago' => 'efectivo',
+            ]);
+        }
+
+        // Al corte 8: Debe mostrar las 8 filas y la fila 8/8 queda con $0 o liquidada
+        $filasCorte8 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(8, $filasCorte8, 'En el corte 8 deben verse las 8 quincenas');
+        $this->assertEquals('8/8', $filasCorte8[7]['numero_pago']);
+
+        // MOMENTO CLAVE: Avanzar a Corte 9 (+15 días del corte 8)
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(8 * 15));
+        $service->simularSiguienteCorte();
+
+        // En el corte 9 (el siguiente corte después de liquidar todo el vale), el vale DEBE DESAPARECER POR COMPLETO
+        $filasCorte9 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(0, $filasCorte9, 'En el corte 9 el vale liquidado debe desaparecer completamente de la relación');
+
+        // Avanzar a Corte 10: Sigue sin aparecer
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(9 * 15));
+        $service->simularSiguienteCorte();
+
+        $filasCorte10 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(0, $filasCorte10, 'En el corte 10 no deben existir filas sobrantes');
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    /**
+     * PRUEBA: Liquidación anticipada total en corte 2 (pagando el adeudo total restante).
+     * En el corte 2 se muestra liquidado, y en el corte 3 desaparece completamente de la relación.
+     */
+    public function test_liquidacion_anticipada_total_en_corte_dos_desaparece_en_corte_tres()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-09-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        $config = Configuracion::actual();
+        $config->update([
+            'comision_cobre' => 3.00,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'activo' => true,
+        ]);
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+        $cliente = $this->crearClienteTest('Carlos Anticipado', $distribuidora);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-5000-ANT',
+            'nombre' => 'Vale $5,000',
+            'monto_prestamo' => 5000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-5000-ANT-01',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 5000.00,
+            'cuota_quincenal' => 950.00,
+            'monto_total_pagar' => 7600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 7600.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // Corte 1: Paga quincena 1 ($931.25)
+        $service->simularSiguienteCorte();
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 931.25,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // Corte 2 (+15 días): Paga todo el saldo restante del vale (7 quincenas * $931.25 = $6,518.75)
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(15));
+        $service->simularSiguienteCorte();
+
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 6518.75,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // En corte 2 se ven 2 filas y la fila 2/8 queda liquidada (saldo <= 0)
+        $filasCorte2 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(2, $filasCorte2);
+        $this->assertLessThanOrEqual(0.00, $filasCorte2[1]['total']);
+
+        // Corte 3 (+30 días): El vale fue liquidado totalmente en el corte 2 -> DESAPARECE DE LA RELACIÓN
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(30));
+        $service->simularSiguienteCorte();
+
+        $filasCorte3 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(0, $filasCorte3, 'En el corte 3 el vale pagado anticipadamente desaparece por completo');
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    /**
+     * PRUEBA: Los puntos NO se asignan al momento de hacer el abono en caja.
+     * Se asignan EXCLUSIVAMENTE hasta que se ejecuta/procesa el corte quincenal
+     * bajo la condición de que la cuota haya sido liquidada antes del corte y sin multas.
+     */
+    public function test_puntos_no_se_otorgan_al_hacer_abono_sino_hasta_procesar_el_corte()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-09-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        $config = Configuracion::actual();
+        $config->update([
+            'comision_cobre' => 3.00,
+            'monto_base_puntos' => 1200.00,
+            'puntos_por_monto_base' => 3,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'activo' => true,
+            'puntos' => 0,
+            'multas' => 0.00,
+        ]);
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+        $cliente = $this->crearClienteTest('Distribuidora Puntos Test', $distribuidora);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-15000-PTS',
+            'nombre' => 'Vale $15,000',
+            'monto_prestamo' => 15000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-15000-PTS-01',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 15000.00,
+            'cuota_quincenal' => 2825.00,
+            'monto_total_pagar' => 22600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 22600.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // 1. Simular Corte 1 (se abre el periodo 1/8)
+        $service->simularSiguienteCorte();
+        $this->assertEquals(0, $distribuidora->puntos, 'Al abrir el corte 1 tiene 0 puntos');
+
+        // 2. La distribuidora paga su cuota 1 ($2,768.75) antes del siguiente corte
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 2768.75,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // MOMENTO CLAVE 1: Inmediatamente tras hacer el abono, los puntos NO deben asignarse todavía
+        $distribuidora->refresh();
+        $this->assertEquals(0, $distribuidora->puntos, 'El abono NO otorga puntos de inmediato antes de que se ejecute el corte');
+
+        // 3. Llega la fecha del Corte 2 (+15 días) y se procesa el corte
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(15));
+        $resCorte2 = $service->simularSiguienteCorte();
+
+        // MOMENTO CLAVE 2: AL EJECUTARSE EL CORTE, se evalúa que pagó a tiempo y se le otorgan sus 36 puntos
+        $distribuidora->refresh();
+        $this->assertEquals(36, $distribuidora->puntos, 'Al procesarse el corte, se otorgan los 36 puntos de bonificación por pago anticipado');
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    /**
+     * PRUEBA CASO USUARIO IMAGEN:
+     * 1. Se cobra el vale (entregado en ventanilla).
+     * 2. Se paga la cuota quincenal ($2,768.75) ANTES del primer corte.
+     * 3. Se ejecuta el Corte #1.
+     * RESULTADO ESPERADO:
+     * - Muestra ÚNICAMENTE 1 fila (1/8), NO dos filas (1/8 y 2/8).
+     * - Otorga los 36 puntos de bonificación por pago anticipado.
+     * - La fila 1/8 muestra saldo cubierto y el total a pagar queda en $0.00.
+     */
+    public function test_cobro_vale_pago_anticipado_y_despues_corte_muestra_solo_un_pago_y_otorga_puntos()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-09-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        $config = Configuracion::actual();
+        $config->update([
+            'comision_cobre' => 3.00,
+            'monto_base_puntos' => 1200.00,
+            'puntos_por_monto_base' => 3,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'activo' => true,
+            'puntos' => 0,
+            'multas' => 0.00,
+        ]);
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+        $cliente = $this->crearClienteTest('Maria Garcia', $distribuidora);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-15000-MG',
+            'nombre' => 'Vale $15,000',
+            'monto_prestamo' => 15000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        // 1. Cobro del vale (entregado en ventanilla)
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-15000-MG-01',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 15000.00,
+            'cuota_quincenal' => 2825.00,
+            'monto_total_pagar' => 22600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 22600.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // 2. La distribuidora paga la cuota ($2,768.75) ANTES de que se haga el primer corte
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 2768.75,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // 3. Se ejecuta el Corte #1
+        $service->simularSiguienteCorte();
+
+        // 4. Verificación de puntos otorgados al corte
+        $distribuidora->refresh();
+        $this->assertEquals(36, $distribuidora->puntos, 'Debe otorgar 36 puntos al momento de hacer el corte');
+
+        // 5. Verificación de que en el Corte #1 se genera ÚNICAMENTE 1 fila (1/8) y NO dos filas
+        $filasCorte1 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(1, $filasCorte1, 'Debe mostrar solo 1 fila (1/8) en el Corte #1');
+        $this->assertEquals('1/8', $filasCorte1[0]['numero_pago']);
+        $this->assertEquals(0.00, $filasCorte1[0]['total'], 'La fila 1/8 debe estar liquidada con total $0.00');
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    /**
+     * PRUEBA CASO USUARIO IMAGEN 2:
+     * Maria Garcia tiene 3 cortes transcurridos (1/8, 2/8, 3/8).
+     * Se asigna un nuevo vale a Probiño Macaquiño.
+     * En el siguiente corte (Corte 4):
+     * - Maria debe mostrar su corte correlativo (4/8).
+     * - Probiño debe mostrar ÚNICAMENTE su primer corte (1/8), NO dos cortes (1/8 y 2/8).
+     */
+    public function test_maria_tres_cortes_y_nuevo_vale_probino_muestra_solo_un_corte_en_el_siguiente()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-09-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        $config = Configuracion::actual();
+        $config->update([
+            'comision_cobre' => 3.00,
+            'monto_base_puntos' => 1200.00,
+            'puntos_por_monto_base' => 3,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'activo' => true,
+            'puntos' => 0,
+            'multas' => 0.00,
+        ]);
+
+        $clienteMaria = $this->crearClienteTest('Maria Garcia', $distribuidora);
+        $clienteProbino = $this->crearClienteTest('Probiño Macaquiño', $distribuidora);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-15000-MP',
+            'nombre' => 'Vale $15,000',
+            'monto_prestamo' => 15000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        // 1. Vale de Maria entregado en t = 0
+        $prestamoMaria = Prestamo::create([
+            'referencia' => 'VAL-MARIA-01',
+            'cliente_id' => $clienteMaria->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 15000.00,
+            'cuota_quincenal' => 2825.00,
+            'monto_total_pagar' => 22600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 22600.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // Simular Corte 1 (+0d)
+        $service->simularSiguienteCorte();
+
+        // Simular Corte 2 (+15d)
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(15));
+        $service->simularSiguienteCorte();
+
+        // Simular Corte 3 (+30d)
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(30));
+        $service->simularSiguienteCorte();
+
+        // En Corte 3: Maria tiene 3 cortes
+        $filasCorte3 = $service->generarFilasRelacionCobranza($distribuidora);
+        $filasMariaCorte3 = array_values(array_filter($filasCorte3, fn($f) => $f['cliente'] === 'Maria Garcia'));
+        $this->assertCount(3, $filasMariaCorte3);
+
+        // 2. Ahora, durante/después de Corte 3, se asigna y cobra un vale a Probiño Macaquiño
+        $tiempoProbino = $tiempoInicial->copy()->addDays(30)->addHours(2);
+        \Carbon\Carbon::setTestNow($tiempoProbino);
+
+        $prestamoProbino = Prestamo::create([
+            'referencia' => 'VAL-PROBINO-01',
+            'cliente_id' => $clienteProbino->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 15000.00,
+            'cuota_quincenal' => 2825.00,
+            'monto_total_pagar' => 22600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 22600.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoProbino,
+            'entregado_at' => $tiempoProbino,
+        ]);
+
+        // Antes de que corra el Corte 4, Probiño no debe tener cortes pasados
+        $filasAntesCorte4 = $service->generarFilasRelacionCobranza($distribuidora);
+        $filasProbinoAntes = array_values(array_filter($filasAntesCorte4, fn($f) => $f['cliente'] === 'Probiño Macaquiño'));
+        $this->assertCount(0, $filasProbinoAntes, 'Probiño recién cobrado no tiene cortes pasados');
+
+        // 3. Simular Corte 4 (+45d)
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(45));
+        $service->simularSiguienteCorte();
+
+        // En Corte 4: Maria tiene 4 cortes y Probiño tiene EXACTAMENTE 1 corte (1/8)
+        $filasCorte4 = $service->generarFilasRelacionCobranza($distribuidora);
+        $filasMariaCorte4 = array_values(array_filter($filasCorte4, fn($f) => $f['cliente'] === 'Maria Garcia'));
+        $filasProbinoCorte4 = array_values(array_filter($filasCorte4, fn($f) => $f['cliente'] === 'Probiño Macaquiño'));
+
+        $this->assertCount(4, $filasMariaCorte4, 'Maria debe tener 4 cortes en el Corte 4');
+        $this->assertCount(1, $filasProbinoCorte4, 'Probiño debe tener ÚNICAMENTE 1 corte (1/8) en el Corte 4');
+        $this->assertEquals('1/8', $filasProbinoCorte4[0]['numero_pago']);
+
+        \Carbon\Carbon::setTestNow();
+    }
 }
+

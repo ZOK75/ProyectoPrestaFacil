@@ -276,7 +276,7 @@ class CorteCobranzaService
                                     })
                                     ->whereNotNull('fecha_corte')
                                     ->where('fecha_corte', '<=', $ahora)
-                                    ->where('fecha_corte', '>=', $fechaInicioPrestamo->copy()->subMinutes(1))
+                                    ->where('fecha_corte', '>=', $fechaInicioPrestamo)
                                     ->count();
                             }
 
@@ -377,7 +377,7 @@ class CorteCobranzaService
 
             $tieneMultas = floatval($distribuidora->multas ?? 0.0) > 0 || floatval($relacion->multa_aplicada ?? 0.0) > 0;
 
-            if ($estaLiquidado && $relacion->estado_pago === 'pendiente') {
+            if ($estaLiquidado) {
                 $relacion->estado_pago = ($esPagoAntesDelCorte && !$tieneMultas) ? 'pago_anticipado' : 'pago_a_tiempo';
                 $relacion->liquidado_at = $ahora;
             }
@@ -452,11 +452,11 @@ class CorteCobranzaService
                 // 1. Verificar si la distribuidora ya liquidó el corte previo que se está cerrando
                 $relacionPrevia = RelacionCobranza::where('distribuidora_id', $dist->id)
                     ->whereNotNull('fecha_corte')
-                    ->where('fecha_corte', '<', $ahora)
+                    ->where('fecha_corte', '<=', $ahora)
                     ->latest('fecha_corte')
                     ->first();
 
-                $fueLiquidadoCortePrevio = ($relacionPrevia && ($relacionPrevia->adeudo_pendiente <= 0 || floor(floatval($relacionPrevia->monto_pagado)) >= floor(floatval($relacionPrevia->monto_total_periodo)) || abs(floatval($relacionPrevia->monto_pagado) - floatval($relacionPrevia->monto_total_periodo)) < 0.99) && in_array($relacionPrevia->estado_pago, ['pago_anticipado', 'pago_a_tiempo', 'liquidado']));
+                $fueLiquidadoCortePrevio = ($relacionPrevia && ($relacionPrevia->adeudo_pendiente <= 0 || floor(floatval($relacionPrevia->monto_pagado)) >= floor(floatval($relacionPrevia->monto_total_periodo)) || abs(floatval($relacionPrevia->monto_pagado) - floatval($relacionPrevia->monto_total_periodo)) < 0.99));
 
                 $multaTotalEsteCiclo = 0.0;
 
@@ -1010,19 +1010,25 @@ class CorteCobranzaService
                             $adeudoArrastre = $cuotaBrutaFila;
                         }
                     } else {
-                        $exigibleCorte = $adeudoArrastre + $cuotaNetaFila + $recargosFila;
+                        $exigibleCorte = ($adeudoArrastre > 0) ? ($adeudoArrastre + $cuotaNetaFila + $recargosFila) : ($cuotaNetaFila + $recargosFila);
                         $pagoIgualado = ($abonoEsteCorte > 0 && $exigibleCorte > 0) && (floor($abonoEsteCorte) === floor($exigibleCorte) || abs($abonoEsteCorte - $exigibleCorte) < 0.99);
                         if ($pagoIgualado) {
-                            $totalFila = ($adeudoArrastre == 0) ? $cuotaNetaFila : 0.00;
+                            $totalFila = ($adeudoArrastre <= 0) ? $cuotaNetaFila : 0.00;
                             $adeudoArrastre = 0.00;
                         } elseif (floor($abonoEsteCorte) > floor($exigibleCorte) && $exigibleCorte > 0) {
                             $excedente = floor($abonoEsteCorte) - floor($exigibleCorte);
                             $totalFila = -$excedente;
                             $adeudoArrastre = -$excedente;
                         } elseif ($abonoEsteCorte > 0) {
-                            $faltante = max(0.0, round($exigibleCorte - $abonoEsteCorte, 2));
-                            $totalFila = $faltante;
-                            $adeudoArrastre = $faltante + $comisionFila;
+                            if ($adeudoArrastre > 0 && $abonoEsteCorte >= ($adeudoArrastre + $recargosFila)) {
+                                $excedente = round($abonoEsteCorte - ($adeudoArrastre + $recargosFila), 2);
+                                $totalFila = -$excedente;
+                                $adeudoArrastre = -$excedente;
+                            } else {
+                                $faltante = max(0.0, round($exigibleCorte - $abonoEsteCorte, 2));
+                                $totalFila = $faltante;
+                                $adeudoArrastre = $faltante + $comisionFila;
+                            }
                         } else {
                             $totalFila = $exigibleCorte;
                             // Al vencerse sin pagar, se pierde el beneficio de comision en el arrastre
@@ -1040,12 +1046,19 @@ class CorteCobranzaService
                         if ($recargosFila <= 0) {
                             $recargosFila = 300.00;
                         }
+                    } else {
+                        $recargosFila = 0.00;
                     }
 
                     if ($corteNum === 1) {
                         $exigibleCorte = $cuotaNetaFila;
                     } else {
-                        $exigibleCorte = $adeudoArrastre + $cuotaNetaFila + $recargosFila;
+                        if ($adeudoArrastre > 0) {
+                            $exigibleCorte = $adeudoArrastre + $cuotaNetaFila + $recargosFila;
+                        } else {
+                            // Saldo al corriente o con saldo a favor arrastrado de cortes previos
+                            $exigibleCorte = max(0.0, round($cuotaNetaFila + $adeudoArrastre, 2));
+                        }
                     }
 
                     $pagoIgualado = ($abonoEsteCorte > 0 && $exigibleCorte > 0) && (floor($abonoEsteCorte) === floor($exigibleCorte) || abs($abonoEsteCorte - $exigibleCorte) < 0.99);
@@ -1058,9 +1071,15 @@ class CorteCobranzaService
                         $totalFila = -$excedente;
                         $adeudoArrastre = -$excedente;
                     } elseif ($abonoEsteCorte > 0) {
-                        $diferencia = round($exigibleCorte - $abonoEsteCorte, 2);
-                        $totalFila = $diferencia;
-                        $adeudoArrastre = $diferencia;
+                        if ($adeudoArrastre > 0 && $abonoEsteCorte >= ($adeudoArrastre + $recargosFila)) {
+                            $excedente = round($abonoEsteCorte - ($adeudoArrastre + $recargosFila), 2);
+                            $totalFila = -$excedente;
+                            $adeudoArrastre = -$excedente;
+                        } else {
+                            $diferencia = round($exigibleCorte - $abonoEsteCorte, 2);
+                            $totalFila = $diferencia;
+                            $adeudoArrastre = $diferencia;
+                        }
                     } else {
                         $totalFila = $exigibleCorte;
                         $adeudoArrastre = $exigibleCorte;

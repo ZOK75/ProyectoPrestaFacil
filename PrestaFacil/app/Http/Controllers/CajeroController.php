@@ -547,7 +547,7 @@ class CajeroController extends Controller
             if ($distribuidora && $fechaInicioPrestamo) {
                 $cortesPosteriores = \App\Models\RelacionCobranza::where('distribuidora_id', $distribuidora->id)
                     ->whereNotNull('fecha_corte')
-                    ->where('fecha_corte', '>=', $fechaInicioPrestamo->copy()->subMinutes(1))
+                    ->where('fecha_corte', '>=', $fechaInicioPrestamo)
                     ->count();
             }
             $totalQuincenasPrestamo = intval($prestamo->pagos_totales ?: ($prestamo->productoVale?->plazo_quincenas ?: 8));

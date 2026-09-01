@@ -277,8 +277,11 @@ class User extends Authenticatable
     }
 
     /**
-     * Calcula el monto de crédito de vales en estado 'activo' o 'pendiente' que tiene ocupados el distribuidor.
-     * Al asignar un vale, se descuenta de inmediato del crédito disponible de la distribuidora.
+     * Calcula el monto de crédito ocupado actualmente por los vales de la distribuidora.
+     * Al asignar un vale, se descuenta de inmediato el monto prestado.
+     * Conforme se pagan las cuotas quincenales (a tiempo, anticipadas o con retraso),
+     * la distribuidora recupera el capital proporcional (monto_prestamo / plazo_quincenas)
+     * en su línea de crédito disponible.
      */
     public function creditoUtilizado(): float
     {
@@ -286,9 +289,51 @@ class User extends Authenticatable
             return 0.0;
         }
 
-        return floatval(Prestamo::where('created_by_user_id', $this->id)
+        $prestamos = Prestamo::where('created_by_user_id', $this->id)
             ->whereIn('estado', ['activo', 'pendiente'])
-            ->sum('monto_prestamo'));
+            ->with(['pagos', 'productoVale'])
+            ->get();
+
+        $porcentajeComision = floatval($this->obtenerPorcentajeGanancia() ?? 0.0);
+        $totalCreditoOcupado = 0.0;
+
+        foreach ($prestamos as $p) {
+            $montoPrestamo = floatval($p->monto_prestamo);
+            $totalQuincenas = max(1, intval($p->pagos_totales ?: ($p->productoVale?->plazo_quincenas ?: 8)));
+
+            // Préstamo finalizado o pagado por completo: 0 crédito ocupado
+            if ($p->estaPagado() || $p->estado === 'finalizado') {
+                continue;
+            }
+
+            // Préstamo pendiente de entrega en ventanilla: ocupa el 100% de su capital
+            if ($p->estado === 'pendiente') {
+                $totalCreditoOcupado += $montoPrestamo;
+                continue;
+            }
+
+            // Para préstamos activos: calcular capital amortizado / recuperado
+            $cuotaBruta = floatval($p->cuota_quincenal ?: ($montoPrestamo / $totalQuincenas));
+            $comisionQuincenal = (($porcentajeComision / 100) * $montoPrestamo) / $totalQuincenas;
+            $cuotaNeta = max(0.01, $cuotaBruta - $comisionQuincenal);
+
+            $totalAbonado = floatval($p->pagos->sum('monto_abonado'));
+            $totalNetoExigible = $cuotaNeta * $totalQuincenas;
+
+            if ($totalAbonado >= ($totalNetoExigible - 0.99)) {
+                // Préstamo cubierto por completo
+                continue;
+            }
+
+            // Capital amortizado proporcional a los pagos realizados
+            $porcentajeAmortizado = min(1.0, max(0.0, $totalAbonado / $totalNetoExigible));
+            $capitalRecuperado = round($porcentajeAmortizado * $montoPrestamo, 2);
+            $capitalPendiente = max(0.0, $montoPrestamo - $capitalRecuperado);
+
+            $totalCreditoOcupado += $capitalPendiente;
+        }
+
+        return round($totalCreditoOcupado, 2);
     }
 
     /**

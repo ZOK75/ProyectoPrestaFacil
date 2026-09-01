@@ -4424,5 +4424,224 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
 
         \Carbon\Carbon::setTestNow();
     }
+
+    /**
+     * PRUEBA: Recuperación progresiva del crédito disponible conforme se pagan las quincenas del vale.
+     * Fórmula: monto_prestamo / total_quincenas se reintegra al crédito disponible con cada pago quincenal cubierto.
+     * Si el pago se atrasa y se liquida posteriormente, también recupera su porción correspondiente de crédito.
+     */
+    public function test_recuperacion_proporcional_de_credito_por_quincena_pagada()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-09-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        $config = Configuracion::actual();
+        $config->update([
+            'comision_cobre' => 3.00,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'limite_credito' => 200000.00,
+            'activo' => true,
+            'puntos' => 0,
+            'multas' => 0.00,
+        ]);
+
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+
+        $cliente = $this->crearClienteTest('Cliente Credito Progresivo', $distribuidora);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-15000-CRED',
+            'nombre' => 'Vale $15,000',
+            'monto_prestamo' => 15000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        // 1. Asignar y entregar el vale de $15,000 (8 quincenas)
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-CRED-01',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 15000.00,
+            'cuota_quincenal' => 2825.00,
+            'monto_total_pagar' => 22600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 22600.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        // Al inicio (sin pagos): Crédito Ocupado = $15,000, Crédito Disponible = $185,000 ($200,000 - $15,000)
+        $this->assertEquals(15000.00, $distribuidora->creditoUtilizado());
+        $this->assertEquals(185000.00, $distribuidora->creditoDisponible());
+
+        // 2. Pago de Quincena 1 ($2,768.75)
+        // Capital a recuperar: 15,000 / 8 = $1,875.00
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 2768.75,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        $this->assertEquals(13125.00, $distribuidora->creditoUtilizado());
+        $this->assertEquals(186875.00, $distribuidora->creditoDisponible(), 'Debe recuperar $1,875 de crédito tras pagar quincena 1');
+
+        // 3. Pago de Quincena 2 ($2,768.75)
+        // Total acumulado pagado: $5,537.50 (2/8) -> Capital recuperado acumulado: $3,750.00
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 2768.75,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        $this->assertEquals(11250.00, $distribuidora->creditoUtilizado());
+        $this->assertEquals(188750.00, $distribuidora->creditoDisponible(), 'Debe recuperar $3,750 de crédito acumulado tras pagar quincena 2');
+
+        // 4. Pago con retraso en quincena 3: se paga la cuota quincenal correspondiente
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 2768.75,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // 3 quincenas cubiertas: capital recuperado $5,625.00 -> disponible $190,625.00
+        $this->assertEquals(9375.00, $distribuidora->creditoUtilizado());
+        $this->assertEquals(190625.00, $distribuidora->creditoDisponible(), 'Al liquidarse con retraso también recupera su capital equivalente');
+
+        // 5. Liquidación restante (5 quincenas restantes: 5 * 2768.75 = $13,843.75)
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 13843.75,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // Totalmente pagado: Crédito Ocupado = $0.00, Crédito Disponible = $200,000.00
+        \Carbon\Carbon::setTestNow();
+    }
+
+    /**
+     * PRUEBA CASO USUARIO: Pago con retraso en Corte 2 ($3,127.50 cubriendo $3,125/$3,126.75 con excedente).
+     * En Corte 3:
+     * - NO debe aplicar nueva multa moratoria en Corte 3 (recargos = $0.00).
+     * - Debe descontar el excedente pagado en Corte 2 de la cuota exigible en Corte 3.
+     */
+    public function test_pago_con_multa_en_corte_dos_liquida_fila_y_en_corte_tres_no_aplica_multa_y_descuenta_excedente()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-09-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        $config = Configuracion::actual();
+        $config->update([
+            'comision_cobre' => 3.00,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'limite_credito' => 200000.00,
+            'activo' => true,
+            'puntos' => 0,
+            'multas' => 0.00,
+        ]);
+
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+
+        $cliente = $this->crearClienteTest('Maria Garcia', $distribuidora);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-15000-MP',
+            'nombre' => 'Vale $15,000',
+            'monto_prestamo' => 15000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-MARIA-EXC',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 15000.00,
+            'cuota_quincenal' => 2825.00,
+            'monto_total_pagar' => 22600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 22600.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // 1. Simular Corte 1 (sin pagar)
+        $service->simularSiguienteCorte();
+
+        // 2. Simular Corte 2 (+15d): Al no pagar Corte 1, se aplica multa de $300
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(15));
+        $service->simularSiguienteCorte();
+
+        $prestamo->refresh();
+        $this->assertEquals(300.00, $prestamo->multas, 'Debe tener $300 de multa aplicada en Corte 2');
+
+        // 3. En Corte 2, la distribuidora paga $3,127.50
+        // Monto exigible de Fila 2: Cuota Bruta $2,825 + Multa $300 = $3,125.00 (Excedente = $2.50)
+        $response = $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 3127.50,
+            'metodo_pago' => 'efectivo',
+        ]);
+        $response->assertSessionHasNoErrors();
+
+        $prestamo->refresh();
+        $this->assertEquals(0.00, $prestamo->multas, 'La multa del vale se liquida a $0 tras el pago');
+
+        // 4. Simular Corte 3 (+30d)
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(30));
+        $resCorte3 = $service->simularSiguienteCorte();
+
+        // En Corte 3: NO debe aplicarse nueva multa porque el ciclo anterior fue liquidado
+        $this->assertEquals(0, $resCorte3['multas_aplicadas'], 'No deben aplicarse multas en Corte 3');
+
+        $filasCorte3 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(3, $filasCorte3);
+
+        // Fila 3 (Corte 3 actual):
+        $fila3 = $filasCorte3[2];
+        $this->assertEquals('3/8', $fila3['numero_pago']);
+        $this->assertEquals(0.00, $fila3['recargos'], 'La Fila 3 no debe tener recargos ($0.00)');
+        // Cuota neta ($2,768.75) - Excedente ($2.50) = $2,766.25
+        $this->assertEquals(2766.25, $fila3['total'], 'La Fila 3 debe restar el excedente de $2.50 de la cuota neta ($2,768.75 - $2.50 = $2,766.25)');
+
+        \Carbon\Carbon::setTestNow();
+    }
 }
 

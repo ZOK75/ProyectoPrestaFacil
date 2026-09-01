@@ -2725,7 +2725,7 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $numCortesAtrasados = max(0, count($filasP) - 1);
         $comisionPorQuincena = count($filasP) > 0 ? ($comisionVale / count($filasP)) : 0;
         $comisionesPerdidas = ($numCortesAtrasados > 0 && $multaPrestamo > 0) ? ($numCortesAtrasados * $comisionPorQuincena) : 0.0;
-        $totalSaldoPendiente = floatval($prestamo->adeudo_pendiente) + $multaPrestamo + $comisionesPerdidas;
+        $totalSaldoPendiente = floatval($prestamo->adeudo_pendiente) + max(floatval($prestamo->multas ?? 0), $multaPrestamo) + $comisionesPerdidas;
 
         // El cajero abona el totalSaldoPendiente completo
         $response = $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
@@ -4640,6 +4640,125 @@ class DistribuidorCortesAbonosConciliacionTest extends TestCase
         $this->assertEquals(0.00, $fila3['recargos'], 'La Fila 3 no debe tener recargos ($0.00)');
         // Cuota neta ($2,768.75) - Excedente ($2.50) = $2,766.25
         $this->assertEquals(2766.25, $fila3['total'], 'La Fila 3 debe restar el excedente de $2.50 de la cuota neta ($2,768.75 - $2.50 = $2,766.25)');
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    /**
+     * PRUEBA CASO USUARIO IMAGEN 3:
+     * En Corte 2 hay un excedente de $1.00 (Fila 2/8 muestra -$1.00).
+     * En Corte 3, la Fila 3/8 descuenta el $1.00 ($2,768.75 - $1.00 = $2,767.75).
+     * Tras pagar los $2,767.75 en Corte 3 y avanzar a Corte 4:
+     * - Fila 3/8 queda liquidada.
+     * - Fila 4/8 entra al corriente ($2,768.75 con $0 recargos).
+     */
+    public function test_abono_excedente_en_corte_dos_se_descuenta_en_corte_tres_y_no_se_pierde_en_corte_cuatro()
+    {
+        $tiempoInicial = \Carbon\Carbon::parse('2026-09-01 10:00:00');
+        \Carbon\Carbon::setTestNow($tiempoInicial);
+
+        $config = Configuracion::actual();
+        $config->update([
+            'comision_cobre' => 3.00,
+        ]);
+
+        $distribuidora = User::factory()->create([
+            'rol_id' => $this->rolDistribuidor->id,
+            'sucursal_id' => $this->sucursal->id,
+            'categoria_distribuidor' => 'Cobre',
+            'limite_credito' => 200000.00,
+            'activo' => true,
+            'puntos' => 0,
+            'multas' => 0.00,
+        ]);
+
+        $cajero = User::factory()->create([
+            'rol_id' => $this->rolCajero->id,
+            'sucursal_id' => $this->sucursal->id,
+            'activo' => true,
+        ]);
+
+        $cliente = $this->crearClienteTest('Probiño Macaquiño', $distribuidora);
+
+        $productoVale = ProductoVale::create([
+            'clave' => 'VALE-15000-PROB',
+            'nombre' => 'Vale $15,000',
+            'monto_prestamo' => 15000.00,
+            'costo_seguro' => 100.00,
+            'comision_apertura' => 10.00,
+            'tasa_interes_quincenal' => 5.00,
+            'plazo_quincenas' => 8,
+            'multa' => 300.00,
+            'activo' => true,
+        ]);
+
+        $prestamo = Prestamo::create([
+            'referencia' => 'VAL-PROB-EXC',
+            'cliente_id' => $cliente->id,
+            'producto_vale_id' => $productoVale->id,
+            'created_by_user_id' => $distribuidora->id,
+            'tipo' => 'vale',
+            'monto_prestamo' => 15000.00,
+            'cuota_quincenal' => 2825.00,
+            'monto_total_pagar' => 22600.00,
+            'pagos_totales' => 8,
+            'pagos_realizados' => 0,
+            'pagos_recibidos' => 0.00,
+            'adeudo_pendiente' => 22600.00,
+            'multas' => 0.00,
+            'estado' => 'activo',
+            'estado_entrega' => 'entregado',
+            'created_at' => $tiempoInicial,
+            'entregado_at' => $tiempoInicial,
+        ]);
+
+        $service = app(CorteCobranzaService::class);
+
+        // 1. Corte 1 (+0d): Pago regular de $2,768.75
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 2768.75,
+            'metodo_pago' => 'efectivo',
+        ]);
+        $service->simularSiguienteCorte();
+
+        // 2. Corte 2 (+15d): Pago excedente de $1.00 ($2,769.75)
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(15));
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 2769.75,
+            'metodo_pago' => 'efectivo',
+        ]);
+        $service->simularSiguienteCorte();
+
+        // 3. Corte 3 (+30d): Se simula Corte 3
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(30));
+        $service->simularSiguienteCorte();
+
+        $filasCorte3 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(3, $filasCorte3);
+
+        // Fila 2/8 muestra saldo a favor -$1.00
+        $this->assertEquals(-1.00, $filasCorte3[1]['total']);
+        // Fila 3/8 descuenta el $1.00 de la cuota neta ($2,768.75 - $1.00 = $2,767.75)
+        $this->assertEquals(2767.75, $filasCorte3[2]['total'], 'Corte 3 debe descontar el $1.00 de saldo a favor');
+        $this->assertEquals(0.00, $filasCorte3[2]['recargos']);
+
+        // Se paga la cuota de Corte 3 con el descuento aplicado ($2,767.75)
+        $this->actingAs($cajero)->post(route('cajero.abonos.store', $prestamo), [
+            'monto_abonado' => 2767.75,
+            'metodo_pago' => 'efectivo',
+        ]);
+
+        // 4. Corte 4 (+45d): Se simula Corte 4
+        \Carbon\Carbon::setTestNow($tiempoInicial->copy()->addDays(45));
+        $service->simularSiguienteCorte();
+
+        $filasCorte4 = $service->generarFilasRelacionCobranza($distribuidora);
+        $this->assertCount(4, $filasCorte4);
+
+        $this->assertEquals(2767.75, $filasCorte4[2]['total'], 'Fila 3/8 pagada con descuento muestra su cuota neta descontada ($2,767.75)');
+        $this->assertEquals('4/8', $filasCorte4[3]['numero_pago']);
+        $this->assertEquals(0.00, $filasCorte4[3]['recargos'], 'Fila 4/8 entra sin multas ($0.00)');
+        $this->assertEquals(2768.75, $filasCorte4[3]['total'], 'Fila 4/8 entra al corriente con su cuota neta');
 
         \Carbon\Carbon::setTestNow();
     }

@@ -621,7 +621,15 @@ class CorteCobranzaService
                     'corte_notificado_at' => $ahora,
                 ];
 
-                RelacionCobranza::create($datosCorte);
+                $relacionMismaFecha = RelacionCobranza::where('distribuidora_id', $dist->id)
+                    ->where('fecha_corte', $fechaCorteProcesada)
+                    ->first();
+
+                if ($relacionMismaFecha) {
+                    $relacionMismaFecha->update($datosCorte);
+                } else {
+                    RelacionCobranza::create($datosCorte);
+                }
 
                 if ($multaTotalEsteCiclo > 0) {
                     NotificacionCajero::create([
@@ -1010,10 +1018,15 @@ class CorteCobranzaService
                             $adeudoArrastre = $cuotaBrutaFila;
                         }
                     } else {
-                        $exigibleCorte = ($adeudoArrastre > 0) ? ($adeudoArrastre + $cuotaNetaFila + $recargosFila) : ($cuotaNetaFila + $recargosFila);
+                        if ($adeudoArrastre > 0) {
+                            $exigibleCorte = $adeudoArrastre + $cuotaNetaFila + $recargosFila;
+                        } else {
+                            $exigibleCorte = max(0.0, round($cuotaNetaFila + $adeudoArrastre, 2));
+                        }
+
                         $pagoIgualado = ($abonoEsteCorte > 0 && $exigibleCorte > 0) && (floor($abonoEsteCorte) === floor($exigibleCorte) || abs($abonoEsteCorte - $exigibleCorte) < 0.99);
                         if ($pagoIgualado) {
-                            $totalFila = ($adeudoArrastre <= 0) ? $cuotaNetaFila : 0.00;
+                            $totalFila = ($adeudoArrastre <= 0) ? $exigibleCorte : 0.00;
                             $adeudoArrastre = 0.00;
                         } elseif (floor($abonoEsteCorte) > floor($exigibleCorte) && $exigibleCorte > 0) {
                             $excedente = floor($abonoEsteCorte) - floor($exigibleCorte);
@@ -1031,8 +1044,11 @@ class CorteCobranzaService
                             }
                         } else {
                             $totalFila = $exigibleCorte;
-                            // Al vencerse sin pagar, se pierde el beneficio de comision en el arrastre
-                            $adeudoArrastre = $exigibleCorte + $comisionFila;
+                            if ($adeudoArrastre < 0) {
+                                $adeudoArrastre = max(0.0, round($cuotaBrutaFila + $adeudoArrastre, 2));
+                            } else {
+                                $adeudoArrastre = $exigibleCorte + $comisionFila;
+                            }
                         }
                     }
                 } else {

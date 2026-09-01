@@ -159,7 +159,7 @@
         </div>
 
         <!-- Botones de Acción Móvil -->
-        @if($cliente->activo)
+        @if($cliente->activo && !auth()->user()->esAdministrador())
             <div class="flex items-center gap-2 pt-2 border-t border-slate-800">
                 <a href="{{ route('clientes.edit', $cliente) }}" class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold text-center shadow transition">
                     Editar Datos
